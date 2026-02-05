@@ -1,0 +1,58 @@
+{
+  "end_goal": "Uncover the source of the Eclipse Signal and shut it down.",
+  "acts": [
+    {
+      "id": "act_1",
+      "name": "Act I - The Signal Emerges",
+      "beats": [
+        {
+          "id": "a1_b1",
+          "label": "First proof the signal is real",
+          "required_flags": [],
+          "unlock_flags": ["signal_confirmed"]
+        },
+        {
+          "id": "a1_b2",
+          "label": "Find a lead on the signal source",
+          "required_flags": ["signal_confirmed"],
+          "unlock_flags": ["lead_found"]
+        },
+        {
+          "id": "a1_b3",
+          "label": "Reach the lead location",
+          "required_flags": ["lead_found"],
+          "unlock_flags": ["lead_location_reached"]
+        }
+      ]
+    },
+    {
+      "id": "act_2",
+      "name": "Act II - The Source Revealed",
+      "beats": [
+        {
+          "id": "a2_b1",
+          "label": "Discover the signal generator",
+          "required_flags": ["lead_location_reached"],
+          "unlock_flags": ["generator_found"]
+        },
+        {
+          "id": "a2_b2",
+          "label": "Gain access to the generator core",
+          "required_flags": ["generator_found"],
+          "unlock_flags": ["core_access"]
+        },
+        {
+          "id": "a2_b3",
+          "label": "Disable the signal",
+          "required_flags": ["core_access"],
+          "unlock_flags": ["signal_disabled"]
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "beats_per_act": 3,
+    "min_beats_before_act_change": 2,
+    "max_beats_per_turn": 1
+  }
+}

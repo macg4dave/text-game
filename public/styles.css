@@ -1,0 +1,119 @@
+:root {
+  --ink: #121016;
+  --mist: #f3f0ea;
+  --accent: #f2a365;
+  --accent-2: #3e5c76;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #fff3e0, #e8e4dc);
+  color: var(--ink);
+}
+
+.shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+header h1 {
+  font-size: 2.6rem;
+  margin: 0 0 8px;
+}
+
+header p {
+  margin: 0 0 24px;
+  color: #4f4a57;
+}
+
+.log {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  min-height: 320px;
+  box-shadow: 0 10px 30px rgba(20, 16, 25, 0.08);
+  overflow-y: auto;
+}
+
+.log .entry {
+  margin-bottom: 16px;
+}
+
+.log .entry strong {
+  display: block;
+  color: var(--accent-2);
+  margin-bottom: 4px;
+}
+
+.input {
+  display: grid;
+  grid-template-columns: 140px 1fr 120px;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.input input,
+.input button {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #d8d2c8;
+  font-size: 1rem;
+}
+
+.input button {
+  background: var(--accent);
+  border: none;
+  color: #1c0f05;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.options {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.options button {
+  border-radius: 999px;
+  border: 1px solid #c4bcb2;
+  background: #fff;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.assist {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.assist .chip {
+  border-radius: 999px;
+  border: 1px solid #d0c6bb;
+  background: #fff7ef;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.assist .label {
+  font-weight: 600;
+  color: #5e4a3a;
+  padding-right: 6px;
+}
+
+@media (max-width: 720px) {
+  .input {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Eclipse Signal</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <h1>Eclipse Signal</h1>
+        <p>Text adventure with a guided end-goal.</p>
+      </header>
+      <section class="log" id="log"></section>
+      <form class="input" id="input-form">
+        <input id="player-name" placeholder="Name" />
+        <input id="player-input" placeholder="What do you do?" autocomplete="off" required />
+        <button type="submit">Send</button>
+      </form>
+      <section class="assist" id="assist"></section>
+      <section class="options" id="options"></section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

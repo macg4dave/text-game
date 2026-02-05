@@ -1,0 +1,124 @@
+export function validateDirectorSpec(spec) {
+  const errors = [];
+  if (!spec || typeof spec !== "object") {
+    errors.push("Spec must be an object.");
+    return { ok: false, errors };
+  }
+
+  if (!spec.end_goal || typeof spec.end_goal !== "string") {
+    errors.push("Spec must include end_goal (string)." );
+  }
+
+  if (!Array.isArray(spec.acts) || !spec.acts.length) {
+    errors.push("Spec must include non-empty acts array.");
+  }
+
+  const beatIds = new Set();
+  const flagIndex = new Set();
+
+  (spec.acts || []).forEach((act, actIndex) => {
+    if (!act.id || typeof act.id !== "string") {
+      errors.push(`Act ${actIndex} missing id.`);
+    }
+    if (!act.name || typeof act.name !== "string") {
+      errors.push(`Act ${actIndex} missing name.`);
+    }
+    if (!Array.isArray(act.beats) || !act.beats.length) {
+      errors.push(`Act ${actIndex} must include beats.`);
+      return;
+    }
+
+    act.beats.forEach((beat, beatIndex) => {
+      if (!beat.id || typeof beat.id !== "string") {
+        errors.push(`Beat ${actIndex}.${beatIndex} missing id.`);
+      } else if (beatIds.has(beat.id)) {
+        errors.push(`Duplicate beat id: ${beat.id}`);
+      } else {
+        beatIds.add(beat.id);
+      }
+
+      if (!beat.label || typeof beat.label !== "string") {
+        errors.push(`Beat ${actIndex}.${beatIndex} missing label.`);
+      }
+
+      if (beat.required_flags && !Array.isArray(beat.required_flags)) {
+        errors.push(`Beat ${beat.id} required_flags must be array.`);
+      }
+
+      if (beat.unlock_flags && !Array.isArray(beat.unlock_flags)) {
+        errors.push(`Beat ${beat.id} unlock_flags must be array.`);
+      }
+
+      (beat.unlock_flags || []).forEach((flag) => flagIndex.add(flag));
+    });
+  });
+
+  return { ok: errors.length === 0, errors, beatIds: Array.from(beatIds), flags: Array.from(flagIndex) };
+}
+
+export function validateStateUpdates(updates) {
+  const errors = [];
+  if (!updates || typeof updates !== "object") {
+    errors.push("state_updates must be an object.");
+    return { ok: false, errors };
+  }
+
+  const listFields = ["inventory_add", "inventory_remove", "flags_add", "flags_remove"];
+  listFields.forEach((field) => {
+    if (!Array.isArray(updates[field])) {
+      errors.push(`state_updates.${field} must be array.`);
+    }
+  });
+
+  if (!Array.isArray(updates.quests)) {
+    errors.push("state_updates.quests must be array.");
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateQuestSpec(spec) {
+  const errors = [];
+  if (!spec || typeof spec !== "object") {
+    errors.push("Quest spec must be an object.");
+    return { ok: false, errors };
+  }
+  if (!Array.isArray(spec.quests)) {
+    errors.push("Quest spec must include quests array.");
+    return { ok: false, errors };
+  }
+  const questIds = new Set();
+  spec.quests.forEach((quest, idx) => {
+    if (!quest.id || typeof quest.id !== "string") {
+      errors.push(`Quest ${idx} missing id.`);
+      return;
+    }
+    if (questIds.has(quest.id)) {
+      errors.push(`Duplicate quest id: ${quest.id}`);
+    }
+    questIds.add(quest.id);
+
+    if (!quest.title || typeof quest.title !== "string") {
+      errors.push(`Quest ${quest.id} missing title.`);
+    }
+    if (!Array.isArray(quest.stages) || !quest.stages.length) {
+      errors.push(`Quest ${quest.id} must include stages.`);
+    }
+
+    (quest.stages || []).forEach((stage, stageIndex) => {
+      if (!stage.id || typeof stage.id !== "string") {
+        errors.push(`Quest ${quest.id} stage ${stageIndex} missing id.`);
+      }
+      if (!stage.label || typeof stage.label !== "string") {
+        errors.push(`Quest ${quest.id} stage ${stageIndex} missing label.`);
+      }
+      if (stage.required_flags && !Array.isArray(stage.required_flags)) {
+        errors.push(`Quest ${quest.id} stage ${stage.id} required_flags must be array.`);
+      }
+      if (stage.unlock_flags && !Array.isArray(stage.unlock_flags)) {
+        errors.push(`Quest ${quest.id} stage ${stage.id} unlock_flags must be array.`);
+      }
+    });
+  });
+  return { ok: errors.length === 0, errors };
+}

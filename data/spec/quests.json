@@ -1,0 +1,28 @@
+{
+  "quests": [
+    {
+      "id": "signal_investigation",
+      "title": "Echoes of the Eclipse",
+      "summary": "Trace the origin of the Eclipse Signal.",
+      "stages": [
+        {
+          "id": "q1_stage1",
+          "label": "Confirm the signal is real",
+          "unlock_flags": ["signal_confirmed"]
+        },
+        {
+          "id": "q1_stage2",
+          "label": "Locate the source",
+          "required_flags": ["signal_confirmed"],
+          "unlock_flags": ["lead_found"]
+        },
+        {
+          "id": "q1_stage3",
+          "label": "Reach the source",
+          "required_flags": ["lead_found"],
+          "unlock_flags": ["lead_location_reached"]
+        }
+      ]
+    }
+  ]
+}
