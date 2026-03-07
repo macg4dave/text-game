@@ -1,6 +1,15 @@
 import OpenAI from "openai";
+import { config } from "./config.js";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const clientOptions = {
+  apiKey: config.ai.apiKey
+};
+
+if (config.ai.baseUrl) {
+  clientOptions.baseURL = config.ai.baseUrl;
+}
+
+const client = new OpenAI(clientOptions);
 
 const RESPONSE_SCHEMA = {
   name: "game_turn",
@@ -61,31 +70,40 @@ const RESPONSE_SCHEMA = {
 };
 
 export async function generateTurn({ model, systemPrompt, statePack, shortHistory, memories, input }) {
-  const response = await client.responses.create({
+  const promptSections = [
+    `STATE_PACK\n${JSON.stringify(statePack)}`,
+    `SHORT_HISTORY\n${shortHistory.join("\n")}`,
+    `MEMORIES\n${memories.join("\n")}`,
+    `PLAYER_INPUT\n${input}`
+  ].join("\n\n");
+
+  const response = await client.chat.completions.create({
     model,
     temperature: 0.8,
     response_format: {
       type: "json_schema",
       json_schema: RESPONSE_SCHEMA
     },
-    input: [
+    messages: [
       {
         role: "system",
         content: systemPrompt
       },
       {
         role: "user",
-        content: [
-          { type: "input_text", text: `STATE_PACK\n${JSON.stringify(statePack)}` },
-          { type: "input_text", text: `SHORT_HISTORY\n${shortHistory.join("\n")}` },
-          { type: "input_text", text: `MEMORIES\n${memories.join("\n")}` },
-          { type: "input_text", text: `PLAYER_INPUT\n${input}` }
-        ]
+        content: promptSections
       }
     ]
   });
 
-  const outputText = response.output_text?.trim() || "{}";
+  const messageContent = response.choices?.[0]?.message?.content;
+  const outputText = Array.isArray(messageContent)
+    ? messageContent
+        .map((part) => (typeof part === "string" ? part : part?.text || ""))
+        .join("")
+        .trim()
+    : messageContent?.trim?.() || "{}";
+
   return JSON.parse(outputText);
 }
 

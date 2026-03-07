@@ -1,203 +1,82 @@
 # Copilot Instructions for Text Game
 
-## Project Overview
-A portable, text-based adventure game powered by the OpenAI API. Players direct the story freely while a director layer nudges narrative toward a defined end goal. The system prioritizes token efficiency and state management. **This is a milestone-driven project with 4 key phases.**
+## Purpose
 
-## Milestone Structure
-```
-M1 - Core Loop (Target: Feb 2026) - IN PROGRESS
-M2 - Memory + Director Layer (Target: Feb 2026)
-M3 - Quest + World State Tools (Target: Mar 2026)
-M4 - UX Polish + Portability (Target: Mar 2026)
-```
+This repository is intended to be built primarily with AI coding agents. Treat the planning docs as an execution system, not just documentation.
 
-**Current Focus**: M1 Core Loop (state, API, director) and M2 Memory (embeddings + retrieval)
+## Required Reading Order
 
-### Priority Levels
-- **P1**: Core loop, state, director steering, stable JSON outputs
-- **P2**: Memory retrieval, quest tooling, safety rails
-- **P3**: Save/load, export, polish, accessibility
-- **P4**: Desktop packaging and distribution
+Before making substantial changes, read:
 
-## Tech Stack
-- **Backend**: Node.js + Express (src/server.js)
-- **Database**: SQLite (better-sqlite3)
-- **AI**: OpenAI API with JSON schema structured responses
-- **Frontend**: HTML/CSS/JavaScript (public/)
-- **Key Dependencies**: openai, express, better-sqlite3, dotenv
+1. [ROADMAP.md](/g:/text-game/ROADMAP.md)
+2. [BACKLOG.md](/g:/text-game/BACKLOG.md)
+3. [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md)
+4. [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md)
+5. [ARCHITECTURE.md](/g:/text-game/ARCHITECTURE.md) when the task affects architecture or boundaries
 
-## Project File Paths (Complete Reference)
+## Task Manager Rules
 
-### Root Documentation Files
-- **REQUIREMENTS.md** - Functional requirements, goals, non-goals, quality attributes
-- **ROADMAP.md** - Milestones, tracker table, blockers, risks, locked decisions
-- **README.md** - Quick start, environment setup, key files overview
-- **.env.example** - Template for environment configuration
-- **package.json** - Dependencies, scripts, project metadata
+- Treat [BACKLOG.md](/g:/text-game/BACKLOG.md) as the execution source of truth.
+- Select work from the `Ready Queue` unless the user explicitly assigns a different task.
+- Claim one task at a time by updating its status to `In Progress`.
+- Use the detailed task card for scope, files to touch, dependencies, validation, and handoff notes.
+- If a task card is incomplete, repair the task card before writing code.
+- When work is complete, update the task card and move it to `Review` or `Done`.
 
-### Source Code Structure
-```
-src/
-  ├── server.js       - Express server, routing (/api/state, /api/turn, /api/assist)
-  ├── game.js         - Core game logic, state mutations, director updates, memory scoring
-  ├── ai.js           - OpenAI API calls, JSON schema, response parsing
-  ├── db.js           - SQLite operations, schema, initialization
-  └── assist.js       - Local spellcheck, autocomplete
-  
-public/
-  ├── app.js          - Frontend game loop, UI state updates
-  ├── index.html      - Main game interface
-  └── styles.css      - Responsive design, mobile-friendly
-  
-data/
-  └── (SQLite database files and backups)
-```
+## Execution Workflow
 
-## Core Architecture
-1. **State Management** (src/game.js)
-   - SQLite is the source of truth for all game state
-   - Player, location, inventory, flags, quests, events
-   - Director tracks end goal, current act, remaining story beats
+1. Read the chosen task card.
+2. Confirm dependencies are satisfied.
+3. Keep work within the listed `Files to Touch` unless the task card is updated first.
+4. Make the smallest change that satisfies the task.
+5. Run the task's validation commands.
+6. Update affected docs in the same session.
+7. Record handoff notes for the next agent or reviewer.
 
-2. **AI Integration** (src/ai.js)
-   - OpenAI API calls with JSON schema for structured responses
-   - Responses include: narrative text + state updates
-   - Memory retrieval using embeddings (text-embedding-3-small)
+## Status Definitions
 
-3. **Local Assist** (src/assist.js)
-   - Spellcheck and autocomplete without consuming OpenAI tokens
-   - Reduces token usage for the main model
+- `Ready`: safe to start
+- `In Progress`: active work by one agent
+- `Blocked`: cannot proceed safely
+- `Review`: implementation is complete but not fully closed
+- `Done`: validated and handed off
 
-4. **Web UI** (public/)
-   - Input for player actions
-   - Log display of turns
-   - Suggestion chips from assist endpoint
+## Documentation Update Rules
 
-## How to Update Project Documents
+- Update [BACKLOG.md](/g:/text-game/BACKLOG.md) when task state, dependencies, or validation state changes.
+- Update [ROADMAP.md](/g:/text-game/ROADMAP.md) when scope, sequencing, or phase definitions change.
+- Update [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md) when user-visible behavior or functional scope changes.
+- Update [README.md](/g:/text-game/README.md) when setup, scripts, or environment variables change.
 
-### Updating REQUIREMENTS.md
-- **When**: Functional requirements change or new features are locked
-- **What to Update**:
-  - Functional Requirements section: Add/modify user-facing features
-  - Quality Attributes: Update if performance or reliability goals change
-  - Non-Goals: Clarify scope boundaries
-  - Data & State: If database schema changes
-  - Configuration: If new env vars are needed
-- **Example**: If P2 quest tooling is ready, update "Functional Requirements" to include quest CRUD
+## Project Constraints
 
-### Updating ROADMAP.md
-- **When**: Milestones progress, items complete, blockers emerge, or priorities shift
-- **What to Update**:
-  - Tracker Table: Change Status (Done/In Progress/Planned), update Notes
-  - Tracker IDs: T1, T2, etc. (add new rows with next available ID)
-  - Blockers: Document any issues blocking milestone completion
-  - Risks: New risks discovered; update mitigation strategies
-  - Decisions Locked: Lock architectural decisions once made
-- **Example**: After embedding retrieval ships, change T6 from "In Progress" to "Done"
+- Keep authoritative state server-side and replayable.
+- Validate AI output before state mutation.
+- Keep provider-specific behavior behind a provider-neutral boundary.
+- Treat LiteLLM as the default external AI interface.
+- Prefer deterministic behavior, compact state, and small verifiable patches.
 
-### Updating README.md
-- **When**: Setup instructions change, key files move, or quick start should be different
-- **What to Update**:
-  - Quick Start commands if scripts change
-  - Key Files list if new major modules are added
-  - Environment variables if new configuration is needed
-- **Purpose**: Keep as a minimal quick reference for new developers
+## File Responsibilities
 
-## Key Files & Responsibilities
-- **src/server.js** - Express routing, API endpoints, request/response handling
-- **src/game.js** - Core game loop, state mutations, director contract, memory operations
-- **src/ai.js** - OpenAI API integration, JSON schema validation, structured outputs
-- **src/db.js** - SQLite schema, queries, transaction management
-- **src/assist.js** - Local text processing, spellcheck, autocomplete algorithms
-- **public/app.js** - Frontend logic, game UI state, event listeners, API calls to /api/
-- **public/index.html** - Game interface, form inputs, log display
-- **public/styles.css** - Layout, responsive design, mobile optimization
+- `src/server.js`: API routing and request lifecycle
+- `src/game.js`: core game loop and state mutation logic
+- `src/ai.js`: AI integration and structured response handling
+- `src/db.js`: SQLite access and schema-related logic
+- `src/config.js`: runtime configuration parsing and validation
+- `src/assist.js`: local text assistance features
+- `public/app.js`: browser-side game loop and UI logic
+- `public/index.html`: main interface
+- `public/styles.css`: layout and presentation
 
-## Environment Variables
-- **OPENAI_API_KEY** - Required for OpenAI API access
-- **OPENAI_MODEL** - AI model (default: gpt-4o-mini)
-- **OPENAI_EMBEDDING_MODEL** - Embedding model (default: text-embedding-3-small)
-- **PORT** - API server port (default: 3000)
+## Validation Rules
 
-## Code Editing Strategy: Small, Safe Patches
+- Never mark a task `Done` without running the listed validation or stating exactly what could not be verified.
+- If validation is incomplete, use `Review` instead of `Done`.
+- If blocked, set the task to `Blocked` and record the blocker clearly.
 
-### Philosophy
-Edit code in small, verifiable patches that are easy to review, test, and rollback. This ensures code quality and makes collaboration safer.
+## Editing Rules
 
-### Requirements for All Code Edits
-1. **Single Concern Per Patch**: One logical change per edit (not multiple features in one patch)
-2. **Rich Context**: Always include 3-5 lines of surrounding code BEFORE and AFTER the change
-3. **Unambiguous Location**: Make the exact edit location clear—don't use placeholders or `...existing code...`
-4. **Independent When Batched**: Only group multiple edits if they are in different files OR have no logical dependencies
-5. **Incremental**: Test/validate after meaningful edit blocks
-6. **Rollback-Friendly**: Each patch should be small enough to revert cleanly if needed
-7. **Clear Explanation**: State what the patch does, why, and any dependencies
-
-### Patch Size Guidelines
-- **Good**: 5-20 line changes; single function/feature update; one test addition
-- **Bad**: 100+ line refactors; mixing concerns; large architectural changes without breaking down
-- **Breaking Down**: Complex features should be split across multiple focused patches
-
-### Batching Rules
-- ✅ **Safe to batch**: Edits in different files; independent cosmetic fixes; adding multiple utility functions
-- ❌ **Do NOT batch**: Same file with competing logic; refactors in the same module; related state changes without clear order
-
-### No Replacements Allowed
-- Never use `...existing code...` or `(lines omitted)` in oldString—always provide exact literal text with full context
-- This ensures the edit engine can find the exact match without ambiguity
-
-## Development Guidelines
-- Keep state mutations in src/game.js, not scattered across files
-- Minimize token usage: use compact state representations and selective memory retrieval
-- All AI responses must be validated server-side
-- Maintain separation between state ownership (database) and generation (AI)
-- Test on both desktop and mobile for responsive UI
-- Log events consistently for debugging and replay
-- Update ROADMAP.md tracker when completing items; update REQUIREMENTS.md if feature scope changes
-- Follow the "Small, Safe Patches" strategy above for all code modifications
-
-## Design Principles
-1. **Player Freedom**: Allow attempts at anything; director guides toward end goal
-2. **Token Efficiency**: Compact state, summaries, and embedding-based retrieval
-3. **Portability**: Simple web-based UI, no external dependencies beyond npm
-4. **Reliability**: Clear state ownership, fault-tolerant output validation
-5. **Maintainability**: Separation of concerns, clear module boundaries
-
-## Current Milestone Focus (M1 & M2)
-
-### M1 - Core Loop (In Progress)
-- [x] T1: Node server + API routes
-- [x] T2: SQLite state + event log
-- [x] T3: OpenAI Responses API wiring
-- [x] T4: Web UI shell
-- [x] T5: Story director contract
-- [x] T11: Output validator
-- [x] T12: Local spellcheck/autocomplete
-
-### M2 - Memory + Director Layer (In Progress)
-- [ ] T6: Embeddings + memory retrieval (In Progress)
-- [ ] Refine director steering logic
-
-### Upcoming (M3 & M4)
-- [ ] T7: Quest editor + tools (P2)
-- [ ] T8: Save slots + export (P3)
-- [ ] T9: Accessibility pass (P3)
-- [ ] T10: Desktop wrapper (P4)
-
-## Common Tasks
-- **Complete M1 item**: Update status in ROADMAP.md tracker, verify all P1 items done
-- **Add M2 feature**: Update T6 progress in ROADMAP.md, ensure REQUIREMENTS reflects memory system
-- **Fix blocker**: Document in ROADMAP.md Blockers section, flag for discussion
-- **Add new game mechanic**: Update src/game.js state shape, update REQUIREMENTS.md if scope-changing
-- **Optimize tokens**: Review memory retrieval scoring in src/game.js, compact summaries in src/ai.js
-- **Improve AI responses**: Adjust JSON schema in src/ai.js or system prompts
-- **Enhance UI**: Modify public/app.js and public/styles.css, test mobile
-- **Debug state issues**: Check SQLite queries in src/db.js and state mutations in src/game.js
-
-## Quick Start (for testing/development)
-```bash
-npm install
-# Add OPENAI_API_KEY to .env (copy from .env.example)
-npm run dev
-# Open http://localhost:3000
-```
+- Prefer small, single-concern edits.
+- Avoid unrelated refactors.
+- Do not silently widen scope into multiple backlog tasks.
+- Keep code and docs consistent in the same session.

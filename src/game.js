@@ -2,8 +2,6 @@ import crypto from "crypto";
 import { getDb } from "./db.js";
 import { getInitialDirectorState, loadDirectorSpec } from "./director.js";
 
-import { getInitialDirectorState, loadDirectorSpec } from "./director.js";
-
 export function getOrCreatePlayer({ playerId, name }) {
   const db = getDb();
   const existing = db

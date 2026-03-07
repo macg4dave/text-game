@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import { config } from "./config.js";
 import { initDb } from "./db.js";
 import {
   getOrCreatePlayer,
@@ -25,9 +26,9 @@ import { loadQuestSpec, reloadQuestSpec } from "./quest.js";
 import { generateTurn, getEmbedding, getEmbeddings } from "./ai.js";
 
 const app = express();
-const port = process.env.PORT || 3000;
-const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
+const port = config.port;
+const model = config.ai.chatModel;
+const embeddingModel = config.ai.embeddingModel;
 let directorSpec = loadDirectorSpec();
 let questSpec = loadQuestSpec();
 
