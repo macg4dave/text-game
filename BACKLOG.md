@@ -70,6 +70,9 @@ Use this exact shape when adding new work:
 | T02 | Now | P0 | P1 | Config module with schema validation | Ready | None | `npm test` |
 | T02a | Now | P0 | P1 | LiteLLM env contract and alias defaults | Ready | T02 | Manual config verification |
 | T02b | Now | P0 | P1 | LiteLLM proxy template and startup docs | Ready | T02a | Manual LiteLLM startup verification |
+| T02c | Now | P0 | P2 | Windows local AI smoke-test path | Review | T02 | Manual local provider startup verification |
+| T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
+| T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
 | T03 | Now | P0 | P1 | Logging with levels and redaction | Ready | None | `npm test` |
 | T04 | Now | P0 | P1 | DB migrations and seed flow | Ready | None | Manual DB reset verification |
 | T05 | Next | P0 | P2 | Error boundary and global handler | Ready | None | `npm test` |
@@ -277,6 +280,116 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Handoff Notes:
   - record schema version names and any intentionally deferred fields
 
+### T02c - Windows Local AI Smoke-Test Path
+
+- Status: Review
+- Queue: Now
+- Phase: P0
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Add a Windows-only local AI setup path that keeps the runtime provider-neutral and is cheap enough for smoke testing.
+- Scope:
+  - add a local provider mode with sensible defaults for a small Windows-friendly model stack
+  - document the Windows install and startup flow in `setup_local_a.i.md`
+  - expose the local env contract in repo docs and examples
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - README.md
+  - REQUIREMENTS.md
+  - .env.example
+  - src/config.js
+  - setup_local_a.i.md
+- Do Not Touch:
+  - public/
+  - data/spec/
+  - src/server.js
+- Dependencies:
+  - T02
+- Validation:
+  - `npm install`
+  - `npm run dev`
+  - manual config inspection for `AI_PROVIDER=ollama`
+- Definition of Done:
+  - a Windows developer has one documented local AI setup path to follow
+  - the app can resolve local-provider defaults without extra code edits
+  - setup and config docs match the implemented env behavior
+- Handoff Notes:
+  - use this path for smoke tests only until structured-output reliability is measured against fixtures
+  - direct Ollama validation passed on 2026-03-07 for `POST /v1/chat/completions` with JSON schema, `POST /v1/embeddings`, and one full `game_turn`-shaped response using `gemma3:4b` plus `embeddinggemma`
+  - `npm install`, `npm run dev`, and config runtime verification were not runnable in this session because `node` and `npm` were unavailable in the shell environment
+
+### T02d - Local AI Workflow Regression Harness
+
+- Status: Done
+- Queue: Now
+- Phase: P0
+- Priority: P2
+- Owner Role: AI systems lead
+- Goal: Turn local AI smoke checks into a repeatable regression workflow that developers can run before and after AI-related changes.
+- Scope:
+  - add a Windows-first script that validates the local OpenAI-compatible AI contract used by this repo
+  - add one repo command that runs the local AI workflow test
+  - document the expected red-green workflow for AI prompt, schema, and adapter changes
+- Files to Touch:
+  - BACKLOG.md
+  - ENGINEERING_STANDARDS.md
+  - README.md
+  - package.json
+  - setup_local_a.i.md
+  - scripts/test-local-ai-workflow.ps1
+- Do Not Touch:
+  - public/
+  - data/spec/
+  - src/server.js
+  - src/ai.js
+- Dependencies:
+  - T02c
+- Validation:
+  - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`
+- Definition of Done:
+  - the local AI contract can be re-run on demand with one documented command
+  - the workflow explains when to run the harness before and after AI-related changes
+  - failures are specific enough to point at the broken contract area
+- Handoff Notes:
+  - keep this harness provider-neutral at the API shape level even when Ollama is the current local default
+  - validated on 2026-03-07 with `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` against local Ollama using `gemma3:4b` and `embeddinggemma`
+
+### T02e - AI Test-First Workflow Policy
+
+- Status: Done
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Make AI-facing changes follow a test-first workflow so future agent work is verified before behavior is changed.
+- Scope:
+  - define a repo-wide test-first policy for AI-related work
+  - align agent instructions, engineering standards, and contributor docs on the same workflow
+  - require AI behavior changes to add or tighten a reusable verification artifact before implementation
+- Files to Touch:
+  - BACKLOG.md
+  - ENGINEERING_STANDARDS.md
+  - README.md
+  - AGENTS.md
+  - .copilot-instructions
+- Do Not Touch:
+  - src/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T02d
+- Validation:
+  - manual doc consistency review
+- Definition of Done:
+  - repo instructions explicitly require test-first handling for AI-related work
+  - the AI workflow documents describe the same order of operations
+  - future agents can identify what verification artifact must exist before implementation starts
+- Handoff Notes:
+  - user explicitly requested this process on 2026-03-07
+  - future AI tasks should begin by updating a unit test, integration fixture, replay case, or the local AI workflow harness before changing implementation
+  - manual consistency review completed across `ENGINEERING_STANDARDS.md`, `AGENTS.md`, `.copilot-instructions`, `README.md`, and this task card
+
 ## Immediate Open Decisions
 
 | ID | Decision | Needed By | Owner | Status |
@@ -295,3 +408,4 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Update related docs in the same session when the task changes setup, scope, or behavior.
 - If a task card is missing fields, repair the card before writing code.
 - If the user request conflicts with the queue, follow the user request and then update this file to reflect reality.
+- For AI-related work, require a test-first flow: add or tighten a test, fixture, replay case, or harness step before changing implementation, then run the focused check plus the relevant broader validation.

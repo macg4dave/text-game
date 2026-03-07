@@ -10,42 +10,78 @@ function readEnv(...keys) {
   return undefined;
 }
 
+function normalizeProvider(value) {
+  if (!value || typeof value !== "string") return "openai-compatible";
+  return value.trim().toLowerCase() || "openai-compatible";
+}
+
 function normalizeBaseUrl(value) {
   if (!value) return "";
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
+function getProviderDefaults(provider) {
+  if (provider === "litellm") {
+    return {
+      apiKey: "anything",
+      baseUrl: "http://127.0.0.1:4000",
+      chatModel: "game-chat",
+      embeddingModel: "game-embedding"
+    };
+  }
+
+  if (provider === "ollama") {
+    return {
+      apiKey: "ollama",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      chatModel: "gemma3:4b",
+      embeddingModel: "embeddinggemma"
+    };
+  }
+
+  return {
+    apiKey: "",
+    baseUrl: "",
+    chatModel: "gpt-4o-mini",
+    embeddingModel: "text-embedding-3-small"
+  };
+}
+
 function resolveAiConfig() {
-  const provider = readEnv("AI_PROVIDER") || "openai-compatible";
-  const isLiteLlm = provider === "litellm";
+  const provider = normalizeProvider(readEnv("AI_PROVIDER"));
+  const defaults = getProviderDefaults(provider);
 
   return {
     provider,
     apiKey:
       readEnv(
-        isLiteLlm ? "LITELLM_API_KEY" : undefined,
+        provider === "litellm" ? "LITELLM_API_KEY" : undefined,
+        provider === "ollama" ? "OLLAMA_API_KEY" : undefined,
         "AI_API_KEY",
         "OPENAI_API_KEY"
-      ) || (isLiteLlm ? "anything" : ""),
+      ) || defaults.apiKey,
     baseUrl: normalizeBaseUrl(
       readEnv(
-        isLiteLlm ? "LITELLM_PROXY_URL" : undefined,
+        provider === "litellm" ? "LITELLM_PROXY_URL" : undefined,
+        provider === "ollama" ? "OLLAMA_BASE_URL" : undefined,
         "AI_BASE_URL",
         "OPENAI_BASE_URL"
-      ) || (isLiteLlm ? "http://127.0.0.1:4000" : "")
+      ) || defaults.baseUrl
     ),
     chatModel:
       readEnv(
-        isLiteLlm ? "LITELLM_CHAT_MODEL" : undefined,
+        provider === "litellm" ? "LITELLM_CHAT_MODEL" : undefined,
+        provider === "ollama" ? "OLLAMA_CHAT_MODEL" : undefined,
         "AI_CHAT_MODEL",
         "OPENAI_MODEL"
-      ) || (isLiteLlm ? "game-chat" : "gpt-4o-mini"),
+      ) || defaults.chatModel,
     embeddingModel:
       readEnv(
-        isLiteLlm ? "LITELLM_EMBEDDING_MODEL" : undefined,
+        provider === "litellm" ? "LITELLM_EMBEDDING_MODEL" : undefined,
+        provider === "ollama" ? "OLLAMA_EMBEDDING_MODEL" : undefined,
         "AI_EMBEDDING_MODEL",
         "OPENAI_EMBEDDING_MODEL"
-      ) || (isLiteLlm ? "game-embedding" : "text-embedding-3-small")
+      ) || defaults.embeddingModel
   };
 }
 

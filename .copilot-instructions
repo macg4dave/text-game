@@ -27,11 +27,12 @@ Before making substantial changes, read:
 
 1. Read the chosen task card.
 2. Confirm dependencies are satisfied.
-3. Keep work within the listed `Files to Touch` unless the task card is updated first.
-4. Make the smallest change that satisfies the task.
-5. Run the task's validation commands.
-6. Update affected docs in the same session.
-7. Record handoff notes for the next agent or reviewer.
+3. For AI-related work, first add or tighten a test, fixture, or scripted harness step that defines the expected behavior before changing implementation.
+4. Keep work within the listed `Files to Touch` unless the task card is updated first.
+5. Make the smallest change that satisfies the task.
+6. Run the task's validation commands.
+7. Update affected docs in the same session.
+8. Record handoff notes for the next agent or reviewer.
 
 ## Status Definitions
 
@@ -73,6 +74,7 @@ Before making substantial changes, read:
 - Never mark a task `Done` without running the listed validation or stating exactly what could not be verified.
 - If validation is incomplete, use `Review` instead of `Done`.
 - If blocked, set the task to `Blocked` and record the blocker clearly.
+- For AI behavior changes, validation must include the updated test, fixture, or harness path that was defined before implementation, plus the local AI workflow harness when a compatible local provider is available.
 
 ## Editing Rules
 

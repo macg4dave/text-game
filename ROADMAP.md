@@ -191,6 +191,7 @@ Exit gate:
 
 - Finalize numeric engineering budgets and LiteLLM alias conventions.
 - Stand up repeatable local development, migrations, and logging.
+- Add a Windows-only local AI smoke-test path that stays inside the provider-neutral adapter boundary.
 - Lock the schema boundaries needed for the first playable loop.
 
 ### Next

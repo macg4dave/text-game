@@ -40,6 +40,20 @@ Numeric targets are required before Phase 0 closes. Until then, this register is
 - Golden replay tests for deterministic scripted runs
 - Fuzz tests for validator and sanitizer inputs
 - CI execution on every push by Phase 4
+- Any change to AI prompts, schemas, model defaults, or adapter request shapes must run the local AI workflow harness before and after the change when a local compatible provider is available
+
+## AI Test-First Change Policy
+
+- Treat AI-related work as test-based by default, not as prompt tinkering followed by hope.
+- Before changing prompts, schemas, model defaults, adapter request shapes, retrieval logic, director rules, or validation behavior, first add or update at least one verification artifact that captures the intended behavior.
+- Acceptable verification artifacts are:
+  - a unit test for pure logic
+  - an integration test using fixtures
+  - a golden replay fixture
+  - an extension to `scripts/test-local-ai-workflow.ps1` for provider-compatible contract checks
+- The preferred loop is: define or tighten the expectation, run it to observe the current failure or gap, make the smallest implementation change, then re-run the focused check plus the relevant broader suite.
+- If fully automated verification is not yet possible, add the smallest deterministic fixture or scripted harness step that proves the contract and record the limitation in [BACKLOG.md](/g:/text-game/BACKLOG.md).
+- AI-related changes are not complete unless the changed behavior is covered by a test, fixture, or scripted harness path that another agent can re-run.
 
 ## Telemetry Contract
 

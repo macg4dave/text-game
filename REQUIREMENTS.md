@@ -15,7 +15,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter t
 
 - Full 3D graphics or real-time gameplay.
 - Multiplayer in the initial scope.
-- Full offline story generation (main story remains OpenAI-powered).
+- Full offline story generation as the main supported runtime path. A Windows-only local model setup may be used for development smoke tests.
 
 ## Functional Requirements
 
@@ -59,6 +59,10 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter t
 - `LITELLM_API_KEY` (used when `AI_PROVIDER=litellm`)
 - `LITELLM_CHAT_MODEL` (default: `game-chat` in LiteLLM mode)
 - `LITELLM_EMBEDDING_MODEL` (default: `game-embedding` in LiteLLM mode)
+- `OLLAMA_BASE_URL` (used when `AI_PROVIDER=ollama`; default `http://127.0.0.1:11434/v1`)
+- `OLLAMA_API_KEY` (optional placeholder key in Ollama mode)
+- `OLLAMA_CHAT_MODEL` (default: `gemma3:4b` in Ollama mode)
+- `OLLAMA_EMBEDDING_MODEL` (default: `embeddinggemma` in Ollama mode)
 - Backward-compatible support for legacy `OPENAI_*` env vars
 - `PORT`
 

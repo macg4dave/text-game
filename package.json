@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:local-ai": "powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1",
     "dev": "node src/server.js",
     "start": "node src/server.js"
   },
