@@ -7,19 +7,87 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <header>
-        <h1>Eclipse Signal</h1>
-        <p>Text adventure with a guided end-goal.</p>
+    <main class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Local Story Loop</p>
+          <h1>Eclipse Signal</h1>
+          <p class="lede">Minimal browser UI for text I/O with server-side debug visibility for the local AI path.</p>
+        </div>
+        <section class="hero-card">
+          <span class="stack-label">Runtime</span>
+          <strong id="runtime-summary">Waiting for session...</strong>
+          <p id="session-summary">No active session yet.</p>
+        </section>
       </header>
-      <section class="log" id="log"></section>
-      <form class="input" id="input-form">
-        <input id="player-name" placeholder="Name" />
-        <input id="player-input" placeholder="What do you do?" autocomplete="off" required />
-        <button type="submit">Send</button>
-      </form>
-      <section class="assist" id="assist"></section>
-      <section class="options" id="options"></section>
+
+      <section class="workspace">
+        <section class="panel play-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Play</h2>
+              <p class="panel-copy">Send turns, inspect responses, and keep the current session in view.</p>
+            </div>
+            <div class="toolbar">
+              <button type="button" class="secondary" id="refresh-session">Refresh State</button>
+              <button type="button" class="secondary" id="new-session">New Session</button>
+            </div>
+          </div>
+
+          <div class="status-row">
+            <span class="status-pill" id="status-pill" data-tone="idle">Connecting</span>
+          </div>
+
+          <section class="log panel-slab" id="log" aria-live="polite"></section>
+
+          <form class="input-form" id="input-form">
+            <label class="field">
+              <span>Player name</span>
+              <input id="player-name" placeholder="Wanderer" />
+            </label>
+
+            <label class="field field-wide">
+              <span>Action</span>
+              <textarea
+                id="player-input"
+                rows="3"
+                placeholder="Type an action. Ctrl+Enter sends."
+                autocomplete="off"
+                required
+              ></textarea>
+            </label>
+
+            <button type="submit" id="send-button">Send Turn</button>
+          </form>
+
+          <section class="assist panel-slab" id="assist"></section>
+          <section class="options" id="options"></section>
+        </section>
+
+        <aside class="panel debug-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Debug</h2>
+              <p class="panel-copy">Safe runtime detail for local AI inspection without opening devtools.</p>
+            </div>
+          </div>
+
+          <section class="debug-block">
+            <h3>Connection</h3>
+            <pre id="connection-debug"></pre>
+          </section>
+
+          <section class="debug-block">
+            <h3>Player State</h3>
+            <pre id="state-debug"></pre>
+          </section>
+
+          <section class="debug-block">
+            <h3>Last Turn</h3>
+            <pre id="turn-debug"></pre>
+          </section>
+        </aside>
+      </section>
     </main>
     <script src="/app.js"></script>
   </body>

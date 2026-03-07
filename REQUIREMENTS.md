@@ -24,7 +24,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter t
 - Director layer to track end goal, act, and remaining beats.
 - AI responses must be structured JSON with narrative + updates.
 - Memory system with summaries and embedding-based retrieval.
-- Web UI with log, input, and suggestion chips.
+- Web UI with text log, turn input, session controls, suggestion chips, and a local debug panel.
 - Local assist endpoint for spellcheck + autocomplete.
 
 ## Quality Attributes

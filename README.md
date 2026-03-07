@@ -16,6 +16,41 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+On Windows, the repo now has a one-command launcher:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+```
+
+Or, if `npm` is already installed and on `PATH`:
+
+```bash
+npm run dev:windows
+```
+
+The launcher:
+
+- checks `node` and `npm`
+- runs `npm install` when `node_modules/` is missing
+- reads `.env` when present
+- falls back to the local Ollama preset for that run when `.env` is missing
+- checks the configured AI path and starts local Ollama or LiteLLM when possible
+- starts the app server in a new PowerShell window
+- waits for the app to respond, then opens the browser automatically
+
+Useful flags:
+
+- `-NoBrowser` skips opening the webpage
+- `-SkipInstall` skips `npm install`
+- `-ForceInstall` forces `npm install` before launch
+
+The browser UI includes:
+
+- a text log for player and narrator turns
+- player naming plus a multiline turn input with local assist chips
+- `Refresh State` and `New Session` controls for quick local iteration
+- a debug panel showing the active provider/model config, current player state, and the last turn payload returned by the server
+
 For a Windows-only local model setup, use [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md).
 
 For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`.
@@ -88,6 +123,8 @@ The repo now includes an `ollama` preset intended for local smoke tests on Windo
 
 Setup steps and download links live in [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md). Treat this path as a cheap local test harness, not as the default production-quality model setup.
 
+Once Ollama and the models are installed, the quickest Windows startup path is `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+
 ## AI Workflow Test Loop
 
 Use a test-first loop as the default workflow for prompt, schema, adapter, retrieval, and director-rule changes:
@@ -104,3 +141,11 @@ If `npm` is available on your machine, the same check is exposed as `npm run tes
 ## Assist Endpoint
 
 `POST /api/assist` returns lightweight, local spellcheck and autocomplete suggestions so you can reduce token use in the main model.
+
+## Web Debug Surface
+
+The browser client is intentionally useful for local AI debugging:
+
+- `GET /api/state` returns the current player plus safe runtime/session debug data
+- `POST /api/turn` returns the narrator payload plus safe debug details such as request id, latency, prompt preview, embedding fallback status, validation result, and before/after player state
+- API keys are not returned by the debug payload; only non-secret runtime metadata is exposed

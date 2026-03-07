@@ -1,4 +1,5 @@
 import "dotenv/config";
+import crypto from "crypto";
 import express from "express";
 import { config } from "./config.js";
 import { initDb } from "./db.js";
@@ -56,7 +57,13 @@ app.get("/api/state", (req, res) => {
     updateDirectorState(player.id, normalized.director);
     player.director_state = normalized.director;
   }
-  res.json({ player });
+  res.json({
+    player,
+    debug: {
+      runtime: buildRuntimeDebug(),
+      session: buildSessionDebug(player)
+    }
+  });
 });
 
 app.post("/api/assist", (req, res) => {
@@ -107,13 +114,51 @@ app.post("/api/quests/reload", (req, res) => {
 });
 
 app.post("/api/turn", async (req, res) => {
+  const requestId = crypto.randomUUID();
+  const startedAt = Date.now();
+  let player = null;
+  let refreshedPlayer = null;
+  let input = "";
+  let shortHistory = [];
+  let memories = [];
+  let statePack = null;
+  let inputEmbedding = [];
+  let inputEmbeddingError = null;
+  let rawResult = null;
+  let result = null;
+  let updateValidation = { ok: true, errors: [] };
+  let memoryEmbeddings = [];
+  let memoryEmbeddingError = null;
+
+  res.setHeader("x-request-id", requestId);
+
   try {
-    const { playerId, name, input } = req.body || {};
+    const { playerId, name, input: submittedInput } = req.body || {};
+    input = submittedInput;
     if (!input || typeof input !== "string") {
-      return res.status(400).json({ error: "Missing input" });
+      return res.status(400).json({
+        error: "Missing input",
+        debug: buildTurnDebug({
+          requestId,
+          startedAt,
+          input,
+          player,
+          refreshedPlayer,
+          shortHistory,
+          memories,
+          statePack,
+          inputEmbedding,
+          inputEmbeddingError,
+          rawResult,
+          result,
+          updateValidation,
+          memoryEmbeddings,
+          memoryEmbeddingError
+        })
+      });
     }
 
-    const player = getOrCreatePlayer({ playerId, name });
+    player = getOrCreatePlayer({ playerId, name });
     const normalized = normalizeDirectorState(player);
     if (normalized.changed) {
       updateDirectorState(player.id, normalized.director);
@@ -122,16 +167,16 @@ app.post("/api/turn", async (req, res) => {
 
     addEvent(player.id, "player", input);
 
-    const shortHistory = getShortHistory(player.id, 6);
-    let inputEmbedding = [];
+    shortHistory = getShortHistory(player.id, 6);
     try {
       inputEmbedding = await getEmbedding({ model: embeddingModel, input });
     } catch (err) {
       inputEmbedding = [];
+      inputEmbeddingError = err.message;
     }
-    const memories = getRelevantMemories(player.id, inputEmbedding, 6);
+    memories = getRelevantMemories(player.id, inputEmbedding, 6);
 
-    const statePack = {
+    statePack = {
       player: {
         id: player.id,
         name: player.name,
@@ -150,7 +195,7 @@ app.post("/api/turn", async (req, res) => {
       quest_spec: questSpec
     };
 
-    const rawResult = await generateTurn({
+    rawResult = await generateTurn({
       model,
       systemPrompt: SYSTEM_PROMPT,
       statePack,
@@ -159,10 +204,30 @@ app.post("/api/turn", async (req, res) => {
       input
     });
 
-    const result = sanitizeTurnResult(rawResult, player);
-    const updateValidation = validateStateUpdates(result.state_updates);
+    result = sanitizeTurnResult(rawResult, player);
+    updateValidation = validateStateUpdates(result.state_updates);
     if (!updateValidation.ok) {
-      return res.status(400).json({ error: "Invalid state updates", detail: updateValidation.errors });
+      return res.status(400).json({
+        error: "Invalid state updates",
+        detail: updateValidation.errors,
+        debug: buildTurnDebug({
+          requestId,
+          startedAt,
+          input,
+          player,
+          refreshedPlayer,
+          shortHistory,
+          memories,
+          statePack,
+          inputEmbedding,
+          inputEmbeddingError,
+          rawResult,
+          result,
+          updateValidation,
+          memoryEmbeddings,
+          memoryEmbeddingError
+        })
+      });
     }
 
     addEvent(player.id, "narrator", result.narrative);
@@ -182,32 +247,73 @@ app.post("/api/turn", async (req, res) => {
     directorState.end_goal_progress = result.director_updates.end_goal_progress;
     updateDirectorState(player.id, directorState);
     if (result.memory_updates?.length) {
-      let embeddings = [];
       try {
-        embeddings = await getEmbeddings({
+        memoryEmbeddings = await getEmbeddings({
           model: embeddingModel,
           inputs: result.memory_updates
         });
       } catch (err) {
-        embeddings = [];
+        memoryEmbeddings = [];
+        memoryEmbeddingError = err.message;
       }
 
       const memoryItems = result.memory_updates.map((content, index) => ({
         content,
-        embedding: embeddings[index]
+        embedding: memoryEmbeddings[index]
       }));
       addMemories(player.id, memoryItems);
       updateSummary(player.id, result.memory_updates);
     }
 
+    refreshedPlayer = getOrCreatePlayer({ playerId: player.id });
+
     res.json({
       narrative: result.narrative,
       player_options: result.player_options,
       state_updates: result.state_updates,
-      director_updates: result.director_updates
+      director_updates: result.director_updates,
+      player: refreshedPlayer,
+      debug: buildTurnDebug({
+        requestId,
+        startedAt,
+        input,
+        player,
+        refreshedPlayer,
+        shortHistory,
+        memories,
+        statePack,
+        inputEmbedding,
+        inputEmbeddingError,
+        rawResult,
+        result,
+        updateValidation,
+        memoryEmbeddings,
+        memoryEmbeddingError
+      })
     });
   } catch (err) {
-    res.status(500).json({ error: "Turn failed", detail: err.message });
+    res.status(500).json({
+      error: "Turn failed",
+      detail: err.message,
+      debug: buildTurnDebug({
+        requestId,
+        startedAt,
+        input,
+        player,
+        refreshedPlayer,
+        shortHistory,
+        memories,
+        statePack,
+        inputEmbedding,
+        inputEmbeddingError,
+        rawResult,
+        result,
+        updateValidation,
+        memoryEmbeddings,
+        memoryEmbeddingError,
+        error: err.message
+      })
+    });
   }
 });
 
@@ -286,4 +392,101 @@ function normalizeDirectorState(player) {
   }
 
   return { director: fallback, changed: true };
+}
+
+function buildRuntimeDebug() {
+  return {
+    provider: config.ai.provider,
+    chat_model: config.ai.chatModel,
+    embedding_model: config.ai.embeddingModel,
+    base_url: config.ai.baseUrl || null,
+    api_key_configured: Boolean(config.ai.apiKey),
+    server_time: new Date().toISOString()
+  };
+}
+
+function buildSessionDebug(player) {
+  if (!player) return null;
+
+  return {
+    player_id: player.id,
+    name: player.name,
+    created_at: player.created_at,
+    location: player.location
+  };
+}
+
+function buildPlayerSnapshot(player) {
+  if (!player) return null;
+
+  return {
+    id: player.id,
+    name: player.name,
+    created_at: player.created_at,
+    location: player.location,
+    inventory: player.inventory,
+    flags: player.flags,
+    quests: player.quests,
+    summary: player.summary,
+    director_state: player.director_state
+  };
+}
+
+function buildPromptPreview(statePack, shortHistory, memories) {
+  if (!statePack) return null;
+
+  return {
+    short_history: shortHistory,
+    retrieved_memories: memories,
+    player_state: statePack.player,
+    summary: statePack.summary,
+    director_state: statePack.director,
+    current_beat: statePack.director_spec?.current_beat || null
+  };
+}
+
+function buildTurnDebug({
+  requestId,
+  startedAt,
+  input,
+  player,
+  refreshedPlayer,
+  shortHistory,
+  memories,
+  statePack,
+  inputEmbedding,
+  inputEmbeddingError,
+  rawResult,
+  result,
+  updateValidation,
+  memoryEmbeddings,
+  memoryEmbeddingError,
+  error = null
+}) {
+  return {
+    request_id: requestId,
+    runtime: buildRuntimeDebug(),
+    session: buildSessionDebug(refreshedPlayer || player),
+    turn: {
+      input: typeof input === "string" ? input : null,
+      latency_ms: Date.now() - startedAt,
+      prompt_preview: buildPromptPreview(statePack, shortHistory, memories),
+      embeddings: {
+        input_dimensions: inputEmbedding.length,
+        input_status: inputEmbedding.length ? "ok" : "fallback",
+        input_error: inputEmbeddingError,
+        memory_vectors_generated: memoryEmbeddings.length,
+        memory_error: memoryEmbeddingError
+      },
+      validation: {
+        ok: Boolean(updateValidation?.ok),
+        errors: updateValidation?.errors || []
+      },
+      raw_model_output: rawResult,
+      sanitized_output: result,
+      state_before_turn: buildPlayerSnapshot(player),
+      state_after_turn: buildPlayerSnapshot(refreshedPlayer),
+      error
+    }
+  };
 }

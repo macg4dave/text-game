@@ -66,7 +66,7 @@ Use this exact shape when adding new work:
 
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T01 | Now | P0 | P1 | Dev environment bootstrap script | Ready | None | `npm install`; `npm run dev` |
+| T01 | Now | P0 | P1 | Dev environment bootstrap script | Review | None | `npm install`; `npm run dev`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
 | T02 | Now | P0 | P1 | Config module with schema validation | Ready | None | `npm test` |
 | T02a | Now | P0 | P1 | LiteLLM env contract and alias defaults | Ready | T02 | Manual config verification |
 | T02b | Now | P0 | P1 | LiteLLM proxy template and startup docs | Ready | T02a | Manual LiteLLM startup verification |
@@ -82,7 +82,7 @@ Use this exact shape when adding new work:
 | T08 | Next | P1 | P1 | Deterministic state reducer | Ready | T06 | `npm test` |
 | T09 | Next | P1 | P1 | Event log persistence and replay | Ready | T04, T08 | Replay fixture execution |
 | T10 | Next | P1 | P1 | Output validator and sanitizer | Ready | T06 | `npm test` |
-| T11 | Next | P1 | P2 | Minimal web UI loop | Ready | T06 | Manual browser smoke test |
+| T11 | Next | P1 | P2 | Minimal web UI loop | Review | T06 | Manual browser smoke test |
 | T12 | Next | P1 | P2 | New game onboarding | Ready | T06 | Manual new-game flow check |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
 | T13 | Later | P2 | P1 | Embeddings pipeline | Ready | T07a | Manual embedding call verification |
@@ -131,7 +131,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T01 - Dev Environment Bootstrap Script
 
-- Status: Ready
+- Status: Review
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -139,12 +139,15 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Goal: Make local setup and startup reproducible with the fewest manual steps possible.
 - Scope:
   - define a one-command local startup path
+  - add a Windows launcher that checks prerequisites, verifies the configured AI path, starts the app server, and opens the browser
   - document the expected local prerequisites
   - ensure the startup path matches the README
 - Files to Touch:
   - package.json
   - README.md
   - .env.example
+  - BACKLOG.md
+  - scripts/start-dev.ps1
 - Do Not Touch:
   - src/
   - public/
@@ -153,12 +156,18 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Validation:
   - `npm install`
   - `npm run dev`
+  - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`
 - Definition of Done:
   - one documented command starts the app locally
+  - the Windows launcher checks the expected local prerequisites and opens the app automatically
   - required environment variables are documented
   - setup instructions match the current repository
 - Handoff Notes:
-  - record any missing prerequisites or manual steps that remain
+  - user assigned the Windows startup script directly on 2026-03-07
+  - added `scripts/start-dev.ps1` plus `npm run dev:windows`
+  - the launcher reads `.env` when present, falls back to the Ollama local preset when `.env` is missing, checks the configured AI path, starts the app server in a new PowerShell window, waits for readiness, and opens the browser
+  - validation completed: PowerShell syntax parse for `scripts/start-dev.ps1`, direct launcher run through the prerequisite check, and `git diff --check`
+  - full validation is still pending because `node` and `npm` are unavailable in this shell, so `npm install`, `npm run dev`, and end-to-end browser startup could not be executed here
 
 ### T02 - Config Module With Schema Validation
 
@@ -279,6 +288,47 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - the schema contract is documented for future AI tasks
 - Handoff Notes:
   - record schema version names and any intentionally deferred fields
+
+### T11 - Minimal Web UI Loop
+
+- Status: Review
+- Queue: Next
+- Phase: P1
+- Priority: P2
+- Owner Role: Product/UI lead
+- Goal: Provide a simple browser UI that can send turns to the local AI path and expose enough runtime detail for manual debugging.
+- Scope:
+  - keep a text-first browser play loop for player input and narrator output
+  - add a debug surface for session, model, timing, and turn payload inspection
+  - keep the implementation aligned with the existing server endpoints instead of creating a parallel UI contract
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - REQUIREMENTS.md
+  - public/index.html
+  - public/app.js
+  - public/styles.css
+  - src/server.js
+- Do Not Touch:
+  - data/spec/
+  - src/ai.js
+  - src/assist.js
+  - src/db.js
+- Dependencies:
+  - T06
+- Validation:
+  - `npm install`
+  - `npm run dev`
+  - manual browser smoke test against the configured local AI path
+- Definition of Done:
+  - a player can create or resume a session in the browser and submit turns
+  - narrator output, suggested options, and current state are visible without opening devtools
+  - useful debug details are visible for local AI iteration without exposing secrets
+- Handoff Notes:
+  - user assigned this ahead of queue order on 2026-03-07 to make local AI iteration easier before deeper roadmap work
+  - implemented a browser play shell with session refresh/new-session controls, multiline text input, suggestion chips, and a persistent debug panel
+  - `/api/state` now returns safe runtime/session debug data and `/api/turn` now returns safe debug data including request id, latency, prompt preview, embedding fallback status, validation result, and before/after player snapshots
+  - local validation was limited to code inspection plus `git diff --check`; `npm install`, `npm run dev`, and the manual browser smoke test were not runnable because `node` and `npm` were unavailable in this shell environment
 
 ### T02c - Windows Local AI Smoke-Test Path
 
