@@ -166,7 +166,7 @@ Use one of the exact shapes below when adding new work.
 | T11a | Now | P1 | P2 | Browser UI module decomposition groundwork | Done | T11, T12b | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/global-error.test.ts src/ui/http-client.test.ts src/ui/player-name.test.ts src/ui/session-data.test.ts src/ui/setup-view.test.ts src/ui/debug-view.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
 | T48 | Now | P1 | P1 | Server route and turn pipeline extraction | Done | T06, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T49 | Now | P1 | P1 | App shell controller extraction | Done | T11a, T12c | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1` |
-| T50 | Now | P1 | P1 | Runtime preflight service split | Ready | T02h, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/runtime-preflight.test.ts src/server/setup-status.test.ts src/server/host-preflight.test.ts` |
+| T50 | Now | P1 | P1 | Runtime preflight service split | Done | T02h, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/runtime-preflight.test.ts src/server/setup-status.test.ts src/server/host-preflight.test.ts` |
 | T56 | Now | P1 | P2 | Future issue intake workflow | Done | None | Manual planning-doc consistency review |
 | T56a | Now | P1 | P2 | Backlog parent and child task pattern | Done | T56 | Manual backlog structure review |
 | T56b | Now | P1 | P2 | Cross-doc planning sync policy | Done | T56 | Manual roadmap, requirements, architecture, and standards consistency review |
@@ -2643,7 +2643,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T50 - Runtime Preflight Service Split
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -2676,6 +2676,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - anti-monolith audit on 2026-03-08 found `src/server/runtime-preflight.ts` combining service state, models probing, LiteLLM health probing, transport error classification, alias checks, and issue-shaping helpers
   - `T36b` and any future setup diagnostics work should build on extracted probe or classification modules instead of extending the current file
   - keep issue copy stable unless a concrete bug or mismatch is found during the test-first extraction
+  - completed on 2026-03-08 by keeping `src/server/runtime-preflight.ts` as the cache and orchestration surface, moving generic JSON probe transport into `src/server/runtime-preflight-probe.ts`, and moving AI probe flow plus LiteLLM or model issue classification into `src/server/runtime-preflight-ai.ts`
+  - focused runtime-preflight coverage now includes direct tests for probe transport header handling, DNS transport classification, and repeated LiteLLM health issue deduping inside `src/server/runtime-preflight.test.ts`
+  - validation on 2026-03-08 required rebuilding the Docker `app` image because the compose service does not bind-mount repo source; after `docker compose build app`, the task validation passed with `docker compose run --rm --no-deps app npm run type-check` and `docker compose run --rm --no-deps app npx tsx --test src/server/runtime-preflight.test.ts src/server/setup-status.test.ts src/server/host-preflight.test.ts`
 
 ### T51 - Database Storage And Migration Boundary Split
 

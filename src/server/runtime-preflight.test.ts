@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadConfig } from "../core/config.js";
+import { buildLiteLlmHealthIssues, buildTransportIssue } from "./runtime-preflight-ai.js";
+import { createJsonProbeTransport } from "./runtime-preflight-probe.js";
 import { createRuntimePreflightService } from "./runtime-preflight.js";
 
 function createJsonResponse(body: unknown, status = 200): Response {
@@ -26,6 +28,74 @@ async function withMockFetch(
     globalThis.fetch = originalFetch;
   }
 }
+
+test("createJsonProbeTransport forwards headers and parses JSON bodies", async () => {
+  let capturedAuthHeader = "";
+  const transport = createJsonProbeTransport(async (_input, init) => {
+    capturedAuthHeader = String((init?.headers as Record<string, string> | undefined)?.Authorization ?? "");
+    return createJsonResponse({ ok: true });
+  });
+
+  const result = await transport.probeJson("http://litellm:4000/models", {
+    headers: {
+      Authorization: "Bearer probe-key"
+    }
+  });
+
+  assert.equal(capturedAuthHeader, "Bearer probe-key");
+  assert.ok(!(result instanceof Error));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.body, { ok: true });
+});
+
+test("buildTransportIssue classifies DNS failures without collapsing them into generic endpoint errors", () => {
+  const config = loadConfig({
+    AI_PROFILE: "custom",
+    AI_PROVIDER: "litellm",
+    LITELLM_PROXY_URL: "http://missing-host:4000",
+    LITELLM_API_KEY: "anything",
+    LITELLM_CHAT_MODEL: "game-chat",
+    LITELLM_EMBEDDING_MODEL: "game-embedding"
+  });
+
+  const issue = buildTransportIssue(config, "http://missing-host:4000/models", new Error("getaddrinfo ENOTFOUND missing-host"));
+
+  assert.equal(issue.code, "ai_dns_lookup_failed");
+  assert.equal(issue.severity, "blocker");
+  assert.match(issue.recommended_fix || "", /hostname/i);
+});
+
+test("buildLiteLlmHealthIssues dedupes repeated upstream failures while keeping affected model notes", () => {
+  const config = loadConfig({
+    AI_PROFILE: "custom",
+    AI_PROVIDER: "litellm",
+    LITELLM_PROXY_URL: "http://litellm:4000",
+    LITELLM_API_KEY: "anything",
+    LITELLM_CHAT_MODEL: "game-chat",
+    LITELLM_EMBEDDING_MODEL: "game-embedding"
+  });
+
+  const issues = buildLiteLlmHealthIssues(
+    config,
+    {
+      unhealthy_endpoints: [
+        {
+          model: "openai/gpt-4o-mini",
+          error: "AuthenticationError: Incorrect API key provided."
+        },
+        {
+          model: "openai/text-embedding-3-small",
+          error: "AuthenticationError: Incorrect API key provided."
+        }
+      ]
+    },
+    "http://litellm:4000/health"
+  );
+
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0]?.code, "ai_upstream_auth_failed");
+  assert.match(issues[0]?.details?.notes?.join("\n") || "", /text-embedding-3-small/);
+});
 
 test("runtime preflight reports a LiteLLM proxy auth mismatch separately from endpoint reachability", async () => {
   const config = loadConfig({
