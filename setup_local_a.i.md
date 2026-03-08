@@ -79,6 +79,14 @@ On Windows, you can use the launcher instead:
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
 
+If you run the app outside Docker after installing Node.js, the TypeScript-aware host flow is:
+
+```powershell
+npm install
+npm run type-check
+npm run dev
+```
+
 ## Default Test Workflow
 
 Use this harness whenever you change prompts, schemas, model defaults, or adapter request shapes:
@@ -95,10 +103,11 @@ What it checks:
 
 Recommended loop:
 
-1. Run the harness before you edit AI workflow code.
+1. Run `npm run type-check` and the harness before you edit AI workflow code.
 2. Make one small change.
-3. Re-run the harness.
-4. If it fails, fix the contract break before touching unrelated code.
+3. Re-run `npm run type-check`.
+4. Re-run the harness.
+5. If it fails, fix the contract break before touching unrelated code.
 
 ## Smoke Test Checklist
 
@@ -117,8 +126,8 @@ Recommended loop:
 
 ## Official References
 
-- Windows install: https://docs.ollama.com/windows
-- OpenAI compatibility: https://docs.ollama.com/openai
-- Structured outputs: https://docs.ollama.com/capabilities/structured-outputs
-- Embeddings: https://docs.ollama.com/capabilities/embeddings
-- Gemma 3 model library: https://ollama.com/library/gemma3
+- Windows install: <https://docs.ollama.com/windows>
+- OpenAI compatibility: <https://docs.ollama.com/openai>
+- Structured outputs: <https://docs.ollama.com/capabilities/structured-outputs>
+- Embeddings: <https://docs.ollama.com/capabilities/embeddings>
+- Gemma 3 model library: <https://ollama.com/library/gemma3>

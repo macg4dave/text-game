@@ -45,7 +45,18 @@ Do not assume:
 
 ## First Decisions To Keep
 
-- Node.js backend
+- Node.js backend with TypeScript source
 - SQLite state source of truth
 - server-side director enforcement
 - provider-neutral AI config with backward compatibility for existing `OPENAI_*` env vars
+
+## TypeScript Note
+
+TypeScript is a compile-time tooling choice for this repo, not an architecture boundary.
+
+It should not change:
+
+- the provider-neutral adapter seam
+- the server-side authority model
+- the runtime validation requirements for model output
+- the external HTTP contract of the app

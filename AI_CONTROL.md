@@ -31,14 +31,19 @@ Keep the narrative flexible while ensuring the story advances toward the end goa
 - `completed_beats`
 
 ## Model Contract
+
 The model must return JSON:
+
 - `narrative`
 - `player_options`
 - `state_updates` (including `flags_add`)
 - `director_updates.end_goal_progress`
 - `memory_updates`
 
+TypeScript types in `src/*.ts` help keep the codebase honest, but they do not replace runtime validation. Model responses must still be sanitized and validated server-side before state mutation.
+
 ## Why This Works
+
 - Player freedom is preserved because the model can interpret any action.
 - Story direction is enforced by server logic, not model opinion.
 - Token usage stays low via compact state and summaries.

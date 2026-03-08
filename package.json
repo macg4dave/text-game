@@ -8,14 +8,27 @@
   },
   "scripts": {
     "dev:windows": "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1",
-    "test:local-ai": "powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1",
-    "dev": "node src/server.js",
-    "start": "node src/server.js"
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:client": "esbuild public/app.ts --bundle --format=iife --platform=browser --outfile=public/app.js",
+    "build": "npm run build:server && npm run build:client",
+    "type-check": "tsc -p tsconfig.json",
+    "test:local-ai": "npm run type-check && powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1",
+    "test": "npm run type-check && tsx --test src/**/*.test.ts",
+    "dev": "npm run build:client && tsx src/server.ts",
+    "start": "npm run build && node dist/src/server.js"
   },
   "dependencies": {
     "better-sqlite3": "^9.4.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "openai": "^4.79.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.10",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
   }
 }

@@ -1,7 +1,6 @@
 param(
   [switch]$NoBrowser,
-  [switch]$Rebuild,
-  [switch]$Detached = $true
+  [switch]$Rebuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,12 +32,38 @@ function Fail {
 function Invoke-Native {
   param(
     [string]$FilePath,
-    [string[]]$Arguments
+    [string[]]$ArgList
   )
 
-  & $FilePath @Arguments
+  & $FilePath @ArgList
   if ($LASTEXITCODE -ne 0) {
-    Fail ("Command failed: {0} {1}" -f $FilePath, ($Arguments -join " "))
+    Fail ("Command failed: {0} {1}" -f $FilePath, ($ArgList -join " "))
+  }
+}
+
+function Invoke-NativeCapture {
+  param(
+    [string]$FilePath,
+    [string[]]$ArgList
+  )
+
+  $restorePreference = $null
+  $hadPreference = Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue
+  if ($hadPreference) {
+    $restorePreference = $PSNativeCommandUseErrorActionPreference
+    $PSNativeCommandUseErrorActionPreference = $false
+  }
+
+  try {
+    $output = & $FilePath @ArgList 2>&1
+    return [pscustomobject]@{
+      ExitCode = $LASTEXITCODE
+      Output = @($output)
+    }
+  } finally {
+    if ($hadPreference) {
+      $PSNativeCommandUseErrorActionPreference = $restorePreference
+    }
   }
 }
 
@@ -53,7 +78,7 @@ function Get-CommandPath {
   return $command.Source
 }
 
-function Load-DotEnvMap {
+function Get-DotEnvMap {
   param([string]$Path)
 
   $values = @{}
@@ -139,11 +164,20 @@ function Get-UriObject {
 function Test-HttpReady {
   param(
     [string]$Uri,
-    [int]$TimeoutSeconds = 3
+    [int]$TimeoutSeconds = 3,
+    [string]$ExpectedContent = ""
   )
 
   try {
-    $null = Invoke-WebRequest -Uri $Uri -Method Get -TimeoutSec $TimeoutSeconds -UseBasicParsing
+    $response = Invoke-WebRequest -Uri $Uri -Method Get -TimeoutSec $TimeoutSeconds -UseBasicParsing
+    if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
+      return $false
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedContent) -and ($response.Content -notlike "*$ExpectedContent*")) {
+      return $false
+    }
+
     return $true
   } catch {
     return $false
@@ -154,13 +188,173 @@ function Wait-ForHttpReady {
   param(
     [string]$Uri,
     [int]$TimeoutSeconds = 60,
+    [int]$PollMilliseconds = 1000,
+    [string]$ExpectedContent = ""
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if (Test-HttpReady -Uri $Uri -ExpectedContent $ExpectedContent) {
+      return $true
+    }
+
+    Start-Sleep -Milliseconds $PollMilliseconds
+  }
+
+  return $false
+}
+
+function Get-ListeningProcessName {
+  param([int]$Port)
+
+  $connection = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($null -eq $connection) {
+    return $null
+  }
+
+  $process = Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue
+  if ($null -eq $process) {
+    return ("PID {0}" -f $connection.OwningProcess)
+  }
+
+  return $process.ProcessName
+}
+
+function Get-AlternatePortSuggestion {
+  param([int]$CurrentPort)
+
+  $candidate = $CurrentPort + 100
+  if ($candidate -gt 0 -and $candidate -lt 65536) {
+    return $candidate
+  }
+
+  return 3000
+}
+
+function Wait-ForPortReleased {
+  param(
+    [int]$Port,
+    [int]$TimeoutSeconds = 15,
+    [int]$PollMilliseconds = 500
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if ($null -eq (Get-ListeningProcessName -Port $Port)) {
+      return $true
+    }
+
+    Start-Sleep -Milliseconds $PollMilliseconds
+  }
+
+  return $false
+}
+
+function Set-ConfigPort {
+  param(
+    $Config,
+    [int]$Port
+  )
+
+  $Config.port = $Port
+  $Config.appUrl = "http://127.0.0.1:$Port/"
+  $Config.readyUrl = "http://127.0.0.1:$Port/api/state?name=LauncherCheck"
+}
+
+function Find-AvailablePort {
+  param(
+    [int]$PreferredPort,
+    [int]$MaxAttempts = 20
+  )
+
+  $candidates = New-Object System.Collections.Generic.List[int]
+  $baseSuggestion = Get-AlternatePortSuggestion -CurrentPort $PreferredPort
+  $null = $candidates.Add($baseSuggestion)
+
+  for ($offset = 1; $offset -lt $MaxAttempts; $offset++) {
+    $candidate = $baseSuggestion + $offset
+    if ($candidate -gt 0 -and $candidate -lt 65536) {
+      $null = $candidates.Add($candidate)
+    }
+  }
+
+  foreach ($candidate in $candidates) {
+    if ($null -eq (Get-ListeningProcessName -Port $candidate)) {
+      return $candidate
+    }
+  }
+
+  return $null
+}
+
+function Resolve-LaunchPort {
+  param($Config)
+
+  $portProcess = Get-ListeningProcessName -Port $Config.port
+  if ($null -eq $portProcess) {
+    return
+  }
+
+  if (Test-HttpReady -Uri $Config.readyUrl -TimeoutSeconds 2 -ExpectedContent '"player"') {
+    return
+  }
+
+  $alternatePort = Find-AvailablePort -PreferredPort $Config.port
+  if ($null -ne $alternatePort) {
+    Write-Info ("Port {0} is in use by `{1}`. Using port {2} for this launcher run." -f $Config.port, $portProcess, $alternatePort)
+    Set-ConfigPort -Config $Config -Port $alternatePort
+    $env:PORT = [string]$alternatePort
+    return
+  }
+
+  $guidance = @(
+    ("Port {0} is already in use by another local service (`{1}`)." -f $Config.port, $portProcess),
+    "Stop that service, or set `PORT` in `.env` or this PowerShell session to an unused port, then rerun the launcher."
+  )
+
+  Fail ($guidance -join [Environment]::NewLine)
+}
+
+function Get-AppContainerId {
+  $containerId = & docker compose ps -q app
+  if ($LASTEXITCODE -ne 0) {
+    Fail "Unable to determine the app container id from docker compose."
+  }
+
+  return ($containerId | Out-String).Trim()
+}
+
+function Get-ContainerHealthStatus {
+  param([string]$ContainerId)
+
+  if ([string]::IsNullOrWhiteSpace($ContainerId)) {
+    return "missing"
+  }
+
+  $status = & docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" $ContainerId
+  if ($LASTEXITCODE -ne 0) {
+    return "missing"
+  }
+
+  return ($status | Out-String).Trim()
+}
+
+function Wait-ForContainerHealthy {
+  param(
+    [string]$ContainerId,
+    [int]$TimeoutSeconds = 90,
     [int]$PollMilliseconds = 1000
   )
 
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   while ((Get-Date) -lt $deadline) {
-    if (Test-HttpReady -Uri $Uri) {
-      return $true
+    $status = Get-ContainerHealthStatus -ContainerId $ContainerId
+    switch ($status) {
+      "healthy" { return $true }
+      "unhealthy" { return $false }
+      "exited" { return $false }
+      "dead" { return $false }
+      default { }
     }
 
     Start-Sleep -Milliseconds $PollMilliseconds
@@ -195,6 +389,7 @@ function Resolve-ProviderConfig {
     baseUrl = $baseUrl
     port = $port
     appUrl = "http://127.0.0.1:$port/"
+    readyUrl = "http://127.0.0.1:$port/api/state?name=LauncherCheck"
   }
 }
 
@@ -213,19 +408,40 @@ function Convert-ToDockerReachableUrl {
   return $Url.Replace($uri.Host, "host.docker.internal")
 }
 
-function Ensure-DockerTooling {
+function Confirm-DockerTooling {
   $dockerPath = Get-CommandPath -Name "docker"
   if (-not $dockerPath) {
-    Fail "Docker was not found on PATH. Install Docker Desktop or Docker Engine with Compose support, then rerun this script."
+    Fail "Docker was not found on PATH. Install Docker Desktop or Docker Engine with Compose support, then rerun this launcher."
   }
 
   Write-Info ("docker: {0}" -f $dockerPath)
 
-  Invoke-Native -FilePath "docker" -Arguments @("info")
-  Invoke-Native -FilePath "docker" -Arguments @("compose", "version")
+  Invoke-Native -FilePath "docker" -ArgList @("compose", "version")
+
+  $dockerInfo = Invoke-NativeCapture -FilePath "docker" -ArgList @("info", "--format", "{{.ServerVersion}}")
+  if ($dockerInfo.ExitCode -ne 0) {
+    $details = ($dockerInfo.Output -join [Environment]::NewLine).Trim()
+    $guidance = @(
+      "Docker is installed, but the Docker engine is not responding.",
+      "Start Docker Desktop and wait for the Linux container engine to finish starting, then rerun this launcher.",
+      "If Docker Desktop is already open, switch it to Linux containers and confirm `docker info` works in a new PowerShell window."
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($details)) {
+      $guidance += ""
+      $guidance += ("Docker said: {0}" -f $details)
+    }
+
+    Fail ($guidance -join [Environment]::NewLine)
+  }
+
+  $serverVersion = ($dockerInfo.Output -join "").Trim()
+  if (-not [string]::IsNullOrWhiteSpace($serverVersion)) {
+    Write-Info ("docker engine: {0}" -f $serverVersion)
+  }
 }
 
-function Ensure-ProviderReady {
+function Confirm-ProviderReady {
   param($Config)
 
   Write-Step ("Checking AI provider: {0}" -f $Config.provider)
@@ -302,30 +518,52 @@ function Set-ComposeOverrides {
 function Start-AppContainer {
   param($Config)
 
-  $args = @("compose", "up")
+  $composeArgs = @("compose", "up", "-d")
+  $composeArgs += "--build"
+  $composeArgs += "app"
+
+  Write-Step "Clearing any previous app container"
+  Invoke-Native -FilePath "docker" -ArgList @("compose", "down", "--remove-orphans")
+
+  if (-not (Wait-ForPortReleased -Port $Config.port -TimeoutSeconds 15)) {
+    Write-Info ("Port {0} still appears busy after docker compose down; checking again before launch." -f $Config.port)
+  }
+
+  Resolve-LaunchPort -Config $Config
+
   if ($Rebuild) {
-    $args += "--build"
+    Write-Step "Rebuilding app image without cache"
+    Invoke-Native -FilePath "docker" -ArgList @("compose", "build", "--no-cache", "app")
   }
-  if ($Detached) {
-    $args += "-d"
-  }
-  $args += "app"
 
   Write-Step "Starting app container"
-  Invoke-Native -FilePath "docker" -Arguments $args
+  Invoke-Native -FilePath "docker" -ArgList $composeArgs
 
-  if (-not (Wait-ForHttpReady -Uri $Config.appUrl -TimeoutSeconds 90)) {
+  $containerId = Get-AppContainerId
+  if ([string]::IsNullOrWhiteSpace($containerId)) {
+    Fail "Docker Compose did not return an app container id."
+  }
+
+  if (-not (Wait-ForContainerHealthy -ContainerId $containerId -TimeoutSeconds 90)) {
     Write-Host ""
     & docker compose ps
     Write-Host ""
     & docker compose logs --tail 100 app
-    Fail ("App did not become ready at {0}." -f $Config.appUrl)
+    Fail "App container did not become healthy."
+  }
+
+  if (-not (Wait-ForHttpReady -Uri $Config.readyUrl -TimeoutSeconds 20 -ExpectedContent '"player"')) {
+    Write-Host ""
+    & docker compose ps
+    Write-Host ""
+    & docker compose logs --tail 100 app
+    Fail ("App container became healthy, but the app API was not confirmed at {0}." -f $Config.readyUrl)
   }
 
   Write-Info ("App server is ready at {0}" -f $Config.appUrl)
 }
 
-$dotEnv = Load-DotEnvMap -Path $dotEnvPath
+$dotEnv = Get-DotEnvMap -Path $dotEnvPath
 $config = Resolve-ProviderConfig -DotEnv $dotEnv
 
 Write-Host "Text Game Docker startup" -ForegroundColor Green
@@ -337,8 +575,8 @@ if ($config.hasDotEnv) {
   Write-Info "configuration: no .env found, using Docker-side local defaults for this run"
 }
 
-Ensure-DockerTooling
-Ensure-ProviderReady -Config $config
+Confirm-DockerTooling
+Confirm-ProviderReady -Config $config
 Set-ComposeOverrides -Config $config
 Start-AppContainer -Config $config
 

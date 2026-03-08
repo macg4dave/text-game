@@ -1,6 +1,8 @@
 import "dotenv/config";
-import crypto from "crypto";
-import express from "express";
+import crypto from "node:crypto";
+import path from "node:path";
+import process from "node:process";
+import express, { type Request, type Response } from "express";
 import { assertValidConfig, config } from "./config.js";
 import { initDb } from "./db.js";
 import {
@@ -25,11 +27,33 @@ import {
 import { validateDirectorSpec, validateQuestSpec, validateStateUpdates } from "./validator.js";
 import { loadQuestSpec, reloadQuestSpec } from "./quest.js";
 import { generateTurn, getEmbedding, getEmbeddings } from "./ai.js";
+import type { DirectorSpec, DirectorState, Player, QuestSpec, QuestUpdate, StateUpdates, TurnResult } from "./types.js";
+
+interface TurnDebugParams {
+  requestId: string;
+  startedAt: number;
+  input: string;
+  player: Player | null;
+  refreshedPlayer: Player | null;
+  shortHistory: string[];
+  memories: string[];
+  statePack: unknown;
+  inputEmbedding: number[];
+  inputEmbeddingError: string | null;
+  rawResult: unknown;
+  result: TurnResult | null;
+  updateValidation: { ok: boolean; errors: string[] };
+  memoryEmbeddings: number[][];
+  memoryEmbeddingError: string | null;
+  error?: string | null;
+}
+
+type LegacyDirectorState = Partial<DirectorState> & { current_act?: string };
 
 try {
   assertValidConfig(config);
 } catch (error) {
-  console.error(error.message);
+  console.error(getErrorMessage(error));
   process.exit(1);
 }
 
@@ -43,7 +67,7 @@ let questSpec = loadQuestSpec();
 initDb();
 
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static(path.resolve(process.cwd(), "public")));
 
 const SYSTEM_PROMPT = `You are the Narrative Engine for a text-based adventure game.
 - The player can attempt anything; never refuse. Adapt consequences instead.
@@ -55,9 +79,9 @@ const SYSTEM_PROMPT = `You are the Narrative Engine for a text-based adventure g
 - Keep outputs concise and vivid.
 - Provide structured JSON only (no extra text).`;
 
-app.get("/api/state", (req, res) => {
-  const playerId = req.query.playerId || undefined;
-  const name = req.query.name || undefined;
+app.get("/api/state", (req: Request, res: Response) => {
+  const playerId = readQueryValue(req.query.playerId);
+  const name = readQueryValue(req.query.name);
   const player = getOrCreatePlayer({ playerId, name });
   const normalized = normalizeDirectorState(player);
   if (normalized.changed) {
@@ -73,28 +97,29 @@ app.get("/api/state", (req, res) => {
   });
 });
 
-app.post("/api/assist", (req, res) => {
-  const { playerId, name, input } = req.body || {};
-  if (!input || typeof input !== "string") {
+app.post("/api/assist", (req: Request, res: Response) => {
+  const body = req.body as Partial<{ playerId: string; name: string; input: string }> | undefined;
+  const input = typeof body?.input === "string" ? body.input : "";
+  if (!input) {
     return res.status(400).json({ error: "Missing input" });
   }
 
-  const player = getOrCreatePlayer({ playerId, name });
+  const player = getOrCreatePlayer({ playerId: body?.playerId, name: body?.name });
   const dynamicTexts = getRecentText(player.id, 120);
   const result = assistText({ text: input, dynamicTexts });
 
   return res.json(result);
 });
 
-app.get("/api/director/spec", (req, res) => {
+app.get("/api/director/spec", (_req: Request, res: Response) => {
   res.json({ spec: directorSpec });
 });
 
-app.get("/api/quests/spec", (req, res) => {
+app.get("/api/quests/spec", (_req: Request, res: Response) => {
   res.json({ spec: questSpec });
 });
 
-app.post("/api/director/reload", (req, res) => {
+app.post("/api/director/reload", (_req: Request, res: Response) => {
   try {
     directorSpec = reloadDirectorSpec();
     const validation = validateDirectorSpec(directorSpec);
@@ -102,12 +127,12 @@ app.post("/api/director/reload", (req, res) => {
       return res.status(400).json({ error: "Invalid director spec", detail: validation.errors });
     }
     return res.json({ ok: true, spec: directorSpec });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to reload spec", detail: err.message });
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to reload spec", detail: getErrorMessage(error) });
   }
 });
 
-app.post("/api/quests/reload", (req, res) => {
+app.post("/api/quests/reload", (_req: Request, res: Response) => {
   try {
     questSpec = reloadQuestSpec();
     const validation = validateQuestSpec(questSpec);
@@ -115,34 +140,35 @@ app.post("/api/quests/reload", (req, res) => {
       return res.status(400).json({ error: "Invalid quest spec", detail: validation.errors });
     }
     return res.json({ ok: true, spec: questSpec });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to reload quest spec", detail: err.message });
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to reload quest spec", detail: getErrorMessage(error) });
   }
 });
 
-app.post("/api/turn", async (req, res) => {
+app.post("/api/turn", async (req: Request, res: Response) => {
   const requestId = crypto.randomUUID();
   const startedAt = Date.now();
-  let player = null;
-  let refreshedPlayer = null;
+  let player: Player | null = null;
+  let refreshedPlayer: Player | null = null;
   let input = "";
-  let shortHistory = [];
-  let memories = [];
-  let statePack = null;
-  let inputEmbedding = [];
-  let inputEmbeddingError = null;
-  let rawResult = null;
-  let result = null;
-  let updateValidation = { ok: true, errors: [] };
-  let memoryEmbeddings = [];
-  let memoryEmbeddingError = null;
+  let shortHistory: string[] = [];
+  let memories: string[] = [];
+  let statePack: unknown = null;
+  let inputEmbedding: number[] = [];
+  let inputEmbeddingError: string | null = null;
+  let rawResult: unknown = null;
+  let result: TurnResult | null = null;
+  let updateValidation: { ok: boolean; errors: string[] } = { ok: true, errors: [] };
+  let memoryEmbeddings: number[][] = [];
+  let memoryEmbeddingError: string | null = null;
 
   res.setHeader("x-request-id", requestId);
 
   try {
-    const { playerId, name, input: submittedInput } = req.body || {};
+    const body = req.body as Partial<{ playerId: string; name: string; input: string }> | undefined;
+    const submittedInput = typeof body?.input === "string" ? body.input : "";
     input = submittedInput;
-    if (!input || typeof input !== "string") {
+    if (!input) {
       return res.status(400).json({
         error: "Missing input",
         debug: buildTurnDebug({
@@ -165,7 +191,7 @@ app.post("/api/turn", async (req, res) => {
       });
     }
 
-    player = getOrCreatePlayer({ playerId, name });
+    player = getOrCreatePlayer({ playerId: body?.playerId, name: body?.name });
     const normalized = normalizeDirectorState(player);
     if (normalized.changed) {
       updateDirectorState(player.id, normalized.director);
@@ -177,9 +203,9 @@ app.post("/api/turn", async (req, res) => {
     shortHistory = getShortHistory(player.id, 6);
     try {
       inputEmbedding = await getEmbedding({ model: embeddingModel, input });
-    } catch (err) {
+    } catch (error) {
       inputEmbedding = [];
-      inputEmbeddingError = err.message;
+      inputEmbeddingError = getErrorMessage(error);
     }
     memories = getRelevantMemories(player.id, inputEmbedding, 6);
 
@@ -240,11 +266,7 @@ app.post("/api/turn", async (req, res) => {
     addEvent(player.id, "narrator", result.narrative);
 
     updatePlayerState(player.id, result.state_updates);
-    const nextFlags = mergeList(
-      player.flags,
-      result.state_updates.flags_add,
-      result.state_updates.flags_remove
-    );
+    const nextFlags = mergeList(player.flags, result.state_updates.flags_add, result.state_updates.flags_remove);
     const directorState = applyDirectorRules({
       spec: directorSpec,
       directorState: player.director_state,
@@ -253,15 +275,15 @@ app.post("/api/turn", async (req, res) => {
     });
     directorState.end_goal_progress = result.director_updates.end_goal_progress;
     updateDirectorState(player.id, directorState);
-    if (result.memory_updates?.length) {
+    if (result.memory_updates.length) {
       try {
         memoryEmbeddings = await getEmbeddings({
           model: embeddingModel,
           inputs: result.memory_updates
         });
-      } catch (err) {
+      } catch (error) {
         memoryEmbeddings = [];
-        memoryEmbeddingError = err.message;
+        memoryEmbeddingError = getErrorMessage(error);
       }
 
       const memoryItems = result.memory_updates.map((content, index) => ({
@@ -298,10 +320,10 @@ app.post("/api/turn", async (req, res) => {
         memoryEmbeddingError
       })
     });
-  } catch (err) {
+  } catch (error) {
     res.status(500).json({
       error: "Turn failed",
-      detail: err.message,
+      detail: getErrorMessage(error),
       debug: buildTurnDebug({
         requestId,
         startedAt,
@@ -318,7 +340,7 @@ app.post("/api/turn", async (req, res) => {
         updateValidation,
         memoryEmbeddings,
         memoryEmbeddingError,
-        error: err.message
+        error: getErrorMessage(error)
       })
     });
   }
@@ -328,44 +350,43 @@ app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`);
 });
 
-function sanitizeTurnResult(result, player) {
-  const safe = {
-    narrative: typeof result?.narrative === "string" ? result.narrative : "The world holds its breath.",
-    player_options: ensureStringArray(result?.player_options, 6),
-    state_updates: {
-      location: ensureString(result?.state_updates?.location, player.location),
-      inventory_add: ensureStringArray(result?.state_updates?.inventory_add),
-      inventory_remove: ensureStringArray(result?.state_updates?.inventory_remove),
-      flags_add: ensureStringArray(result?.state_updates?.flags_add),
-      flags_remove: ensureStringArray(result?.state_updates?.flags_remove),
-      quests: ensureQuestArray(result?.state_updates?.quests)
-    },
-    director_updates: {
-      end_goal_progress: ensureString(result?.director_updates?.end_goal_progress, player.director_state.end_goal_progress)
-    },
-    memory_updates: ensureStringArray(result?.memory_updates, 8)
+function sanitizeTurnResult(result: unknown, player: Player): TurnResult {
+  const candidate = (result && typeof result === "object" ? result : {}) as Partial<TurnResult> & {
+    state_updates?: Partial<StateUpdates>;
+    director_updates?: Partial<TurnResult["director_updates"]>;
   };
 
-  return safe;
+  return {
+    narrative: typeof candidate.narrative === "string" ? candidate.narrative : "The world holds its breath.",
+    player_options: ensureStringArray(candidate.player_options, 6),
+    state_updates: {
+      location: ensureString(candidate.state_updates?.location, player.location),
+      inventory_add: ensureStringArray(candidate.state_updates?.inventory_add),
+      inventory_remove: ensureStringArray(candidate.state_updates?.inventory_remove),
+      flags_add: ensureStringArray(candidate.state_updates?.flags_add),
+      flags_remove: ensureStringArray(candidate.state_updates?.flags_remove),
+      quests: ensureQuestArray(candidate.state_updates?.quests)
+    },
+    director_updates: {
+      end_goal_progress: ensureString(candidate.director_updates?.end_goal_progress, player.director_state.end_goal_progress)
+    },
+    memory_updates: ensureStringArray(candidate.memory_updates, 8)
+  };
 }
 
-function ensureString(value, fallback = "") {
+function ensureString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
 
-function ensureNumber(value, fallback = 0) {
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function ensureStringArray(value, max = 20) {
+function ensureStringArray(value: unknown, max = 20): string[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((item) => typeof item === "string").slice(0, max);
+  return value.filter((item): item is string => typeof item === "string").slice(0, max);
 }
 
-function ensureQuestArray(value) {
+function ensureQuestArray(value: unknown): QuestUpdate[] {
   if (!Array.isArray(value)) return [];
   return value
-    .filter((item) => item && typeof item.id === "string")
+    .filter((item): item is { id: string; status?: string; summary?: string } => Boolean(item) && typeof item === "object" && "id" in item && typeof item.id === "string")
     .map((item) => ({
       id: item.id,
       status: typeof item.status === "string" ? item.status : "unknown",
@@ -373,22 +394,24 @@ function ensureQuestArray(value) {
     }));
 }
 
-function mergeList(existing, addList = [], removeList = []) {
+function mergeList(existing: string[], addList: string[] = [], removeList: string[] = []): string[] {
   const set = new Set(existing);
   addList.forEach((item) => set.add(item));
   removeList.forEach((item) => set.delete(item));
   return Array.from(set);
 }
 
-function normalizeDirectorState(player) {
-  const director = player.director_state || getInitialDirectorState(directorSpec);
-  const missingFields = !director.current_act_id || !director.current_beat_id || !director.current_beat_label;
-  if (!missingFields) return { director, changed: false };
-
+function normalizeDirectorState(player: Player): { director: DirectorState; changed: boolean } {
   const initial = getInitialDirectorState(directorSpec);
-  const fallback = { ...initial, end_goal_progress: director.end_goal_progress || initial.end_goal_progress };
+  const director = (player.director_state || initial) as LegacyDirectorState;
+  const missingFields = !director.current_act_id || !director.current_beat_id || !director.current_beat_label;
+  if (!missingFields) return { director: director as DirectorState, changed: false };
+
+  const fallback: DirectorState = {
+    ...initial,
+    end_goal_progress: director.end_goal_progress || initial.end_goal_progress
+  };
   if (director.current_act && director.current_act_id === undefined) {
-    // Attempt to map legacy act names
     const act = directorSpec.acts.find((item) => item.name === director.current_act);
     if (act) {
       fallback.current_act_id = act.id;
@@ -408,7 +431,7 @@ function buildRuntimeDebug() {
   };
 }
 
-function buildSessionDebug(player) {
+function buildSessionDebug(player: Player | null) {
   if (!player) return null;
 
   return {
@@ -419,7 +442,7 @@ function buildSessionDebug(player) {
   };
 }
 
-function buildPlayerSnapshot(player) {
+function buildPlayerSnapshot(player: Player | null) {
   if (!player) return null;
 
   return {
@@ -435,16 +458,23 @@ function buildPlayerSnapshot(player) {
   };
 }
 
-function buildPromptPreview(statePack, shortHistory, memories) {
-  if (!statePack) return null;
+function buildPromptPreview(statePack: unknown, shortHistory: string[], memories: string[]) {
+  if (!statePack || typeof statePack !== "object") return null;
+
+  const typedPack = statePack as {
+    player: unknown;
+    summary: unknown;
+    director: unknown;
+    director_spec?: { current_beat?: unknown };
+  };
 
   return {
     short_history: shortHistory,
     retrieved_memories: memories,
-    player_state: statePack.player,
-    summary: statePack.summary,
-    director_state: statePack.director,
-    current_beat: statePack.director_spec?.current_beat || null
+    player_state: typedPack.player,
+    summary: typedPack.summary,
+    director_state: typedPack.director,
+    current_beat: typedPack.director_spec?.current_beat || null
   };
 }
 
@@ -465,13 +495,13 @@ function buildTurnDebug({
   memoryEmbeddings,
   memoryEmbeddingError,
   error = null
-}) {
+}: TurnDebugParams) {
   return {
     request_id: requestId,
     runtime: buildRuntimeDebug(),
     session: buildSessionDebug(refreshedPlayer || player),
     turn: {
-      input: typeof input === "string" ? input : null,
+      input: input || null,
       latency_ms: Date.now() - startedAt,
       prompt_preview: buildPromptPreview(statePack, shortHistory, memories),
       embeddings: {
@@ -482,8 +512,8 @@ function buildTurnDebug({
         memory_error: memoryEmbeddingError
       },
       validation: {
-        ok: Boolean(updateValidation?.ok),
-        errors: updateValidation?.errors || []
+        ok: Boolean(updateValidation.ok),
+        errors: updateValidation.errors || []
       },
       raw_model_output: rawResult,
       sanitized_output: result,
@@ -492,4 +522,15 @@ function buildTurnDebug({
       error
     }
   };
+}
+
+function readQueryValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return typeof value[0] === "string" ? value[0] : undefined;
+  return undefined;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }

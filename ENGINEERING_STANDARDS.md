@@ -7,6 +7,7 @@ This document holds the cross-cutting delivery rules for the project. It is inte
 A phase or backlog item is complete only when all relevant conditions below are met:
 
 - Exit criteria are validated through tests or documented manual checks.
+- `npm run type-check` passes for any task that changes TypeScript source, build scripts, or type-facing config.
 - Schema changes include version updates and migrations where applicable.
 - Replay-affecting changes include updated replay fixtures.
 - Backlog state is updated in [BACKLOG.md](/g:/text-game/BACKLOG.md).
@@ -35,6 +36,7 @@ Numeric targets are required before Phase 0 closes. Until then, this register is
 
 ## Test Minimums
 
+- TypeScript compile and `npm run type-check` must pass before unit, integration, or manual validation is counted as complete for TS changes
 - Unit tests for reducers, validators, ranking, and other pure functions
 - Integration tests for the turn pipeline using fixtures
 - Golden replay tests for deterministic scripted runs
@@ -45,6 +47,7 @@ Numeric targets are required before Phase 0 closes. Until then, this register is
 ## AI Test-First Change Policy
 
 - Treat AI-related work as test-based by default, not as prompt tinkering followed by hope.
+- Treat TypeScript type safety as a guardrail, not a substitute for runtime validation.
 - Before changing prompts, schemas, model defaults, adapter request shapes, retrieval logic, director rules, or validation behavior, first add or update at least one verification artifact that captures the intended behavior.
 - Acceptable verification artifacts are:
   - a unit test for pure logic

@@ -29,7 +29,7 @@ Before starting substantial work, read:
 2. Confirm dependencies are satisfied.
 3. For AI-related work, start by adding or tightening a test, fixture, or scripted harness step that defines the expected behavior before changing implementation.
 4. Keep edits inside `Files to Touch` unless the task card is updated first.
-5. Run the listed validation commands.
+5. If TypeScript source changed, run `npm run type-check` before the listed validation commands.
 6. Update docs affected by the change.
 7. Move the task to `Review` or `Done`.
 
@@ -60,6 +60,7 @@ Before starting substantial work, read:
 - Never mark a task `Done` without running the task's listed validation or explaining why it could not be run.
 - If validation is partially complete, use `Review` instead of `Done`.
 - If a blocker appears, switch the task to `Blocked` and record the blocker briefly.
+- Treat TypeScript compile or type-check failures as blockers, not warnings.
 - For AI behavior changes, validation must include the updated test, fixture, or harness path that was defined before implementation, plus the local AI workflow harness when a compatible local provider is available.
 
 ## Project Constraints

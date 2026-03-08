@@ -4,6 +4,8 @@ A portable, text-based adventure with a director layer that nudges the story tow
 
 The project uses the OpenAI Node SDK through a provider-neutral config layer, so you can keep the same app code while swapping between providers that support OpenAI-compatible generation and embeddings endpoints.
 
+The application source is now TypeScript-first: server code lives in `src/*.ts`, the browser source lives in `public/app.ts`, and the browser still loads the emitted `public/app.js` asset.
+
 ## Preferred Dev Runtime
 
 The preferred development path is Docker. The app server, `npm install`, and all Node-based commands should run inside containers so host Node/npm versions and native addon toolchains do not block startup.
@@ -24,14 +26,48 @@ What this gives you:
 
 - Node 22 is pinned inside the container
 - `better-sqlite3` builds inside the container instead of on the host
-- `node_modules` live in a Docker volume, not on the host
-- the repo source and SQLite data stay mounted from your working tree
+- the app source is baked into the image so startup works even when Docker bind mounts from a Windows secondary drive are flaky
+- the SQLite database lives in a Docker volume so app state can survive container restarts without hiding the built-in spec files
+
+Current limitation of the Docker-first path:
+
+- source edits require a rebuild because the app is not bind-mounted into the container
+
+Current limitation of the TypeScript browser path:
+
+- `npm run dev` rebuilds `public/app.js` when it starts, but it does not yet watch `public/app.ts` continuously during the same session
 
 On Windows, the launcher wraps the same Docker path and opens the browser for you:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
+
+## TypeScript Workflow
+
+If you run the app outside Docker, the normal local workflow is now:
+
+```bash
+npm install
+npm run type-check
+npm run dev
+```
+
+Useful TypeScript-aware commands:
+
+```bash
+npm run type-check
+npm run build
+npm run dev
+npm test
+```
+
+What each command does:
+
+- `npm run type-check` validates all TypeScript source in `src/` and `public/`
+- `npm run build` compiles the server to `dist/src` and rebuilds the browser asset at `public/app.js`
+- `npm run dev` rebuilds the browser asset once, then starts the TypeScript server directly through `tsx`
+- `npm test` runs type-checking first, then executes the TypeScript tests directly
 
 ## Install Node.js And npm
 
@@ -41,9 +77,9 @@ If you do want a host install, this project expects Node.js 22 LTS. `npm` is inc
 
 Official references:
 
-- Node.js downloads: https://nodejs.org/en/download
-- Node.js release lines and LTS status: https://nodejs.org/en/download/releases/
-- npm overview: https://nodejs.org/en/learn/getting-started/an-introduction-to-the-npm-package-manager
+- [Node.js downloads](https://nodejs.org/en/download)
+- [Node.js release lines and LTS status](https://nodejs.org/en/download/releases/)
+- [npm overview](https://nodejs.org/en/learn/getting-started/an-introduction-to-the-npm-package-manager)
 
 ### Windows
 
@@ -106,7 +142,7 @@ If your distro package is too old for current packages, use the official downloa
 docker compose up --build
 ```
 
-3. Open `http://localhost:3000`.
+1. Open `http://localhost:3000`.
 
 Useful Docker commands:
 
@@ -115,6 +151,13 @@ docker compose up --build
 docker compose up -d
 docker compose logs -f app
 docker compose down
+```
+
+If port `3000` is already in use on your machine, you can still set `PORT` for that shell session before starting:
+
+```powershell
+$env:PORT = "3300"
+docker compose up --build
 ```
 
 On Windows, the repo now has a one-command launcher:
@@ -135,13 +178,17 @@ The launcher:
 - reads `.env` when present
 - falls back to the local Ollama preset for that run when `.env` is missing
 - checks the configured AI path and starts local Ollama when possible
+- clears any previous `text-game` compose app container before starting the fresh app instance
+- automatically picks a free local port for that run if the configured port is already occupied by another service
 - starts the app container through `docker compose`
-- waits for the app to respond, then opens the browser automatically
+- waits for the app container to become healthy, confirms the player surface is actually being served, then opens the browser automatically
 
 Useful flags:
 
 - `-NoBrowser` skips opening the webpage
 - `-Rebuild` forces a Docker image rebuild before launch
+
+The launcher respects `PORT` from your PowerShell session or `.env`. If that port is already taken by another local service, the launcher now falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
 
 The browser UI includes:
 
@@ -156,13 +203,14 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 
 ## Key Files
 
-- `src/server.js` - API server and routing
-- `src/config.js` - runtime config and provider-neutral AI settings
-- `src/ai.js` - OpenAI-compatible chat completions + JSON schema
-- `src/game.js` - State, memory, director updates + retrieval scoring
-- `src/assist.js` - Local spellcheck + autocomplete
-- `src/validator.js` - Spec and update validation
-- `public/` - Web UI
+- `src/server.ts` - API server and routing
+- `src/config.ts` - runtime config and provider-neutral AI settings
+- `src/ai.ts` - OpenAI-compatible chat completions + JSON schema
+- `src/game.ts` - State, memory, director updates + retrieval scoring
+- `src/assist.ts` - Local spellcheck + autocomplete
+- `src/validator.ts` - Spec and update validation
+- `public/app.ts` - browser TypeScript source
+- `public/app.js` - emitted browser asset loaded by `index.html`
 - `ROADMAP.md` - Roadmap, tracker, blockers
 - `AI_CONTROL.md` - Director/AI control system design
 - `ARCHITECTURE.md` - provider strategy and integration direction
@@ -194,6 +242,14 @@ When the app runs in Docker, `localhost` inside the container is not your host m
 - For any other local OpenAI-compatible gateway, use `host.docker.internal` instead of `127.0.0.1` or `localhost`
 
 The Windows launcher auto-translates local host URLs to Docker-reachable URLs for the container path. Raw `docker compose` usage expects your `.env` values to already be Docker-safe.
+
+### Docker note for Windows repo drives
+
+If Docker Desktop cannot mount the drive that contains this repo, the container now falls back to the copy baked into the image.
+
+- startup still works through `docker compose up --build` or `scripts/start-dev.ps1`
+- live source edits are not reflected until you rebuild
+- this fallback is meant to keep launch reliable while later tasks improve the packaged path
 
 ### Provider notes
 
@@ -241,11 +297,11 @@ If you use raw Docker commands instead of the launcher, prefer `OLLAMA_BASE_URL=
 Use a test-first loop as the default workflow for prompt, schema, adapter, retrieval, and director-rule changes:
 
 1. Add or tighten a test, fixture, replay case, or harness assertion that captures the desired behavior.
-2. Run that focused check first so the missing behavior or coverage gap is visible.
+2. Run `npm run type-check` and that focused check first so the missing behavior or coverage gap is visible.
 3. Run `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` before changing AI behavior when a compatible local provider is available.
 4. Make the smallest change.
-5. Re-run the focused check, then re-run the same local AI harness immediately after the change.
-6. Only move on to broader app testing after the focused check and harness both pass.
+5. Re-run `npm run type-check`, then re-run the focused check, then re-run the same local AI harness immediately after the change.
+6. Only move on to broader app testing after the type-check, focused check, and harness all pass.
 
 If `npm` is available on your machine, the same check is exposed as `npm run test:local-ai`.
 

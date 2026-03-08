@@ -1,18 +1,21 @@
 # Backlog
 
-This document is the AI-facing execution board for the project. It is optimized for coding agents and humans working through small, verifiable tasks.
+This document is the AI-facing execution board for the project. It is optimized for coding agents and humans working through small, verifiable tasks while removing friction from the supported player path.
 
 If this file and [ROADMAP.md](/g:/text-game/ROADMAP.md) disagree, the roadmap wins on product scope and phase order. If this file and implementation disagree, update this file before starting new work.
+
+Post-TypeScript-migration note: source files under `src/` now use `.ts`. When older task cards mention `.js` files, interpret them as the TypeScript equivalents unless the reference is explicitly to an emitted asset such as `public/app.js`.
 
 ## How Agents Must Use This File
 
 1. Read [ROADMAP.md](/g:/text-game/ROADMAP.md), this file, and [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md) before starting substantial work.
 2. Choose work from `## Ready Queue` unless the user explicitly assigns a different task.
-3. Claim exactly one task card by changing its `Status` from `Ready` to `In Progress`.
-4. Do only the work described in that task card unless a blocking dependency forces a documented expansion.
-5. Run the listed validation commands before marking the task complete.
-6. Update the task card, the queue table, and any affected docs before ending the session.
-7. If blocked, change the task to `Blocked` and add a one-line blocker note.
+3. Within the current phase, bias toward the task that removes the most player friction, especially terminal use, manual config editing, and startup ambiguity.
+4. Claim exactly one task card by changing its `Status` from `Ready` to `In Progress`.
+5. Do only the work described in that task card unless a blocking dependency forces a documented expansion.
+6. Run the listed validation commands before marking the task complete.
+7. Update the task card, the queue table, and any affected docs before ending the session.
+8. If blocked, change the task to `Blocked` and add a one-line blocker note.
 
 ## Status Model
 
@@ -28,6 +31,13 @@ If this file and [ROADMAP.md](/g:/text-game/ROADMAP.md) disagree, the roadmap wi
 - `Now`: should be worked in the current phase
 - `Next`: can be prepared now but should not be started until `Now` work is stable
 - `Later`: intentionally deferred
+
+## End-User-First Priority Rules
+
+- Prefer tasks that remove terminal usage, manual `.env` editing, browser URL hunting, or hidden service management from the supported player path.
+- When two tasks are otherwise similar, choose the one that makes clean-machine Windows playtesting easier.
+- A task is not end-user complete if only a developer can diagnose or recover from failure.
+- Browser-only convenience work does not outrank launcher, setup, save or load, or first-run clarity work while the supported player path is still rough.
 
 ## Agent Task Card Template
 
@@ -66,8 +76,11 @@ Use this exact shape when adding new work:
 
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T01 | Now | P0 | P1 | Dev environment bootstrap script | Review | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
-| T02 | Now | P0 | P1 | Config module with schema validation | Ready | None | `npm test` |
+| T01 | Now | P0 | P1 | Player launch bootstrap path | Review | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
+| T41 | Now | P0 | P1 | Full TypeScript migration | In Progress | None | `npm run type-check`; `npm test`; `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
+| T01a | Now | P0 | P1 | Runtime preflight and recovery messaging | Ready | T01, T02 | Manual launcher failure checks |
+| T35 | Now | P0 | P1 | Packaging prototype and decision memo | Ready | T01 | Prototype build verification |
+| T02 | Now | P0 | P1 | Config module with schema validation | Review | None | `npm test` |
 | T02a | Now | P0 | P1 | LiteLLM env contract and alias defaults | Ready | T02 | Manual config verification |
 | T02b | Now | P0 | P1 | LiteLLM proxy template and startup docs | Ready | T02a | Manual LiteLLM startup verification |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Review | T02 | Manual local provider startup verification |
@@ -82,8 +95,11 @@ Use this exact shape when adding new work:
 | T08 | Next | P1 | P1 | Deterministic state reducer | Ready | T06 | `npm test` |
 | T09 | Next | P1 | P1 | Event log persistence and replay | Ready | T04, T08 | Replay fixture execution |
 | T10 | Next | P1 | P1 | Output validator and sanitizer | Ready | T06 | `npm test` |
-| T11 | Next | P1 | P2 | Minimal web UI loop | Review | T06 | Manual browser smoke test |
-| T12 | Next | P1 | P2 | New game onboarding | Ready | T06 | Manual new-game flow check |
+| T11 | Next | P1 | P1 | Minimal player UI loop | Review | T06 | Manual browser smoke test |
+| T12 | Next | P1 | P1 | New game onboarding | Ready | T06 | Manual new-game flow check |
+| T12b | Next | P1 | P1 | First-run setup wizard and connection test | Ready | T02, T11, T12 | Manual first-run flow check |
+| T29 | Next | P1 | P1 | Save slots UI | Ready | T08, T09 | Manual save/load check |
+| T34 | Next | P1 | P1 | Tutorial and first-run guidance | Ready | T11, T12 | Manual onboarding smoke test |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
 | T13 | Later | P2 | P1 | Embeddings pipeline | Ready | T07a | Manual embedding call verification |
 | T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Ready | T02b | Manual embedding route verification |
@@ -92,28 +108,26 @@ Use this exact shape when adding new work:
 | T16 | Later | P2 | P1 | Director spec format and versioning | Ready | T06, D02 | Schema validation check |
 | T17 | Later | P2 | P1 | Director enforcement in turn pipeline | Ready | T16 | Integration test |
 | T18 | Later | P2 | P2 | Director reload endpoint | Ready | T16 | Manual reload verification |
-| T19 | Later | P3 | P1 | Quest schema and validation | Ready | T16 | Schema validation check |
-| T20 | Later | P3 | P1 | Quest state transitions | Ready | T19 | `npm test` |
-| T21 | Later | P3 | P2 | Quest editor UI | Ready | T19 | Manual editor smoke test |
-| T22 | Later | P3 | P2 | World state inspector UI | Ready | T20 | Manual diff view check |
-| T23 | Later | P3 | P2 | Quest import and export | Ready | T19 | Import/export smoke test |
+| T30 | Later | P2 | P2 | Save import and export | Ready | T29 | Import/export compatibility check |
+| T31 | Later | P3 | P2 | Optional save encryption | Ready | T29 | Encryption or decryption smoke test |
+| T32 | Later | P3 | P1 | Accessibility pass | Ready | T11, T34 | Accessibility checklist |
+| T33 | Later | P3 | P2 | Theme and typography pass | Ready | T11 | Manual readability review |
+| T36 | Later | P3 | P1 | Windows playtest build | Ready | T35, T12b, T29 | Build or install verification |
+| T38 | Later | P3 | P1 | Installer packaging | Ready | T36 | Installer smoke test |
+| T19 | Later | P4 | P1 | Quest schema and validation | Ready | T16 | Schema validation check |
+| T20 | Later | P4 | P1 | Quest state transitions | Ready | T19 | `npm test` |
+| T21 | Later | P4 | P2 | Quest editor UI | Ready | T19 | Manual editor smoke test |
+| T22 | Later | P4 | P2 | World state inspector UI | Ready | T20 | Manual diff view check |
+| T23 | Later | P4 | P2 | Quest import and export | Ready | T19 | Import or export smoke test |
 | T24 | Later | P4 | P1 | Core pipeline tests | Ready | T07, T08, T10 | CI-equivalent test run |
 | T25 | Later | P4 | P1 | Fuzz tests for validator | Ready | T10 | Fuzz test run |
 | T26 | Later | P4 | P1 | Telemetry for tokens, latency, and cost | Ready | T07 | Manual telemetry verification |
 | T27 | Later | P4 | P2 | Audit log export | Ready | T09 | Export smoke test |
-| T28 | Later | P4 | P2 | Model failure fallback | Ready | T07, T10 | Timeout/failure simulation |
-| T29 | Later | P5 | P1 | Save slots UI | Ready | T08, T09 | Manual save/load check |
-| T30 | Later | P5 | P1 | Save import and export | Ready | T29 | Import/export compatibility check |
-| T31 | Later | P5 | P2 | Optional save encryption | Ready | T29 | Encryption/decryption smoke test |
-| T32 | Later | P5 | P1 | Accessibility pass | Ready | T11 | Accessibility checklist |
-| T33 | Later | P5 | P2 | Theme and typography pass | Ready | T11 | Manual readability review |
-| T34 | Later | P5 | P1 | Tutorial and first-run guidance | Ready | T11, T12 | Manual onboarding smoke test |
-| T35 | Later | P6 | P1 | Packaging prototype and decision memo | Ready | Phase 5 exit gate, D04 | Prototype build verification |
-| T36 | Later | P6 | P1 | Windows and macOS builds | Ready | T35 | Build/install verification |
-| T37 | Later | P6 | P2 | Auto-update channel | Ready | T36 | Update flow verification |
-| T38 | Later | P6 | P2 | Installer packaging | Ready | T36 | Installer smoke test |
-| T39 | Later | P6 | P3 | Linux build | Ready | T35 | Build verification if supported |
-| T40 | Later | P6 | P2 | Release checklist | Ready | T36 | Checklist walkthrough |
+| T28 | Later | P4 | P2 | Model failure fallback | Ready | T07, T10 | Timeout or failure simulation |
+| T36a | Later | P5 | P2 | macOS feasibility check | Ready | T35 | Feasibility note |
+| T37 | Later | P5 | P2 | Auto-update channel | Ready | T38 | Update flow verification |
+| T39 | Later | P5 | P3 | Linux build | Ready | T35 | Build verification if supported |
+| T40 | Later | P5 | P1 | Release checklist | Ready | T36, T38 | Checklist walkthrough |
 
 ## Active Task Protocol
 
@@ -127,22 +141,68 @@ When an agent starts work, it must:
 
 When a human assigns a task directly, the assigned task overrides queue order.
 
+### T41 - Full TypeScript Migration
+
+- Status: In Progress
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Move the codebase from JavaScript source to TypeScript source without changing runtime behavior or the provider-neutral game contract.
+- Scope:
+  - migrate server, config, gameplay, AI, validation, DB, and browser source to TypeScript
+  - update npm scripts, compiler config, and emitted browser asset flow
+  - update the backlog and repo docs to reflect the new validation and file-path reality
+- Files to Touch:
+  - package.json
+  - tsconfig.json
+  - tsconfig.server.json
+  - README.md
+  - AGENTS.md
+  - BACKLOG.md
+  - ENGINEERING_STANDARDS.md
+  - ARCHITECTURE.md
+  - AI_CONTROL.md
+  - ROADMAP.md
+  - setup_local_a.i.md
+  - public/app.ts
+  - public/app.js
+  - src/
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - None
+- Validation:
+  - `npm run type-check`
+  - `npm test`
+  - `docker compose up --build`
+  - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`
+  - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`
+- Definition of Done:
+  - TypeScript source fully replaces the previous JavaScript source in `src/`
+  - browser source is maintained in TypeScript while the browser continues to load a JS asset
+  - validation and contributor docs reflect the new TypeScript workflow
+  - runtime behavior remains provider-neutral and server-authoritative
+- Handoff Notes:
+  - user explicitly assigned the migration on 2026-03-08, overriding queue order
+  - current shell environment does not have host `npm`, so local host validation may need to run through Docker or another machine with Node.js installed
+
 ## Detailed Task Cards
 
-### T01 - Dev Environment Bootstrap Script
+### T01 - Player Launch Bootstrap Path
 
 - Status: Review
 - Queue: Now
 - Phase: P0
 - Priority: P1
 - Owner Role: Tech lead
-- Goal: Make local setup and startup reproducible with the fewest manual steps possible.
+- Goal: Make startup reproducible through one obvious launch path for both developers and future end users.
 - Scope:
-  - define a one-command local startup path
+  - define a one-command local dev startup path
   - add a Docker-based cross-platform startup path that keeps Node/npm and native builds inside containers
-  - add a Windows launcher that checks prerequisites, verifies the configured AI path, starts the app server, and opens the browser
-  - document the expected local prerequisites
-  - ensure the startup path matches the README
+  - add a Windows launcher that checks prerequisites, verifies the configured AI path, starts the app server, and opens the player surface
+  - document the expected local prerequisites and supported launch limitations
+  - ensure the startup path matches the README and can seed later packaged builds
 - Files to Touch:
   - package.json
   - README.md
@@ -162,9 +222,10 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`
 - Definition of Done:
   - one documented Docker command starts the app locally across supported desktop platforms
-  - the Windows launcher checks the expected local prerequisites and opens the app automatically
+  - the Windows launcher checks the expected local prerequisites, opens the app automatically, and surfaces actionable failures
   - required environment variables are documented
   - setup instructions match the current repository
+  - launcher behavior is suitable as the basis for later packaged builds
 - Handoff Notes:
   - user assigned the Windows startup script directly on 2026-03-07
   - added Docker-first dev startup with `Dockerfile`, `docker-compose.yml`, and `.dockerignore`
@@ -172,13 +233,93 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - kept `npm run dev:windows` as a convenience wrapper for the Windows launcher when local npm exists
   - README now includes a cross-platform Node.js and npm install guide for Windows, macOS, and Linux
   - the launcher now checks Docker, probes the configured AI path, translates local host AI URLs to Docker-reachable URLs when needed, starts the app container, waits for readiness, and opens the browser
-  - Docker-based startup was requested on 2026-03-08 to avoid host Node/npm and native addon issues across Windows, macOS, and Linux
-  - validation completed: PowerShell syntax parse for `scripts/start-dev.ps1`, `docker compose config`, direct launcher run through the Docker engine prerequisite check, and `git diff --check`
-  - full runtime validation is still pending because the Docker CLI is installed but the Docker Desktop Linux engine was not running in this shell, so `docker compose build app`, `docker compose up --build`, and end-to-end browser startup could not be completed here
+  - this task is now treated as the seed of the supported player launch path, not only a developer convenience script
+  - fixed a Docker-on-Windows bind-mount failure from the `G:` workspace by baking app source into the image and persisting only `game.db` through a named Docker volume
+  - tightened launcher readiness so it now waits for container health and verifies the actual player surface instead of accepting any HTTP responder on port 3000
+  - fixed a Windows port-release race after `docker compose down`; the launcher now waits briefly for Docker or WSL listeners to release the configured port before failing
+  - the launcher now auto-selects a nearby free port for the current run when the configured host port is already occupied by another local service
+  - updated the startup docs so `PORT` overrides are explicit for machines where `3000` is already occupied
+  - validation completed on 2026-03-08 with `docker compose up --build` equivalent via `docker compose up --build -d` plus host API verification, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` with `PORT=3300`
+  - default `PORT=3000` on this machine is occupied by an unrelated local `wslrelay` listener that returns an nginx 404, so the launcher's port-conflict guidance was exercised and the successful runtime validation used a session `PORT` override
+  - revalidated on 2026-03-08 with `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` and no manual `PORT` override; the launcher detected the `3000` conflict, selected `3100`, and the app API responded successfully on the fallback port
+
+### T01a - Runtime Preflight And Recovery Messaging
+
+- Status: Ready
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Explain missing config and unreachable AI dependencies in plain language before gameplay starts.
+- Scope:
+  - detect missing env values, unreachable AI endpoints, and common model alias mistakes during startup
+  - expose safe diagnostic state to the launcher or player UI
+  - render actionable recovery messages instead of raw stack traces
+  - cover the common first-run failures for the supported Windows launch path
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - public/index.html
+  - public/app.js
+  - src/config.js
+  - src/server.js
+- Do Not Touch:
+  - data/spec/
+  - src/game.js
+- Dependencies:
+  - T01
+  - T02
+- Validation:
+  - `npm test`
+  - manual launcher failure checks with missing and unreachable AI config
+- Definition of Done:
+  - first-run failures present recovery steps without requiring developer knowledge
+  - diagnostics omit secrets while still distinguishing the common failure modes
+  - launcher and browser surfaces agree on the same recovery guidance
+- Handoff Notes:
+  - keep player-facing wording plain and avoid implementation jargon unless it helps support reproduce the issue
+
+### T35 - Packaging Prototype And Decision Memo
+
+- Status: Ready
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Release lead
+- Goal: Choose the earliest packaging path that preserves one gameplay stack and supports clean-machine playtests.
+- Scope:
+  - compare browser-launcher-only, Tauri, and Electron against the current runtime needs
+  - build one thin prototype of the leading option
+  - document startup, save-path, logging, and AI-config implications
+  - define a clean-machine Windows smoke checklist for the chosen direction
+- Files to Touch:
+  - ARCHITECTURE.md
+  - BACKLOG.md
+  - README.md
+  - ROADMAP.md
+  - package.json
+  - scripts/
+  - packaging/
+- Do Not Touch:
+  - data/spec/
+  - src/game.js
+- Dependencies:
+  - T01
+- Validation:
+  - prototype build verification
+  - clean-machine launch smoke checklist dry run
+- Definition of Done:
+  - one packaging direction has a clear rationale
+  - the prototype proves the local server and UI can be launched from one obvious player action
+  - save, log, and config implications are documented for follow-on tasks
+  - open blockers are written down clearly enough for T36 and T38
+- Handoff Notes:
+  - keep the gameplay stack shared with the browser dev path
+  - if the launcher-only path is enough for the next milestone, record why and what would force a wrapper later
 
 ### T02 - Config Module With Schema Validation
 
-- Status: Ready
+- Status: In Progress
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -187,9 +328,11 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Scope:
   - define the configuration surface used by the app
   - validate required environment variables at startup
-  - expose normalized config values to callers
+  - expose normalized config values to callers and startup preflight flows
 - Files to Touch:
+  - package.json
   - src/config.js
+  - src/config.test.js
   - src/server.js
   - README.md
 - Do Not Touch:
@@ -203,8 +346,10 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Definition of Done:
   - missing required config fails clearly at startup
   - config parsing logic is centralized in one module
+  - launcher and UI preflight code can reuse normalized config without duplicating parsing rules
   - docs reflect the actual config contract
 - Handoff Notes:
+  - user assigned this task directly on 2026-03-08
   - note any env vars intentionally left provisional for LiteLLM integration
 
 ### T03 - Logging With Levels And Redaction
@@ -219,6 +364,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - add log levels
   - redact secrets and sensitive request fields
   - make log usage consistent in the server path
+  - keep startup and recovery logs understandable during launcher troubleshooting
 - Files to Touch:
   - src/server.js
   - src/config.js
@@ -233,7 +379,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Definition of Done:
   - logs include level and message context
   - known sensitive values are not printed plainly
-  - logging behavior is documented enough for local debugging
+  - logging behavior is documented enough for local debugging and startup failure triage
 - Handoff Notes:
   - note any remaining unstructured logs for later cleanup
 
@@ -247,8 +393,8 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Goal: Replace ad hoc database setup with repeatable initialization and reset flows.
 - Scope:
   - define the initial migration path
-  - define a seed/reset workflow
-  - document the workflow for local development
+  - define a seed or reset workflow
+  - document the workflow for local development and launched app recovery
 - Files to Touch:
   - src/db.js
   - package.json
@@ -296,17 +442,18 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Handoff Notes:
   - record schema version names and any intentionally deferred fields
 
-### T11 - Minimal Web UI Loop
+### T11 - Minimal Player UI Loop
 
 - Status: Review
 - Queue: Next
 - Phase: P1
-- Priority: P2
+- Priority: P1
 - Owner Role: Product/UI lead
-- Goal: Provide a simple browser UI that can send turns to the local AI path and expose enough runtime detail for manual debugging.
+- Goal: Provide a text-first browser UI that can serve as the player surface for both the dev loop and the future launched build.
 - Scope:
   - keep a text-first browser play loop for player input and narrator output
-  - add a debug surface for session, model, timing, and turn payload inspection
+  - add session controls that are clear without developer context
+  - add a debug surface for session, model, timing, and turn payload inspection without overwhelming normal play
   - keep the implementation aligned with the existing server endpoints instead of creating a parallel UI contract
 - Files to Touch:
   - BACKLOG.md
@@ -330,12 +477,154 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Definition of Done:
   - a player can create or resume a session in the browser and submit turns
   - narrator output, suggested options, and current state are visible without opening devtools
-  - useful debug details are visible for local AI iteration without exposing secrets
+  - useful debug details are available when needed without exposing secrets
+  - the same UI can be reused by the launcher or packaged path
 - Handoff Notes:
   - user assigned this ahead of queue order on 2026-03-07 to make local AI iteration easier before deeper roadmap work
-  - implemented a browser play shell with session refresh/new-session controls, multiline text input, suggestion chips, and a persistent debug panel
-  - `/api/state` now returns safe runtime/session debug data and `/api/turn` now returns safe debug data including request id, latency, prompt preview, embedding fallback status, validation result, and before/after player snapshots
+  - implemented a browser play shell with session refresh or new-session controls, multiline text input, suggestion chips, and a persistent debug panel
+  - `/api/state` now returns safe runtime or session debug data and `/api/turn` now returns safe debug data including request id, latency, prompt preview, embedding fallback status, validation result, and before or after player snapshots
   - local validation was limited to code inspection plus `git diff --check`; `npm install`, `npm run dev`, and the manual browser smoke test were not runnable because `node` and `npm` were unavailable in this shell environment
+
+### T12 - New Game Onboarding
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Product/UI lead
+- Goal: Get a first-time player from launch to the first turn with minimal explanation debt.
+- Scope:
+  - capture only the information needed to start or resume play
+  - make new game and resume controls obvious from the first screen
+  - explain the basic turn loop in plain language without requiring README reading
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - public/index.html
+  - public/app.js
+  - public/styles.css
+- Do Not Touch:
+  - src/ai.js
+  - src/db.js
+- Dependencies:
+  - T06
+- Validation:
+  - manual new-game flow check
+- Definition of Done:
+  - a first-time player can start or resume without needing external docs mid-session
+  - onboarding copy avoids developer jargon
+  - the onboarding flow hands off cleanly to the tutorial and setup diagnostics paths
+- Handoff Notes:
+  - keep the first screen short enough that it still feels like an app launch, not a configuration checklist
+
+### T12b - First-Run Setup Wizard And Connection Test
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Product/UI lead
+- Goal: Turn configuration and AI connectivity into a guided first-run flow instead of README-only work.
+- Scope:
+  - add guided checks for the supported AI provider and config before the first turn
+  - expose a safe connection test and plain-language error states
+  - allow retrying setup without deleting saves or reopening the terminal
+  - document the supported MVP AI path in the UI and README
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - public/index.html
+  - public/app.js
+  - public/styles.css
+  - src/config.js
+  - src/server.js
+- Do Not Touch:
+  - data/spec/
+  - src/game.js
+- Dependencies:
+  - T02
+  - T11
+  - T12
+- Validation:
+  - `npm test`
+  - manual first-run flow check with reachable and unreachable AI paths
+- Definition of Done:
+  - the setup flow can confirm or clearly reject the current AI config
+  - a user can fix config and retry without deciphering stack traces
+  - diagnostics omit secrets while still giving enough support context
+  - the setup flow matches launcher behavior and README guidance
+- Handoff Notes:
+  - treat the supported AI path as a product decision, not just a config screen
+
+### T29 - Save Slots UI
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Product/UI lead
+- Goal: Make session continuity visible and safe from the main player flow.
+- Scope:
+  - list available save slots in the main UI
+  - create, update, and load slots without file browsing or terminal use
+  - show compatibility or corruption problems in plain language
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - REQUIREMENTS.md
+  - public/index.html
+  - public/app.js
+  - public/styles.css
+  - src/db.js
+  - src/server.js
+- Do Not Touch:
+  - data/spec/
+  - src/ai.js
+- Dependencies:
+  - T08
+  - T09
+- Validation:
+  - manual save or load check
+- Definition of Done:
+  - save slots are accessible from the main UI
+  - save and load errors are actionable for non-developers
+  - the supported player path can save and resume without manual file handling
+- Handoff Notes:
+  - keep slot naming and recovery wording plain because packaged builds will amplify confusion here
+
+### T34 - Tutorial And First-Run Guidance
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Product/UI lead
+- Goal: Explain the core loop and controls inside the app so the README is optional for first-time play.
+- Scope:
+  - add short tutorial beats for the first session
+  - explain suggested inputs, session controls, and recovery actions in plain language
+  - ensure tutorial copy degrades cleanly once the player is familiar
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - public/index.html
+  - public/app.js
+  - public/styles.css
+- Do Not Touch:
+  - data/spec/
+  - src/ai.js
+  - src/db.js
+- Dependencies:
+  - T11
+  - T12
+- Validation:
+  - manual onboarding smoke test
+- Definition of Done:
+  - a first-time player can understand the first three turns without external docs
+  - tutorial copy is concise enough to stay readable during launch
+  - tutorial and recovery guidance do not hide save or repair actions
+- Handoff Notes:
+  - keep this focused on clarity, not lore dumping
 
 ### T02c - Windows Local AI Smoke-Test Path
 
@@ -374,6 +663,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Handoff Notes:
   - use this path for smoke tests only until structured-output reliability is measured against fixtures
   - direct Ollama validation passed on 2026-03-07 for `POST /v1/chat/completions` with JSON schema, `POST /v1/embeddings`, and one full `game_turn`-shaped response using `gemma3:4b` plus `embeddinggemma`
+  - this is still a developer smoke-test path, not the supported non-technical player path
   - `npm install`, `npm run dev`, and config runtime verification were not runnable in this session because `node` and `npm` were unavailable in the shell environment
 
 ### T02d - Local AI Workflow Regression Harness
@@ -453,12 +743,13 @@ When a human assigns a task directly, the assigned task overrides queue order.
 | --- | --- | --- | --- | --- |
 | D01 | Numeric budgets for latency, token use, cost, and DB growth | Phase 0 exit | Tech lead | Open |
 | D02 | Director spec format: JSON or YAML | Before T16 starts | Gameplay systems lead | Open |
-| D03 | Sample MVP quest/story arc definition | Before Phase 1 exit | Product/UI lead | Open |
-| D04 | Packaging stack: Tauri or Electron | Before T35 starts | Release lead | Open |
+| D03 | Sample MVP quest or story arc definition | Before Phase 1 exit | Product/UI lead | Open |
+| D04 | MVP packaging shell: launcher-only, Tauri, or Electron | Before Phase 0 exit | Release lead | Open |
+| D05 | Supported MVP AI setup for non-technical users: hosted, LiteLLM-managed, or guided local gateway | Before Phase 0 exit | Tech lead | Open |
 
 ## Agent Execution Rules
 
-- Prefer the smallest task that unblocks the phase.
+- Prefer the smallest task that unblocks the phase and removes the most player friction.
 - Do not silently expand scope across multiple tasks.
 - Do not mark a task `Done` without running its listed validation.
 - If validation cannot be run, leave the task at `Review` and record exactly what is unverified.
@@ -466,3 +757,4 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - If a task card is missing fields, repair the card before writing code.
 - If the user request conflicts with the queue, follow the user request and then update this file to reflect reality.
 - For AI-related work, require a test-first flow: add or tighten a test, fixture, replay case, or harness step before changing implementation, then run the focused check plus the relevant broader validation.
+- For player-facing startup, setup, save or load, or packaging work, include a launcher or packaged-path smoke check whenever feasible.

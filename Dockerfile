@@ -4,8 +4,13 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /workspace
+WORKDIR /app
+
+COPY package.json ./
+RUN npm install
+
+COPY . .
 
 ENV NODE_ENV=development
 
-CMD ["sh", "-lc", "npm install && npm run dev"]
+CMD ["sh", "-lc", "mkdir -p /data && ln -sf /data/game.db /app/data/game.db && npm run dev"]

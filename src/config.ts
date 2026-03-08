@@ -1,8 +1,14 @@
+import process from "node:process";
+import type { AiConfig, AppConfig, ConfigError, EnvSource, PublicRuntimeConfig } from "./types.js";
+
 const DEFAULT_PORT = 3000;
 
-export const SUPPORTED_AI_PROVIDERS = ["openai-compatible", "litellm", "ollama"];
+export const SUPPORTED_AI_PROVIDERS = ["openai-compatible", "litellm", "ollama"] as const;
 
-function readEnv(env, ...keys) {
+type ProviderDefaults = Omit<AiConfig, "provider">;
+type ConfigLike = Pick<AppConfig, "port" | "ai" | "validation">;
+
+function readEnv(env: EnvSource, ...keys: Array<string | undefined>): string | undefined {
   for (const key of keys) {
     if (!key) continue;
     const value = env?.[key];
@@ -14,18 +20,28 @@ function readEnv(env, ...keys) {
   return undefined;
 }
 
-function normalizeProvider(value) {
+function normalizeProvider(value: string | undefined): string {
   if (!value || typeof value !== "string") return "openai-compatible";
   return value.trim().toLowerCase() || "openai-compatible";
 }
 
-function normalizeBaseUrl(value) {
+function normalizeBaseUrl(value: string | undefined): string {
   if (!value || typeof value !== "string") return "";
   const trimmed = value.trim();
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 }
 
-function buildConfigError({ path, message, envVars = [], code = "invalid" }) {
+function buildConfigError({
+  path,
+  message,
+  envVars = [],
+  code = "invalid"
+}: {
+  path: string;
+  message: string;
+  envVars?: string[];
+  code?: string;
+}): ConfigError {
   return {
     path,
     message,
@@ -34,7 +50,7 @@ function buildConfigError({ path, message, envVars = [], code = "invalid" }) {
   };
 }
 
-function getProviderDefaults(provider) {
+function getProviderDefaults(provider: string): ProviderDefaults {
   if (provider === "litellm") {
     return {
       apiKey: "anything",
@@ -61,7 +77,7 @@ function getProviderDefaults(provider) {
   };
 }
 
-function parsePort(value) {
+function parsePort(value: string | undefined): { value: number; errors: ConfigError[] } {
   if (value === undefined) {
     return { value: DEFAULT_PORT, errors: [] };
   }
@@ -89,7 +105,10 @@ function parsePort(value) {
   return { value: port, errors: [] };
 }
 
-function validateHttpUrl(value, { path, envVars }) {
+function validateHttpUrl(
+  value: string,
+  { path, envVars }: { path: string; envVars: string[] }
+): ConfigError[] {
   if (!value) return [];
 
   try {
@@ -118,10 +137,10 @@ function validateHttpUrl(value, { path, envVars }) {
   return [];
 }
 
-function validateAiConfig(ai) {
-  const errors = [];
+function validateAiConfig(ai: AiConfig): ConfigError[] {
+  const errors: ConfigError[] = [];
 
-  if (!SUPPORTED_AI_PROVIDERS.includes(ai.provider)) {
+  if (!SUPPORTED_AI_PROVIDERS.includes(ai.provider as (typeof SUPPORTED_AI_PROVIDERS)[number])) {
     errors.push(
       buildConfigError({
         path: "ai.provider",
@@ -182,7 +201,7 @@ function validateAiConfig(ai) {
   return errors;
 }
 
-function resolveAiConfig(env) {
+function resolveAiConfig(env: EnvSource): AiConfig {
   const provider = normalizeProvider(readEnv(env, "AI_PROVIDER"));
   const defaults = getProviderDefaults(provider);
 
@@ -224,7 +243,7 @@ function resolveAiConfig(env) {
   };
 }
 
-export function getPublicRuntimeConfig(configToSummarize) {
+export function getPublicRuntimeConfig(configToSummarize: ConfigLike): PublicRuntimeConfig {
   return {
     port: configToSummarize.port,
     provider: configToSummarize.ai.provider,
@@ -243,45 +262,46 @@ export function getPublicRuntimeConfig(configToSummarize) {
   };
 }
 
-export function formatConfigErrors(errors = []) {
+export function formatConfigErrors(errors: ConfigError[] = []): string {
   if (!errors.length) return "Configuration is valid.";
 
   return errors
     .map((error) => {
-      const envVars = error.envVars?.length ? ` (env: ${error.envVars.join(", ")})` : "";
+      const envVars = error.envVars.length ? ` (env: ${error.envVars.join(", ")})` : "";
       return `- ${error.path}: ${error.message}${envVars}`;
     })
     .join("\n");
 }
 
 export class ConfigValidationError extends Error {
-  constructor(errors) {
+  errors: ConfigError[];
+
+  constructor(errors: ConfigError[]) {
     super(`Invalid runtime configuration:\n${formatConfigErrors(errors)}`);
     this.name = "ConfigValidationError";
     this.errors = errors;
   }
 }
 
-export function assertValidConfig(configToValidate = config) {
-  const errors = configToValidate?.validation?.errors || [];
-  if (configToValidate?.validation?.ok) return configToValidate;
+export function assertValidConfig(configToValidate: AppConfig = config): AppConfig {
+  const errors = configToValidate.validation.errors || [];
+  if (configToValidate.validation.ok) return configToValidate;
   throw new ConfigValidationError(errors);
 }
 
-export function loadConfig(env = process.env) {
+export function loadConfig(env: EnvSource = process.env): AppConfig {
   const portResult = parsePort(readEnv(env, "PORT"));
   const ai = resolveAiConfig(env);
-  const validation = {
-    ok: false,
-    errors: [...portResult.errors, ...validateAiConfig(ai)]
-  };
-  validation.ok = validation.errors.length === 0;
-
   const loadedConfig = {
     port: portResult.value,
     ai,
-    validation
+    validation: {
+      ok: false,
+      errors: [...portResult.errors, ...validateAiConfig(ai)]
+    }
   };
+
+  loadedConfig.validation.ok = loadedConfig.validation.errors.length === 0;
 
   return {
     ...loadedConfig,
