@@ -26,6 +26,49 @@ export interface PublicRuntimeValidationError {
   env_vars: string[];
 }
 
+export type RuntimePreflightSeverity = "blocker" | "warning" | "info";
+export type RuntimePreflightArea = "config" | "ai" | "host" | "storage";
+export type RuntimePreflightStatus = "ready" | "action-required" | "checking";
+
+export interface RuntimePreflightIssueDetails {
+  check?: string;
+  provider?: string | null;
+  config_path?: string | null;
+  config_source?: string | null;
+  probe_target?: string | null;
+  http_status?: number | null;
+  resolved_value?: string | number | boolean | null;
+  available_models_preview?: string[];
+  notes?: string[];
+}
+
+export interface RuntimePreflightIssue {
+  code: string;
+  severity: RuntimePreflightSeverity;
+  area: RuntimePreflightArea;
+  title: string;
+  message: string;
+  recovery: string[];
+  recommended_fix: string | null;
+  env_vars: string[];
+  details?: RuntimePreflightIssueDetails;
+}
+
+export interface RuntimePreflightCounts {
+  blocker: number;
+  warning: number;
+  info: number;
+}
+
+export interface RuntimePreflightReport {
+  ok: boolean;
+  status: RuntimePreflightStatus;
+  summary: string;
+  issues: RuntimePreflightIssue[];
+  counts: RuntimePreflightCounts;
+  checked_at: string | null;
+}
+
 export interface PublicRuntimeConfig {
   port: number;
   provider: string;

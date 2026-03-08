@@ -76,6 +76,13 @@ This keeps the server authoritative and replayable while giving the player one o
 
 For the Phase 0 and early Phase 3 packaged playtest path, **Docker Desktop is a required prerequisite for AI startup**.
 
+The packaged shell should reuse the same preflight contract already spoken by the launcher, API, and browser UI:
+
+- report `status` as `checking`, `ready`, or `action-required`
+- classify each issue as `blocker`, `warning`, or `info`
+- keep one `recommended_fix` per issue in the default player-facing view
+- keep probe targets, config-source diagnostics, and other support detail inside optional advanced `details`
+
 What is bundled into the packaged app:
 
 - Electron shell

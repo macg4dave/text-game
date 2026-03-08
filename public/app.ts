@@ -14,16 +14,28 @@ interface SessionDebugPayload {
 }
 
 interface RuntimePreflightIssue {
+  code?: string;
+  area?: string;
+  severity?: "blocker" | "warning" | "info";
   title?: string;
   message?: string;
   recovery?: string[];
+  recommended_fix?: string | null;
+  details?: Record<string, unknown> | null;
+}
+
+interface RuntimePreflightCounts {
+  blocker?: number;
+  warning?: number;
+  info?: number;
 }
 
 interface RuntimePreflightPayload {
   ok?: boolean;
-  status?: string;
+  status?: "ready" | "action-required" | "checking" | string;
   summary?: string;
   issues?: RuntimePreflightIssue[];
+  counts?: RuntimePreflightCounts;
 }
 
 interface TurnDebugPayload extends SessionDebugPayload {
@@ -71,6 +83,8 @@ const preflightPanelEl = getElement<HTMLElement>("preflight-panel");
 const preflightTitleEl = getElement<HTMLElement>("preflight-title");
 const preflightSummaryEl = getElement<HTMLElement>("preflight-summary");
 const preflightIssuesEl = getElement<HTMLElement>("preflight-issues");
+const preflightAdvancedEl = getElement<HTMLDetailsElement>("preflight-advanced");
+const preflightAdvancedJsonEl = getElement<HTMLElement>("preflight-advanced-json");
 const runtimeSummaryEl = getElement<HTMLElement>("runtime-summary");
 const sessionSummaryEl = getElement<HTMLElement>("session-summary");
 const connectionDebugEl = getElement<HTMLElement>("connection-debug");
@@ -136,6 +150,10 @@ function getRuntimePreflight(): RuntimePreflightPayload | null {
   }
 
   return candidate as RuntimePreflightPayload;
+}
+
+function hasBlockingPreflight(preflight: RuntimePreflightPayload | null): boolean {
+  return (preflight?.counts?.blocker || 0) > 0 || preflight?.status === "action-required";
 }
 
 function setOptions(options: string[] = []): void {
@@ -264,27 +282,100 @@ function renderDebugPanels(): void {
 
 function renderPreflightPanel(): void {
   const preflight = getRuntimePreflight();
-  if (!preflight || (preflight.ok && !(preflight.issues || []).length)) {
+  const issues = Array.isArray(preflight?.issues) ? preflight.issues : [];
+  const counts = preflight?.counts || {};
+  const hasIssues = issues.length > 0;
+  if (!preflight || (!hasIssues && preflight.status !== "checking")) {
     preflightPanelEl.hidden = true;
     preflightSummaryEl.textContent = "";
     preflightIssuesEl.innerHTML = "";
+    preflightAdvancedEl.hidden = true;
+    preflightAdvancedJsonEl.textContent = "";
     return;
   }
 
   preflightPanelEl.hidden = false;
-  preflightTitleEl.textContent = preflight.status === "checking" ? "Checking setup" : "Setup required";
+  if (preflight.status === "checking") {
+    preflightTitleEl.textContent = "Checking setup";
+  } else if ((counts.blocker || 0) > 0) {
+    preflightTitleEl.textContent = "Setup required";
+  } else if ((counts.warning || 0) > 0) {
+    preflightTitleEl.textContent = "Setup warnings";
+  } else {
+    preflightTitleEl.textContent = "Setup notes";
+  }
   preflightSummaryEl.textContent = preflight.summary || "The app needs setup changes before the first turn.";
   preflightIssuesEl.innerHTML = "";
 
-  (preflight.issues || []).forEach((issue) => {
+  issues.forEach((issue) => {
     const item = document.createElement("li");
-    const parts = [issue.title, issue.message].filter((value): value is string => Boolean(value));
-    const recovery = Array.isArray(issue.recovery) ? issue.recovery.filter(Boolean) : [];
-    item.textContent = recovery.length
-      ? `${parts.join(": ")} Fix: ${recovery.join(" ")}`
-      : parts.join(": ");
+    item.className = "preflight-issue";
+
+    const header = document.createElement("div");
+    header.className = "preflight-issue-header";
+
+    const badge = document.createElement("span");
+    badge.className = "preflight-badge";
+    badge.dataset.severity = issue.severity || "info";
+    badge.textContent = issue.severity || "info";
+    header.appendChild(badge);
+
+    if (issue.title) {
+      const title = document.createElement("strong");
+      title.textContent = issue.title;
+      header.appendChild(title);
+    }
+
+    item.appendChild(header);
+
+    if (issue.message) {
+      const message = document.createElement("p");
+      message.className = "preflight-issue-copy";
+      message.textContent = issue.message;
+      item.appendChild(message);
+    }
+
+    const recommendedFix = issue.recommended_fix || issue.recovery?.[0];
+    if (recommendedFix) {
+      const fix = document.createElement("p");
+      fix.className = "preflight-issue-fix";
+      fix.textContent = `Recommended next step: ${recommendedFix}`;
+      item.appendChild(fix);
+    }
+
+    if (issue.details && Object.keys(issue.details).length > 0) {
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = "Advanced details";
+      const pre = document.createElement("pre");
+      pre.textContent = formatJson(issue.details, "No advanced details.");
+      details.appendChild(summary);
+      details.appendChild(pre);
+      item.appendChild(details);
+    }
+
     preflightIssuesEl.appendChild(item);
   });
+
+  const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
+  const advancedSnapshot = runtime && typeof runtime === "object"
+    ? {
+        preflight: {
+          status: preflight.status || null,
+          counts: preflight.counts || null,
+          checked_at: (runtime as { preflight?: { checked_at?: unknown } }).preflight?.checked_at || null
+        },
+        config_diagnostics: (runtime as { config_diagnostics?: unknown }).config_diagnostics || null
+      }
+    : null;
+
+  if (advancedSnapshot) {
+    preflightAdvancedEl.hidden = false;
+    preflightAdvancedJsonEl.textContent = formatJson(advancedSnapshot, "No advanced setup details.");
+  } else {
+    preflightAdvancedEl.hidden = true;
+    preflightAdvancedJsonEl.textContent = "";
+  }
 }
 
 function renderSessionSummary(): void {
@@ -296,7 +387,8 @@ function renderSessionSummary(): void {
   const runtimeParts: string[] = [];
   if (runtime && typeof runtime.provider === "string") runtimeParts.push(runtime.provider);
   if (runtime && typeof runtime.chat_model === "string") runtimeParts.push(runtime.chat_model);
-  if (preflight?.status === "blocked") runtimeParts.push("setup required");
+  if (hasBlockingPreflight(preflight)) runtimeParts.push("setup required");
+  if ((preflight?.counts?.warning || 0) > 0 && !hasBlockingPreflight(preflight)) runtimeParts.push("warnings");
   if (preflight?.status === "checking") runtimeParts.push("checking AI");
   if (session && typeof session.player_id === "string") runtimeParts.push(`player ${session.player_id.slice(0, 8)}`);
   runtimeSummaryEl.textContent = runtimeParts.length ? runtimeParts.join(" / ") : "Waiting for session...";
@@ -391,10 +483,12 @@ async function ensurePlayer({ force = false, showStatus = false, announce = fals
 
   if (showStatus) {
     const preflight = getRuntimePreflight();
-    if (preflight?.status === "blocked") {
+    if (hasBlockingPreflight(preflight)) {
       setStatus("Setup required", "error");
     } else if (preflight?.status === "checking") {
       setStatus("Checking AI setup", "working");
+    } else if ((preflight?.counts?.warning || 0) > 0) {
+      setStatus("Ready with warnings", "working");
     } else {
       setStatus("Session ready", "ok");
     }
@@ -433,7 +527,7 @@ async function requestAssist(): Promise<void> {
 function setPending(pending: boolean): void {
   state.pending = pending;
   const preflight = getRuntimePreflight();
-  const setupBlocked = preflight?.status === "blocked";
+  const setupBlocked = hasBlockingPreflight(preflight);
   sendButtonEl.disabled = pending || setupBlocked;
   inputEl.disabled = pending || setupBlocked;
   refreshSessionButtonEl.disabled = pending;
@@ -531,10 +625,12 @@ refreshSessionButtonEl.addEventListener("click", async () => {
     await ensurePlayer({ force: true });
     addEntry("System", "Session state refreshed.", "system");
     const preflight = getRuntimePreflight();
-    if (preflight?.status === "blocked") {
+    if (hasBlockingPreflight(preflight)) {
       setStatus("Setup required", "error");
     } else if (preflight?.status === "checking") {
       setStatus("Checking AI setup", "working");
+    } else if ((preflight?.counts?.warning || 0) > 0) {
+      setStatus("Ready with warnings", "working");
     } else {
       setStatus("Session ready", "ok");
     }

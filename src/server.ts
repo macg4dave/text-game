@@ -6,9 +6,11 @@ import express, { type Request, type Response } from "express";
 import {
   buildConfigPreflightIssues,
   config,
+  createPreflightReport,
   formatConfigErrors,
   getAiEnvVarNames,
-  getSafeConfigDiagnostics
+  getSafeConfigDiagnostics,
+  hasBlockingPreflightIssue
 } from "./config.js";
 import { initDb } from "./db.js";
 import {
@@ -33,8 +35,17 @@ import {
 import { validateDirectorSpec, validateQuestSpec, validateStateUpdates } from "./validator.js";
 import { loadQuestSpec, reloadQuestSpec } from "./quest.js";
 import { generateTurn, getEmbedding, getEmbeddings } from "./ai.js";
-import type { RuntimePreflightIssue } from "./config.js";
-import type { DirectorSpec, DirectorState, Player, QuestSpec, QuestUpdate, StateUpdates, TurnResult } from "./types.js";
+import type {
+  DirectorSpec,
+  DirectorState,
+  Player,
+  QuestSpec,
+  QuestUpdate,
+  RuntimePreflightIssue,
+  RuntimePreflightReport,
+  TurnResult,
+  StateUpdates
+} from "./types.js";
 
 interface TurnDebugParams {
   requestId: string;
@@ -56,16 +67,6 @@ interface TurnDebugParams {
 }
 
 type LegacyDirectorState = Partial<DirectorState> & { current_act?: string };
-type RuntimePreflightStatus = "ok" | "blocked" | "checking";
-
-interface RuntimePreflight {
-  ok: boolean;
-  status: RuntimePreflightStatus;
-  summary: string;
-  issues: RuntimePreflightIssue[];
-  checked_at: string | null;
-}
-
 const app = express();
 const port = config.port;
 const model = config.ai.chatModel;
@@ -75,7 +76,7 @@ let directorSpec = loadDirectorSpec();
 let questSpec = loadQuestSpec();
 let runtimePreflight = createInitialRuntimePreflight();
 let runtimePreflightCheckStartedAt = 0;
-let runtimePreflightPromise: Promise<RuntimePreflight> | null = null;
+let runtimePreflightPromise: Promise<RuntimePreflightReport> | null = null;
 
 initDb();
 
@@ -600,34 +601,32 @@ function logStartupConfigState() {
   );
 }
 
-function createInitialRuntimePreflight(): RuntimePreflight {
+function createInitialRuntimePreflight(): RuntimePreflightReport {
   const issues = buildConfigPreflightIssues(config);
-  if (issues.length) {
+  if (hasBlockingPreflightIssue(issues)) {
     return buildRuntimePreflightReport(issues);
   }
 
-  return {
-    ok: false,
+  if (issues.length) {
+    return createPreflightReport(issues, {
+      status: "checking",
+      summary: "Checking the remaining startup requirements before the first turn.",
+      checkedAt: null
+    });
+  }
+
+  return createPreflightReport([], {
     status: "checking",
     summary: "Checking AI connection before the first turn.",
-    issues: [],
-    checked_at: null
-  };
+    checkedAt: null
+  });
 }
 
-function buildRuntimePreflightReport(issues: RuntimePreflightIssue[]): RuntimePreflight {
-  return {
-    ok: issues.length === 0,
-    status: issues.length ? "blocked" : "ok",
-    summary: issues.length
-      ? "Setup needs attention before the first turn can run."
-      : "AI setup looks ready.",
-    issues,
-    checked_at: new Date().toISOString()
-  };
+function buildRuntimePreflightReport(issues: RuntimePreflightIssue[]): RuntimePreflightReport {
+  return createPreflightReport(issues);
 }
 
-async function ensureRuntimePreflight({ force = false }: { force?: boolean } = {}): Promise<RuntimePreflight> {
+async function ensureRuntimePreflight({ force = false }: { force?: boolean } = {}): Promise<RuntimePreflightReport> {
   if (
     !force &&
     runtimePreflight.checked_at &&
@@ -648,17 +647,17 @@ async function ensureRuntimePreflight({ force = false }: { force?: boolean } = {
   }
 }
 
-async function refreshRuntimePreflight(): Promise<RuntimePreflight> {
+async function refreshRuntimePreflight(): Promise<RuntimePreflightReport> {
   runtimePreflightCheckStartedAt = Date.now();
 
   const configIssues = buildConfigPreflightIssues(config);
-  if (configIssues.length) {
+  if (hasBlockingPreflightIssue(configIssues)) {
     runtimePreflight = buildRuntimePreflightReport(configIssues);
     return runtimePreflight;
   }
 
   const runtimeIssues = await probeRuntimeIssues();
-  runtimePreflight = buildRuntimePreflightReport(runtimeIssues);
+  runtimePreflight = buildRuntimePreflightReport([...configIssues, ...runtimeIssues]);
   return runtimePreflight;
 }
 
@@ -675,21 +674,21 @@ async function probeRuntimeIssues(): Promise<RuntimePreflightIssue[]> {
       headers: buildModelsRequestHeaders(),
       signal: AbortSignal.timeout(5000)
     });
-  } catch {
-    return [buildEndpointIssue("The app could not reach the configured AI service URL.")];
+  } catch (error) {
+    return [buildEndpointIssue("The app could not reach the configured AI service URL.", modelsUrl, null, error)];
   }
 
   if (response.status === 401 || response.status === 403) {
-    return [buildAuthIssue()];
+    return [buildAuthIssue(modelsUrl, response.status)];
   }
 
   if (response.status === 404) {
-    return [buildEndpointIssue("The configured AI service URL did not expose a models list.")];
+    return [buildEndpointIssue("The configured AI service URL did not expose a models list.", modelsUrl, response.status)];
   }
 
   if (!response.ok) {
     return [
-      buildEndpointIssue(`The AI service responded with HTTP ${response.status} during startup.`)
+      buildEndpointIssue(`The AI service responded with HTTP ${response.status} during startup.`, modelsUrl, response.status)
     ];
   }
 
@@ -700,10 +699,10 @@ async function probeRuntimeIssues(): Promise<RuntimePreflightIssue[]> {
 
   const issues: RuntimePreflightIssue[] = [];
   if (!modelIds.includes(config.ai.chatModel)) {
-    issues.push(buildModelAliasIssue("chat", config.ai.chatModel, modelIds));
+    issues.push(buildModelAliasIssue("chat", config.ai.chatModel, modelIds, modelsUrl));
   }
   if (!modelIds.includes(config.ai.embeddingModel)) {
-    issues.push(buildModelAliasIssue("embedding", config.ai.embeddingModel, modelIds));
+    issues.push(buildModelAliasIssue("embedding", config.ai.embeddingModel, modelIds, modelsUrl));
   }
   return issues;
 }
@@ -745,10 +744,16 @@ async function readModelIds(response: globalThis.Response): Promise<string[]> {
     .filter((item): item is string => Boolean(item));
 }
 
-function buildEndpointIssue(message: string): RuntimePreflightIssue {
+function buildEndpointIssue(
+  message: string,
+  probeTarget: string,
+  statusCode: number | null,
+  error?: unknown
+): RuntimePreflightIssue {
   return {
     code: "ai_endpoint_unreachable",
-    severity: "error",
+    severity: "blocker",
+    area: "ai",
     title: "Start or fix the AI service",
     message,
     recovery: [
@@ -760,14 +765,28 @@ function buildEndpointIssue(message: string): RuntimePreflightIssue {
           : "Confirm the provider URL is reachable and accepts OpenAI-compatible requests.",
       "If the app runs in Docker and the AI service runs on your PC, use host.docker.internal instead of localhost."
     ],
-      env_vars: getAiEnvVarNames(config.ai.provider, "baseUrl")
+    recommended_fix:
+      config.ai.provider === "ollama"
+        ? "Start Ollama and confirm OLLAMA_BASE_URL points at the running API."
+        : config.ai.provider === "litellm"
+          ? "Start LiteLLM and confirm LITELLM_PROXY_URL matches the running proxy."
+          : "Confirm the provider URL is reachable and accepts OpenAI-compatible requests.",
+    env_vars: getAiEnvVarNames(config.ai.provider, "baseUrl"),
+    details: {
+      check: "ai-models-probe",
+      provider: config.ai.provider,
+      probe_target: probeTarget,
+      http_status: statusCode,
+      notes: error ? [getErrorMessage(error)] : []
+    }
   };
 }
 
-function buildAuthIssue(): RuntimePreflightIssue {
+function buildAuthIssue(probeTarget: string, statusCode: number): RuntimePreflightIssue {
   return {
     code: "ai_auth_rejected",
-    severity: "error",
+    severity: "blocker",
+    area: "ai",
     title: "Fix the AI credentials",
     message: "The AI service rejected the configured credentials during startup.",
     recovery: [
@@ -776,14 +795,25 @@ function buildAuthIssue(): RuntimePreflightIssue {
         : "Check the API key in .env and confirm it still has access to the selected models.",
       "Restart the launcher after saving the updated credentials."
     ],
-    env_vars: getAiEnvVarNames(config.ai.provider, "apiKey")
+    recommended_fix:
+      config.ai.provider === "litellm"
+        ? "Check LITELLM_API_KEY or the upstream credentials configured behind LiteLLM."
+        : "Check the API key in .env and confirm it still has access to the selected models.",
+    env_vars: getAiEnvVarNames(config.ai.provider, "apiKey"),
+    details: {
+      check: "ai-models-probe",
+      provider: config.ai.provider,
+      probe_target: probeTarget,
+      http_status: statusCode
+    }
   };
 }
 
 function buildModelAliasIssue(
   kind: "chat" | "embedding",
   configuredModel: string,
-  availableModels: string[]
+  availableModels: string[],
+  probeTarget: string
 ): RuntimePreflightIssue {
   const availablePreview = availableModels.slice(0, 5).join(", ");
   const envVars = getAiEnvVarNames(
@@ -800,13 +830,22 @@ function buildModelAliasIssue(
 
   return {
     code: `${kind}_model_alias_missing`,
-    severity: "error",
+    severity: "blocker",
+    area: "ai",
     title: `${kind === "chat" ? "Chat" : "Embedding"} model not found`,
     message: `The configured ${kind} model "${configuredModel}" was not listed by the AI service.`,
     recovery: [
       providerSpecificStep,
       availablePreview ? `Available models reported at startup: ${availablePreview}.` : "No model names were returned to compare against."
     ],
-    env_vars: envVars
+    recommended_fix: providerSpecificStep,
+    env_vars: envVars,
+    details: {
+      check: "ai-models-probe",
+      provider: config.ai.provider,
+      probe_target: probeTarget,
+      available_models_preview: availableModels.slice(0, 5),
+      notes: [`Configured ${kind} model: ${configuredModel}`]
+    }
   };
 }

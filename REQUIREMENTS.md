@@ -26,6 +26,8 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - The default AI setup uses a LiteLLM-managed gateway that can route to local AI or hosted providers behind the same app-facing contract.
 - Startup preflight must validate host prerequisites, AI readiness, writable paths, and save or migration safety before the first turn.
 - Preflight issues must be classified as blocker, warning, or info; blockers must stop the first turn and present plain-language recovery steps.
+- The same preflight contract must be reusable across launcher, API, browser UI, and packaged shell diagnostics.
+- Each preflight issue must include one recommended next step for end users, while advanced diagnostics stay available behind an expandable details surface.
 - Memory system with summaries and embedding-based retrieval.
 - Web UI with text log, turn input, session controls, suggestion chips, and a local debug panel.
 - The setup flow must offer a small set of safe end-user profiles plus validated advanced overrides for developer-oriented configuration changes.

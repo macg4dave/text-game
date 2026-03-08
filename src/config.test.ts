@@ -4,10 +4,13 @@ import {
   assertValidConfig,
   buildConfigPreflightIssues,
   ConfigValidationError,
+  countPreflightIssues,
+  createPreflightReport,
   formatConfigErrors,
   getAiEnvVarNames,
   getPublicRuntimeConfig,
   getSafeConfigDiagnostics,
+  hasBlockingPreflightIssue,
   loadConfig
 } from "./config.js";
 
@@ -223,4 +226,27 @@ test("buildConfigPreflightIssues turns config failures into player-facing recove
   );
   assert.match(issues[1]?.recovery.join(" "), /AI_API_KEY/i);
   assert.match(issues[2]?.recovery.join(" "), /host\.docker\.internal/i);
+  const advisoryEnv = {
+    OPENAI_API_KEY: "legacy-key"
+  };
+  const advisoryLoaded = loadConfig(advisoryEnv);
+  const advisoryIssues = buildConfigPreflightIssues(advisoryLoaded, advisoryEnv);
+  const advisoryReport = createPreflightReport(advisoryIssues);
+
+  assert.deepEqual(
+    advisoryIssues.map((issue) => issue.severity),
+    ["info", "warning"]
+  );
+  assert.equal(advisoryIssues[0]?.code, "provider_inferred");
+  assert.equal(advisoryIssues[1]?.code, "legacy_env_vars_in_use");
+  assert.equal(advisoryIssues[1]?.recommended_fix, advisoryIssues[1]?.recovery[0] ?? null);
+  assert.equal(hasBlockingPreflightIssue(advisoryIssues), false);
+  assert.equal(advisoryReport.ok, true);
+  assert.equal(advisoryReport.status, "ready");
+  assert.deepEqual(countPreflightIssues(advisoryReport.issues), {
+    blocker: 0,
+    warning: 1,
+    info: 1
+  });
+  assert.match(advisoryReport.summary, /warnings/i);
 });

@@ -345,7 +345,7 @@ The browser UI includes:
 
 - a text log for player and narrator turns
 - player naming plus a multiline turn input with local assist chips
-- a startup setup panel that explains missing API keys, bad AI URLs, and common model-name mistakes before the first turn
+- a startup setup panel that uses one shared preflight contract with `blocker`, `warning`, and `info` issues before the first turn
 - `Refresh State` and `New Session` controls for quick local iteration
 - a debug panel showing the active provider/model config, current player state, and the last turn payload returned by the server
 
@@ -476,7 +476,10 @@ If `npm` is available on your machine, the same check is exposed as `npm run tes
 The browser client is intentionally useful for local AI debugging:
 
 - `GET /api/state` returns the current player plus safe runtime/session debug data
-- runtime debug now includes a non-secret `preflight` block with startup status, plain-language recovery steps, and the env vars involved
+- runtime debug now includes a non-secret `preflight` block with one shared contract:
+  - `status`: `checking`, `ready`, or `action-required`
+  - `issues`: each issue has `severity`, `area`, `title`, `message`, `recommended_fix`, `env_vars`, and optional advanced `details`
+  - `counts`: blocker/warning/info totals so the launcher and browser can decide whether play should stay blocked
 - runtime debug now also includes a non-secret `config_diagnostics` block showing whether each resolved config value came from provider-specific, generic, legacy, or default config paths
 - `POST /api/turn` returns the narrator payload plus safe debug details such as request id, latency, prompt preview, embedding fallback status, validation result, and before/after player state
 - API keys are not returned by the debug payload; only non-secret runtime metadata is exposed
@@ -487,8 +490,16 @@ At startup, the server now prints a safe config summary plus a source summary so
 
 First-turn setup problems now split into two paths:
 
-- the Windows launcher stops before opening the app when a configured local LiteLLM or Ollama URL is unreachable
+- the Windows launcher reports preflight issues using the same `blocker`, `warning`, and `info` language as the app runtime
 - the browser shows a setup panel when config is incomplete or the server can prove the configured model names do not exist on the AI service
+
+Current severity policy:
+
+- `blocker` means the first turn stays disabled until the issue is fixed
+- `warning` means the app can continue, but the setup still needs attention
+- `info` means the app is ready and the note is only there to explain inferred or non-default behavior
+
+Advanced setup details are available behind expandable UI sections so end users see one recommended fix first, while developers can still inspect config sources and exact probe targets.
 
 Common fixes:
 

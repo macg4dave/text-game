@@ -87,7 +87,7 @@ Use this exact shape when adding new work:
 | T02f | Now | P0 | P1 | Docker-first LiteLLM sidecar and GPU override | Review | T02a, T02b | `docker compose up --build`; `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
-| T01b | Now | P0 | P1 | Preflight blocker contract and advanced diagnostics | Ready | T01a, T02 | `npm test`; manual blocked and warning preflight check |
+| T01b | Now | P0 | P1 | Preflight blocker contract and advanced diagnostics | Done | T01a, T02 | `npm test`; manual blocked and warning preflight check |
 | T01c | Now | P0 | P1 | Host runtime and path prerequisite checks | Ready | T01, T01b | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T02i | Now | P0 | P1 | AI readiness, network, and model-availability probes | Ready | T01b, T02f | Manual LiteLLM readiness probe |
 | T03 | Now | P0 | P1 | Logging with levels and redaction | Ready | None | `npm test` |
@@ -313,7 +313,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T01b - Preflight Blocker Contract And Advanced Diagnostics
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -351,6 +351,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - user requested on 2026-03-08 that startup should be easy for end users while still allowing dev-friendly config changes
   - treat blocker classification as a product policy, not just a logging detail
   - prefer conservative blocking on write, save, and AI-startup failures; prefer warnings for likely performance issues and optional tuning gaps
+  - completed on 2026-03-08 with one shared preflight contract: `status` is now `checking`, `ready`, or `action-required`, and issue severities are `blocker`, `warning`, or `info`
+  - config-driven preflight now includes one recommended fix per issue plus optional advanced details such as config source and probe target metadata
+  - browser setup UI now shows warning and info issues without blocking play, blocks only on `blocker`, and exposes advanced setup details behind expandable sections
+  - the Windows launcher now formats host-side failures with the same issue vocabulary and prints app-reported preflight issues after startup when present
+  - packaging guidance now explicitly points the future shell at the same preflight contract instead of inventing a new one
+  - validated on 2026-03-08 with `docker compose build app`, `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, and focused Docker-side preflight checks against `dist/config.js` for one blocker case (`AI_PROVIDER=openai-compatible`, invalid URL, missing key) and one non-blocking warning case (legacy `OPENAI_API_KEY` with inferred provider)
 
 ### T01c - Host Runtime And Path Prerequisite Checks
 

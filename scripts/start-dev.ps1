@@ -35,6 +35,86 @@ function Fail {
   throw $Message
 }
 
+function New-PreflightIssue {
+  param(
+    [ValidateSet("blocker", "warning", "info")]
+    [string]$Severity,
+    [ValidateSet("config", "ai", "host", "storage")]
+    [string]$Area,
+    [string]$Code,
+    [string]$Title,
+    [string]$Message,
+    [string[]]$Recovery = @(),
+    [string[]]$EnvVars = @(),
+    [hashtable]$Details = @{}
+  )
+
+  return [pscustomobject]@{
+    code = $Code
+    severity = $Severity
+    area = $Area
+    title = $Title
+    message = $Message
+    recovery = @($Recovery)
+    recommended_fix = if ($Recovery.Count -gt 0) { $Recovery[0] } else { $null }
+    env_vars = @($EnvVars)
+    details = if ($Details.Count -gt 0) { $Details } else { $null }
+  }
+}
+
+function Get-PreflightColor {
+  param([string]$Severity)
+
+  switch ($Severity) {
+    "blocker" { return "Red" }
+    "warning" { return "Yellow" }
+    default { return "DarkCyan" }
+  }
+}
+
+function Format-PreflightIssue {
+  param($Issue)
+
+  $lines = @(
+    ("[{0}] {1}" -f $Issue.severity.ToUpperInvariant(), $Issue.title),
+    $Issue.message
+  )
+
+  if (-not [string]::IsNullOrWhiteSpace($Issue.recommended_fix)) {
+    $lines += ("Recommended next step: {0}" -f $Issue.recommended_fix)
+  }
+
+  if ($Issue.env_vars -and $Issue.env_vars.Count -gt 0) {
+    $lines += ("Env vars: {0}" -f ($Issue.env_vars -join ", "))
+  }
+
+  if ($Issue.details) {
+    $lines += "Advanced details:"
+    $lines += ($Issue.details | ConvertTo-Json -Depth 6)
+  }
+
+  return $lines -join [Environment]::NewLine
+}
+
+function Show-PreflightIssues {
+  param([object[]]$Issues)
+
+  foreach ($issue in $Issues) {
+    if ($null -eq $issue) {
+      continue
+    }
+
+    Write-Host (Format-PreflightIssue -Issue $issue) -ForegroundColor (Get-PreflightColor -Severity $issue.severity)
+    Write-Host ""
+  }
+}
+
+function Fail-PreflightIssue {
+  param($Issue)
+
+  Fail (Format-PreflightIssue -Issue $Issue)
+}
+
 function Invoke-Native {
   param(
     [string]$FilePath,
@@ -43,7 +123,17 @@ function Invoke-Native {
 
   & $FilePath @ArgList
   if ($LASTEXITCODE -ne 0) {
-    Fail ("Command failed: {0} {1}" -f $FilePath, ($ArgList -join " "))
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "host" `
+      -Code "native_command_failed" `
+      -Title "A required host command failed" `
+      -Message ("The launcher could not complete `{0}`." -f $FilePath) `
+      -Recovery @("Review the command output above, fix the reported host issue, and rerun the launcher.") `
+      -Details @{
+        command = $FilePath
+        arguments = @($ArgList)
+      })
   }
 }
 
@@ -265,6 +355,45 @@ function Wait-ForHttpReady {
   return $false
 }
 
+function Get-AppPreflight {
+  param($Config)
+
+  try {
+    $response = Invoke-WebRequest -Uri $Config.readyUrl -Method Get -TimeoutSec 5 -UseBasicParsing
+    if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
+      return $null
+    }
+
+    $payload = $response.Content | ConvertFrom-Json -Depth 12
+    return $payload.debug.runtime.preflight
+  } catch {
+    return $null
+  }
+}
+
+function Show-AppPreflight {
+  param($Config)
+
+  $preflight = Get-AppPreflight -Config $Config
+  if ($null -eq $preflight) {
+    return
+  }
+
+  $issues = @($preflight.issues)
+  if ($issues.Count -eq 0) {
+    return
+  }
+
+  Write-Step "Startup checks reported by the app"
+  Show-PreflightIssues -Issues $issues
+
+  if ($preflight.status -eq "action-required") {
+    Write-Info "The app is reachable, but the first turn will stay blocked until those setup blockers are fixed."
+  } elseif (($preflight.counts.warning -gt 0) -or ($preflight.counts.info -gt 0)) {
+    Write-Info "The app is reachable. These startup notes do not block play."
+  }
+}
+
 function Get-ListeningProcessName {
   param([int]$Port)
 
@@ -373,13 +502,34 @@ function Resolve-LaunchPort {
     "Stop that service, or set `PORT` in `.env` or this PowerShell session to an unused port, then rerun the launcher."
   )
 
-  Fail ($guidance -join [Environment]::NewLine)
+  Fail-PreflightIssue (New-PreflightIssue `
+    -Severity "blocker" `
+    -Area "host" `
+    -Code "app_port_in_use" `
+    -Title "Choose a different app port" `
+    -Message $guidance[0] `
+    -Recovery @($guidance[1]) `
+    -EnvVars @("PORT") `
+    -Details @{
+      port = $Config.port
+      owning_process = $portProcess
+    })
 }
 
 function Get-AppContainerId {
   $result = Invoke-DockerComposeCapture -ArgList @("ps", "-q", "app")
   if ($result.ExitCode -ne 0) {
-    Fail "Unable to determine the app container id from docker compose."
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "host" `
+      -Code "docker_compose_ps_failed" `
+      -Title "The app container could not be identified" `
+      -Message "Docker Compose did not return an app container id for the app service." `
+      -Recovery @("Run `docker compose ps` to inspect the stack, then rerun the launcher.") `
+      -Details @{
+        compose_args = @($composeFileArgs)
+        output = ($result.Output -join [Environment]::NewLine)
+      })
   }
 
   return (($result.Output -join "`n") | Out-String).Trim()
@@ -487,7 +637,16 @@ function Convert-ToDockerReachableUrl {
 function Confirm-DockerTooling {
   $dockerPath = Get-CommandPath -Name "docker"
   if (-not $dockerPath) {
-    Fail "Docker was not found on PATH. Install Docker Desktop or Docker Engine with Compose support, then rerun this launcher."
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "host" `
+      -Code "docker_missing" `
+      -Title "Install Docker before starting the game" `
+      -Message "Docker was not found on PATH, so the supported startup path cannot launch the app and LiteLLM sidecar." `
+      -Recovery @("Install Docker Desktop or Docker Engine with Compose support, then rerun this launcher.") `
+      -Details @{
+        check = "docker"
+      })
   }
 
   Write-Info ("docker: {0}" -f $dockerPath)
@@ -508,7 +667,17 @@ function Confirm-DockerTooling {
       $guidance += ("Docker said: {0}" -f $details)
     }
 
-    Fail ($guidance -join [Environment]::NewLine)
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "host" `
+      -Code "docker_engine_unavailable" `
+      -Title "Start Docker Desktop before launching the game" `
+      -Message $guidance[0] `
+      -Recovery @($guidance[1], $guidance[2]) `
+      -Details @{
+        check = "docker info"
+        docker_output = $details
+      })
   }
 
   $serverVersion = ($dockerInfo.Output -join "").Trim()
@@ -531,13 +700,37 @@ function Confirm-LocalGpuSupport {
   }
 
   Write-Info "No host nvidia-smi command was found on PATH. The Docker GPU override may still fail if NVIDIA drivers or the container runtime are not configured on this machine."
+  Show-PreflightIssues -Issues @(
+    (New-PreflightIssue `
+      -Severity "warning" `
+      -Area "host" `
+      -Code "gpu_tooling_not_detected" `
+      -Title "GPU tooling was not detected on the host" `
+      -Message "The optional local GPU path may fail because `nvidia-smi` is not available on PATH." `
+      -Recovery @("If the GPU path fails, switch back to the hosted default path or install the required NVIDIA tooling first.") `
+      -Details @{
+        ai_stack = $AiStack
+        check = "nvidia-smi"
+      })
+  )
 }
 
 function Confirm-ProviderReady {
   param($Config)
 
   if ($AiStack -eq "local-gpu" -and $Config.provider -ne "litellm") {
-    Fail "The local-gpu launcher mode expects AI_PROVIDER=litellm so the app can keep using the stable LiteLLM aliases. Change `.env` back to LiteLLM mode or rerun without -AiStack local-gpu."
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "config" `
+      -Code "local_gpu_requires_litellm" `
+      -Title "Use LiteLLM mode for the local GPU override" `
+      -Message "The local-gpu launcher mode expects AI_PROVIDER=litellm so the app can keep using the stable LiteLLM aliases." `
+      -Recovery @("Change `.env` back to AI_PROVIDER=litellm, or rerun the launcher without `-AiStack local-gpu`.") `
+      -EnvVars @("AI_PROVIDER") `
+      -Details @{
+        ai_stack = $AiStack
+        provider = $Config.provider
+      })
   }
 
   Write-Step ("Checking AI provider: {0}" -f $Config.provider)
@@ -583,7 +776,17 @@ function Confirm-ProviderReady {
       }
     }
 
-    Fail ("Configured local AI endpoint did not respond at {0}." -f $probeUrl)
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "ai" `
+      -Code "local_ai_endpoint_unreachable" `
+      -Title "Start or fix the local AI service" `
+      -Message ("The configured local AI endpoint did not respond at {0}." -f $probeUrl) `
+      -Recovery @("Start the local AI service and confirm the configured base URL points at the running API.") `
+      -Details @{
+        provider = $Config.provider
+        probe_target = $probeUrl
+      })
   }
 
   Write-Info ("AI endpoint is reachable: {0}" -f $probeUrl)
@@ -651,7 +854,16 @@ function Start-AppContainer {
 
   $containerId = Get-AppContainerId
   if ([string]::IsNullOrWhiteSpace($containerId)) {
-    Fail "Docker Compose did not return an app container id."
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "host" `
+      -Code "app_container_missing" `
+      -Title "The app container did not start correctly" `
+      -Message "Docker Compose did not return an app container id for the app service." `
+      -Recovery @("Run `docker compose ps` and `docker compose logs app`, then rerun the launcher.") `
+      -Details @{
+        compose_args = @($composeFileArgs)
+      })
   }
 
   if (-not (Wait-ForContainerHealthy -ContainerId $containerId -TimeoutSeconds 90)) {
@@ -659,7 +871,17 @@ function Start-AppContainer {
     Show-DockerComposeStatus
     Write-Host ""
     Show-DockerComposeLogs -Services (Get-DebugLogServices)
-    Fail "App container did not become healthy."
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "host" `
+      -Code "app_container_unhealthy" `
+      -Title "The app container never became healthy" `
+      -Message "Docker started the app container, but it did not report a healthy state in time." `
+      -Recovery @("Review the container logs above, fix the startup failure, and rerun the launcher.") `
+      -Details @{
+        container_id = $containerId
+        ready_url = $Config.readyUrl
+      })
   }
 
   if (-not (Wait-ForHttpReady -Uri $Config.readyUrl -TimeoutSeconds 20 -ExpectedContent '"player"')) {
@@ -667,7 +889,17 @@ function Start-AppContainer {
     Show-DockerComposeStatus
     Write-Host ""
     Show-DockerComposeLogs -Services (Get-DebugLogServices)
-    Fail ("App container became healthy, but the app API was not confirmed at {0}." -f $Config.readyUrl)
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "host" `
+      -Code "app_api_not_ready" `
+      -Title "The app started, but the player surface was not ready" `
+      -Message ("The app container became healthy, but the app API was not confirmed at {0}." -f $Config.readyUrl) `
+      -Recovery @("Review the container logs above, confirm the server is listening on the expected port, and rerun the launcher.") `
+      -Details @{
+        container_id = $containerId
+        probe_target = $Config.readyUrl
+      })
   }
 
   Write-Info ("App server is ready at {0}" -f $Config.appUrl)
@@ -691,6 +923,7 @@ Confirm-LocalGpuSupport
 Confirm-ProviderReady -Config $config
 Set-ComposeOverrides -Config $config
 Start-AppContainer -Config $config
+Show-AppPreflight -Config $config
 
 if (-not $NoBrowser) {
   Write-Step "Opening browser"
