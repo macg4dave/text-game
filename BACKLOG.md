@@ -4,7 +4,7 @@ This document is the AI-facing execution board for the project. It is optimized 
 
 If this file and [ROADMAP.md](/g:/text-game/ROADMAP.md) disagree, the roadmap wins on product scope and phase order. If this file and implementation disagree, update this file before starting new work.
 
-Post-TypeScript-migration note: source files under `src/` now use `.ts`. When older task cards mention `.js` files, interpret them as the TypeScript equivalents unless the reference is explicitly to an emitted asset such as `public/app.js`.
+TypeScript source is authoritative in this repo: server code lives under `src/*.ts`, browser source lives at `public/app.ts`, and `public/app.js` is an emitted asset rather than an authoring surface.
 
 ## How Agents Must Use This File
 
@@ -77,7 +77,7 @@ Use this exact shape when adding new work:
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T01 | Now | P0 | P1 | Player launch bootstrap path | Review | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
-| T41 | Now | P0 | P1 | Full TypeScript migration | In Progress | None | `npm run type-check`; `npm test`; `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
+| T41 | Now | P0 | P1 | Full TypeScript migration | Done | None | `npm run type-check`; `npm test`; `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
 | T01a | Now | P0 | P1 | Runtime preflight and recovery messaging | Ready | T01, T02 | Manual launcher failure checks |
 | T35 | Now | P0 | P1 | Packaging prototype and decision memo | Ready | T01 | Prototype build verification |
 | T02 | Now | P0 | P1 | Config module with schema validation | Review | None | `npm test` |
@@ -143,7 +143,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T41 - Full TypeScript Migration
 
-- Status: In Progress
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -151,12 +151,17 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Goal: Move the codebase from JavaScript source to TypeScript source without changing runtime behavior or the provider-neutral game contract.
 - Scope:
   - migrate server, config, gameplay, AI, validation, DB, and browser source to TypeScript
-  - update npm scripts, compiler config, and emitted browser asset flow
+  - align local dev on direct TypeScript execution while keeping Docker and launcher paths on compiled server output
+  - update npm scripts, compiler config, Docker runtime wiring, and emitted browser asset flow
   - update the backlog and repo docs to reflect the new validation and file-path reality
 - Files to Touch:
+  - .dockerignore
+  - .gitignore
   - package.json
   - tsconfig.json
   - tsconfig.server.json
+  - Dockerfile
+  - docker-compose.yml
   - README.md
   - AGENTS.md
   - BACKLOG.md
@@ -166,26 +171,32 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - ROADMAP.md
   - setup_local_a.i.md
   - public/app.ts
-  - public/app.js
+  - public/index.html
   - src/
 - Do Not Touch:
   - data/spec/
 - Dependencies:
   - None
 - Validation:
-  - `npm run type-check`
-  - `npm test`
+  - `npm run type-check` or `docker compose run --rm app npm run type-check`
+  - `npm test` or `docker compose run --rm app npm test`
   - `docker compose up --build`
   - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`
   - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`
 - Definition of Done:
   - TypeScript source fully replaces the previous JavaScript source in `src/`
   - browser source is maintained in TypeScript while the browser continues to load a JS asset
+  - Docker and launcher flows run the compiled server output instead of the source tree
   - validation and contributor docs reflect the new TypeScript workflow
   - runtime behavior remains provider-neutral and server-authoritative
 - Handoff Notes:
   - user explicitly assigned the migration on 2026-03-08, overriding queue order
-  - current shell environment does not have host `npm`, so local host validation may need to run through Docker or another machine with Node.js installed
+  - removed the legacy `.js` source twins from `src/`; TypeScript is now the only authoring surface for app code
+  - Docker now builds the browser asset plus compiled server output during image build, then runs `dist/server.js`
+  - added `.dockerignore` so Docker builds from TypeScript source instead of shipping host build artifacts back into the image
+  - updated repo governance and task cards so future work points at `src/*.ts` and `public/app.ts` instead of deleted `.js` source files
+  - validated on 2026-03-08 with `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, `docker compose up --build -d` with host verification on `PORT=3300`, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, and `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`
+  - this machine still has an unrelated `wslrelay` listener on host port `3000`; the raw Docker smoke used `PORT=3300` and the launcher correctly auto-fell back to `3100`
 
 ## Detailed Task Cards
 
@@ -260,12 +271,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - BACKLOG.md
   - README.md
   - public/index.html
-  - public/app.js
-  - src/config.js
-  - src/server.js
+  - public/app.ts
+  - src/config.ts
+  - src/server.ts
 - Do Not Touch:
   - data/spec/
-  - src/game.js
+  - src/game.ts
 - Dependencies:
   - T01
   - T02
@@ -302,7 +313,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - packaging/
 - Do Not Touch:
   - data/spec/
-  - src/game.js
+  - src/game.ts
 - Dependencies:
   - T01
 - Validation:
@@ -331,9 +342,9 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - expose normalized config values to callers and startup preflight flows
 - Files to Touch:
   - package.json
-  - src/config.js
-  - src/config.test.js
-  - src/server.js
+  - src/config.ts
+  - src/config.test.ts
+  - src/server.ts
   - README.md
 - Do Not Touch:
   - public/
@@ -366,8 +377,8 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - make log usage consistent in the server path
   - keep startup and recovery logs understandable during launcher troubleshooting
 - Files to Touch:
-  - src/server.js
-  - src/config.js
+  - src/server.ts
+  - src/config.ts
   - README.md
 - Do Not Touch:
   - public/
@@ -396,7 +407,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - define a seed or reset workflow
   - document the workflow for local development and launched app recovery
 - Files to Touch:
-  - src/db.js
+  - src/db.ts
   - package.json
   - README.md
 - Do Not Touch:
@@ -425,8 +436,8 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - define structured model output shape
   - define authoritative state shape and version marker
 - Files to Touch:
-  - src/validator.js
-  - src/server.js
+  - src/validator.ts
+  - src/server.ts
   - REQUIREMENTS.md
 - Do Not Touch:
   - public/styles.css
@@ -460,14 +471,14 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - README.md
   - REQUIREMENTS.md
   - public/index.html
-  - public/app.js
+  - public/app.ts
   - public/styles.css
-  - src/server.js
+  - src/server.ts
 - Do Not Touch:
   - data/spec/
-  - src/ai.js
-  - src/assist.js
-  - src/db.js
+  - src/ai.ts
+  - src/assist.ts
+  - src/db.ts
 - Dependencies:
   - T06
 - Validation:
@@ -501,11 +512,11 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - BACKLOG.md
   - README.md
   - public/index.html
-  - public/app.js
+  - public/app.ts
   - public/styles.css
 - Do Not Touch:
-  - src/ai.js
-  - src/db.js
+  - src/ai.ts
+  - src/db.ts
 - Dependencies:
   - T06
 - Validation:
@@ -534,13 +545,13 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - BACKLOG.md
   - README.md
   - public/index.html
-  - public/app.js
+  - public/app.ts
   - public/styles.css
-  - src/config.js
-  - src/server.js
+  - src/config.ts
+  - src/server.ts
 - Do Not Touch:
   - data/spec/
-  - src/game.js
+  - src/game.ts
 - Dependencies:
   - T02
   - T11
@@ -573,13 +584,13 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - README.md
   - REQUIREMENTS.md
   - public/index.html
-  - public/app.js
+  - public/app.ts
   - public/styles.css
-  - src/db.js
-  - src/server.js
+  - src/db.ts
+  - src/server.ts
 - Do Not Touch:
   - data/spec/
-  - src/ai.js
+  - src/ai.ts
 - Dependencies:
   - T08
   - T09
@@ -608,12 +619,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - BACKLOG.md
   - REQUIREMENTS.md
   - public/index.html
-  - public/app.js
+  - public/app.ts
   - public/styles.css
 - Do Not Touch:
   - data/spec/
-  - src/ai.js
-  - src/db.js
+  - src/ai.ts
+  - src/db.ts
 - Dependencies:
   - T11
   - T12
@@ -644,12 +655,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - README.md
   - REQUIREMENTS.md
   - .env.example
-  - src/config.js
+  - src/config.ts
   - setup_local_a.i.md
 - Do Not Touch:
   - public/
   - data/spec/
-  - src/server.js
+  - src/server.ts
 - Dependencies:
   - T02
 - Validation:
@@ -688,8 +699,8 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Do Not Touch:
   - public/
   - data/spec/
-  - src/server.js
-  - src/ai.js
+  - src/server.ts
+  - src/ai.ts
 - Dependencies:
   - T02c
 - Validation:

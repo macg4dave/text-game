@@ -69,3 +69,4 @@ Before starting substantial work, read:
 - Keep authoritative state server-side and replayable.
 - Validate AI output before state mutation.
 - Prefer deterministic behavior and small, verifiable edits.
+- Treat `src/*.ts`, `src/**/*.test.ts`, and `public/app.ts` as the authoring surfaces. `public/app.js` is emitted build output and should not be hand-edited unless a task explicitly requires validating generated assets.

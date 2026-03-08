@@ -40,7 +40,7 @@ The model must return JSON:
 - `director_updates.end_goal_progress`
 - `memory_updates`
 
-TypeScript types in `src/*.ts` help keep the codebase honest, but they do not replace runtime validation. Model responses must still be sanitized and validated server-side before state mutation.
+TypeScript source in `src/*.ts` helps keep the codebase honest, but it does not replace runtime validation. The browser still serves an emitted `public/app.js` asset compiled from `public/app.ts`, and model responses must still be sanitized and validated server-side before state mutation.
 
 ## Why This Works
 

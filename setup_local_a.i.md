@@ -67,6 +67,18 @@ Notes:
 
 ## Start The App
 
+For normal local development after installing Node.js, use the direct TypeScript workflow:
+
+```powershell
+npm install
+npm run type-check
+npm run dev
+```
+
+That path runs the server from TypeScript source and rebuilds the browser asset before startup.
+
+For launcher and Docker runtime smoke checks, use the compiled container path:
+
 ```powershell
 docker compose up --build
 ```
@@ -77,14 +89,6 @@ On Windows, you can use the launcher instead:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
-```
-
-If you run the app outside Docker after installing Node.js, the TypeScript-aware host flow is:
-
-```powershell
-npm install
-npm run type-check
-npm run dev
 ```
 
 ## Default Test Workflow

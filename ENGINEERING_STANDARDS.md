@@ -8,6 +8,7 @@ A phase or backlog item is complete only when all relevant conditions below are 
 
 - Exit criteria are validated through tests or documented manual checks.
 - `npm run type-check` passes for any task that changes TypeScript source, build scripts, or type-facing config.
+- TypeScript source remains the only authoring source of truth. Generated JS assets and compiled output should be rebuilt or validated, not maintained as parallel hand-edited implementations.
 - Schema changes include version updates and migrations where applicable.
 - Replay-affecting changes include updated replay fixtures.
 - Backlog state is updated in [BACKLOG.md](/g:/text-game/BACKLOG.md).
@@ -37,6 +38,7 @@ Numeric targets are required before Phase 0 closes. Until then, this register is
 ## Test Minimums
 
 - TypeScript compile and `npm run type-check` must pass before unit, integration, or manual validation is counted as complete for TS changes
+- Local development should execute the server directly from TypeScript, while Docker and launcher validation should exercise the compiled server output.
 - Unit tests for reducers, validators, ranking, and other pure functions
 - Integration tests for the turn pipeline using fixtures
 - Golden replay tests for deterministic scripted runs

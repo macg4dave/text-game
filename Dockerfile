@@ -11,6 +11,8 @@ RUN npm install
 
 COPY . .
 
-ENV NODE_ENV=development
+RUN npm run build
 
-CMD ["sh", "-lc", "mkdir -p /data && ln -sf /data/game.db /app/data/game.db && npm run dev"]
+ENV NODE_ENV=production
+
+CMD ["sh", "-lc", "mkdir -p /data && ln -sf /data/game.db /app/data/game.db && npm start"]

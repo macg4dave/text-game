@@ -4,7 +4,7 @@
     "noEmit": false,
     "lib": ["ES2022"],
     "rootDir": "./src",
-    "outDir": "./dist/src",
+    "outDir": "./dist",
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],

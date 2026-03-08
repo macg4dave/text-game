@@ -15,7 +15,7 @@
     "test:local-ai": "npm run type-check && powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1",
     "test": "npm run type-check && tsx --test src/**/*.test.ts",
     "dev": "npm run build:client && tsx src/server.ts",
-    "start": "npm run build && node dist/src/server.js"
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "better-sqlite3": "^9.4.0",

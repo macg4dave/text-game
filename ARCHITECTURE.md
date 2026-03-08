@@ -45,7 +45,7 @@ Do not assume:
 
 ## First Decisions To Keep
 
-- Node.js backend with TypeScript source
+- Node.js + TypeScript app source, with `public/app.ts` emitted to `public/app.js`
 - SQLite state source of truth
 - server-side director enforcement
 - provider-neutral AI config with backward compatibility for existing `OPENAI_*` env vars
@@ -60,3 +60,9 @@ It should not change:
 - the server-side authority model
 - the runtime validation requirements for model output
 - the external HTTP contract of the app
+
+Current build/run contract:
+
+- local development runs the server directly from TypeScript
+- the browser still serves an emitted `public/app.js` asset compiled from `public/app.ts`
+- Docker, launcher, and other runtime smoke paths should execute compiled server output from `dist/`

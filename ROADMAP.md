@@ -237,7 +237,7 @@ Exit gate:
 
 | Decision | Status | Owner | Rationale | Next Review |
 | --- | --- | --- | --- | --- |
-| Node.js + TypeScript backend with SQLite | Locked | Tech lead | Matches the current project shape, keeps the first release operationally simple, and adds compile-time safety without changing the runtime boundary. | After MVP |
+| Node.js + TypeScript app with lightweight browser asset compilation and SQLite | Locked | Tech lead | Keeps local development on direct TypeScript, keeps player-facing runtime paths on compiled server output, and adds compile-time safety without changing the runtime boundary. | After MVP |
 | Internal runtime stays web and HTTP based, but player-facing delivery is Windows-first and double-click oriented | Locked | Tech lead | Preserves one gameplay stack while hiding implementation details from players. | End of Phase 3 |
 | LiteLLM as the default AI interface | Locked | AI systems lead | Minimizes provider lock-in and keeps switching costs out of gameplay code. | End of Phase 2 |
 | Provider-neutral internal adapter boundary | Locked | Tech lead | Prevents provider-specific logic from leaking across the app. | End of Phase 1 |

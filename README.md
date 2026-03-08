@@ -4,17 +4,49 @@ A portable, text-based adventure with a director layer that nudges the story tow
 
 The project uses the OpenAI Node SDK through a provider-neutral config layer, so you can keep the same app code while swapping between providers that support OpenAI-compatible generation and embeddings endpoints.
 
-The application source is now TypeScript-first: server code lives in `src/*.ts`, the browser source lives in `public/app.ts`, and the browser still loads the emitted `public/app.js` asset.
+The application source is TypeScript-first: server code lives in `src/*.ts`, browser source lives in `public/app.ts`, and the browser still loads the emitted `public/app.js` asset.
 
-## Preferred Dev Runtime
+## Local Development
 
-The preferred development path is Docker. The app server, `npm install`, and all Node-based commands should run inside containers so host Node/npm versions and native addon toolchains do not block startup.
+The normal development loop now runs the server directly from TypeScript:
+
+```bash
+npm install
+npm run type-check
+npm run dev
+```
+
+Useful commands:
+
+```bash
+npm run type-check
+npm run build
+npm run dev
+npm start
+npm test
+```
+
+What each command does:
+
+- `npm run type-check` validates all TypeScript source in `src/` and `public/`
+- `npm run build` compiles the server to `dist/` and rebuilds the browser asset at `public/app.js`
+- `npm run dev` rebuilds the browser asset once, then starts the TypeScript server directly through `tsx`
+- `npm start` runs the compiled server from `dist/server.js`
+- `npm test` runs type-checking first, then executes the TypeScript tests directly
+
+Current limitation of the browser asset path:
+
+- `npm run dev` rebuilds `public/app.js` when it starts, but it does not yet watch `public/app.ts` continuously during the same session
+
+## Docker And Launcher Runtime
+
+Use Docker and the Windows launcher to exercise the compiled runtime path that later packaging work will depend on.
 
 Required host tool:
 
 - Docker Desktop on Windows or macOS, or Docker Engine with Compose on Linux
 
-Primary startup command:
+Primary compiled-runtime command:
 
 ```bash
 docker compose up --build
@@ -26,54 +58,23 @@ What this gives you:
 
 - Node 22 is pinned inside the container
 - `better-sqlite3` builds inside the container instead of on the host
+- the Docker image builds the browser asset and compiled server output up front, then runs `dist/server.js`
 - the app source is baked into the image so startup works even when Docker bind mounts from a Windows secondary drive are flaky
 - the SQLite database lives in a Docker volume so app state can survive container restarts without hiding the built-in spec files
 
-Current limitation of the Docker-first path:
+Current limitation of the Docker runtime path:
 
 - source edits require a rebuild because the app is not bind-mounted into the container
 
-Current limitation of the TypeScript browser path:
-
-- `npm run dev` rebuilds `public/app.js` when it starts, but it does not yet watch `public/app.ts` continuously during the same session
-
-On Windows, the launcher wraps the same Docker path and opens the browser for you:
+On Windows, the launcher wraps the same compiled Docker path and opens the browser for you:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
 
-## TypeScript Workflow
-
-If you run the app outside Docker, the normal local workflow is now:
-
-```bash
-npm install
-npm run type-check
-npm run dev
-```
-
-Useful TypeScript-aware commands:
-
-```bash
-npm run type-check
-npm run build
-npm run dev
-npm test
-```
-
-What each command does:
-
-- `npm run type-check` validates all TypeScript source in `src/` and `public/`
-- `npm run build` compiles the server to `dist/src` and rebuilds the browser asset at `public/app.js`
-- `npm run dev` rebuilds the browser asset once, then starts the TypeScript server directly through `tsx`
-- `npm test` runs type-checking first, then executes the TypeScript tests directly
-
 ## Install Node.js And npm
 
-You only need a local Node.js install if you explicitly want to run the app outside Docker. The recommended path is still Docker.
-
-If you do want a host install, this project expects Node.js 22 LTS. `npm` is included with standard Node.js installs.
+You need a local Node.js install for the direct TypeScript development loop. This project expects Node.js 22 LTS. `npm` is included with standard Node.js installs.
 
 Official references:
 
@@ -136,13 +137,21 @@ If your distro package is too old for current packages, use the official downloa
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and choose either hosted API credentials or the local AI settings you want.
-2. Start the app in Docker:
+2. For local development, run:
+
+```bash
+npm install
+npm run type-check
+npm run dev
+```
+
+3. Open `http://localhost:3000`.
+
+For the compiled runtime smoke path, use:
 
 ```bash
 docker compose up --build
 ```
-
-1. Open `http://localhost:3000`.
 
 Useful Docker commands:
 
@@ -210,7 +219,7 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 - `src/assist.ts` - Local spellcheck + autocomplete
 - `src/validator.ts` - Spec and update validation
 - `public/app.ts` - browser TypeScript source
-- `public/app.js` - emitted browser asset loaded by `index.html`
+- `public/app.js` - emitted browser asset loaded by `index.html`; do not hand-edit
 - `ROADMAP.md` - Roadmap, tracker, blockers
 - `AI_CONTROL.md` - Director/AI control system design
 - `ARCHITECTURE.md` - provider strategy and integration direction
