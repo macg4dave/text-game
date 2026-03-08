@@ -701,8 +701,8 @@ function Confirm-LocalGpuSupport {
       -Area "host" `
       -Code "gpu_tooling_not_detected" `
       -Title "GPU tooling was not detected on the host" `
-      -Message "The optional local GPU path may fail because `nvidia-smi` is not available on PATH." `
-      -Recovery @("If the GPU path fails, switch back to the hosted default path or install the required NVIDIA tooling first.") `
+      -Message "The optional local GPU path may fail or fall back to very slow CPU inference because `nvidia-smi` is not available on PATH." `
+      -Recovery @("If the GPU path feels slow or fails, switch back to the hosted default path or install the required NVIDIA tooling first.") `
       -Details @{
         ai_stack = $AiStack
         check = "nvidia-smi"

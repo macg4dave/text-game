@@ -106,7 +106,7 @@ Use this exact shape when adding new work:
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
 | T01b | Now | P0 | P1 | Preflight blocker contract and advanced diagnostics | Done | T01a, T02 | `npm test`; manual blocked and warning preflight check |
 | T01c | Now | P0 | P1 | Host runtime and path prerequisite checks | Done | T01, T01b | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
-| T02i | Now | P0 | P1 | AI readiness, network, and model-availability probes | Ready | T01b, T02f | Manual LiteLLM readiness probe |
+| T02i | Now | P0 | P1 | AI readiness, network, and model-availability probes | Done | T01b, T02f | Manual LiteLLM readiness probe |
 | T03 | Now | P0 | P1 | Logging with levels and redaction | Ready | None | `npm test` |
 | T04 | Now | P0 | P1 | DB migrations and seed flow | Ready | None | Manual DB reset verification |
 | T04a | Now | P0 | P1 | Storage, save, and migration preflight | Ready | T04, T01b | Manual DB and save preflight smoke test |
@@ -647,7 +647,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T02i - AI Readiness, Network, And Model-Availability Probes
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -662,9 +662,10 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - BACKLOG.md
   - README.md
   - scripts/start-dev.ps1
-  - src/server.ts
-  - src/config.ts
-  - public/app.ts
+  - src/server/runtime-preflight.ts
+  - src/server/runtime-preflight.test.ts
+  - src/core/config.ts
+  - src/ui/app.ts
   - setup_local_a.i.md
   - litellm.local-gpu.config.yaml
 - Do Not Touch:
@@ -683,6 +684,19 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Handoff Notes:
   - keep messages provider-neutral where possible, but be specific about the failing layer
   - prefer separate probes over one catch-all AI health error because supportability matters here
+  - added `src/server/runtime-preflight.test.ts` first so runtime preflight now has focused coverage for three AI-specific startup cases before implementation changes: LiteLLM proxy-auth mismatch, upstream auth failure behind LiteLLM, and missing local model detection
+  - runtime preflight now probes LiteLLM `/models` for alias exposure and LiteLLM `/health` for upstream route health, then classifies proxy-auth mismatch, proxy auth rejection, upstream auth failure, DNS failure, TLS failure, local-backend reachability, and missing local-model cases separately
+  - trimmed LiteLLM health diagnostics down to short support notes so advanced details stay actionable without dumping full stack traces into the browser debug payload
+  - updated `src/ui/app.ts` so `action-required` really disables turn submission and renders as setup-blocked instead of treating only the older `blocked` label as fatal
+  - updated `scripts/start-dev.ps1` so the existing local-GPU host warning now explicitly tells users that missing GPU tooling can lead to very slow CPU fallback, not just startup failure
+  - updated `README.md` and `setup_local_a.i.md` so the new recovery paths for LiteLLM proxy auth, upstream credentials, missing local models, and slow local-GPU fallback are documented
+  - validated on 2026-03-08 with `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/server/runtime-preflight.test.ts`, and `docker compose run --rm --no-deps app npm test`
+  - manual runtime validation on 2026-03-08 covered four cases:
+    - default Compose LiteLLM startup with no `LITELLM_MASTER_KEY`, where `/api/state` now reports `litellm_proxy_auth_misconfigured` instead of a generic endpoint failure
+    - Compose LiteLLM startup with `LITELLM_MASTER_KEY=anything` and the default placeholder upstream key, where `/api/state` now reports `ai_upstream_auth_failed`
+    - a one-off app container pointed at `http://does-not-resolve.invalid:4011`, where runtime preflight now reports `ai_dns_lookup_failed`
+    - a one-off app container pointed at a temporary host stub that returned a LiteLLM-style `/models` + `/health` payload for a missing Ollama model, where runtime preflight now reports `local_model_missing`
+  - launcher smoke validation on 2026-03-08 used `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`; this machine still had an unrelated `wslrelay` listener on port `3000`, so the launcher correctly fell back to `3100`
 
 ### T02j - End-User Config Profiles And Validated Developer Overrides
 

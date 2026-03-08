@@ -551,6 +551,7 @@ First-turn setup problems now split into two paths:
 
 - the Windows launcher reports preflight issues using the same `blocker`, `warning`, and `info` language as the app runtime
 - the browser shows a setup panel when config is incomplete or the server can prove the configured model names do not exist on the AI service
+- LiteLLM startup checks now distinguish proxy-auth mismatch, upstream credential failure, alias mismatch, and missing local-model cases instead of collapsing them into one generic AI error
 
 Current severity policy:
 
@@ -565,6 +566,10 @@ Common fixes:
 - add `AI_API_KEY` or `OPENAI_API_KEY` when `AI_PROVIDER=openai-compatible`
 - use a full AI base URL such as `https://api.openai.com/v1`, `http://127.0.0.1:4000`, or `http://127.0.0.1:11434/v1`
 - when the app runs in Docker against a host-local AI service, use `host.docker.internal` instead of `localhost`
+- if LiteLLM reports a proxy-auth setup mismatch, set `LITELLM_MASTER_KEY` to the same value as `LITELLM_API_KEY`, or clear both if you do not want proxy auth enabled
+- if LiteLLM reports upstream credential failure, fix the provider key behind LiteLLM; on the default hosted path in this repo that usually means `OPENAI_API_KEY`
 - if LiteLLM or Ollama reports different model names than the ones in `.env`, update the configured chat and embedding model vars to match
+- if the local GPU route reports a missing local model, pull the selected Ollama model or switch back to the hosted default path
+- if the launcher warns that GPU tooling was not detected, expect the optional local path to fail or fall back to very slow CPU inference
 - if the launcher or runtime reports low disk space, free up space on the drive that contains the app `data/` folder before starting another session
 - if the launcher or runtime reports an unwritable app-data path, fix the folder permissions or move the repo to a writable location before retrying

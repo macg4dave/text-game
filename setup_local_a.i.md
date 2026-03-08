@@ -185,6 +185,12 @@ Or the launcher with the local GPU override:
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu
 ```
 
+What the current startup checks will tell you on the local GPU path:
+
+- if LiteLLM is up but Ollama cannot be reached, startup now reports that the local model service is unavailable instead of a generic AI failure
+- if the selected Ollama model is missing, startup now reports that the local model must be pulled or that you should switch back to the hosted default path
+- if the launcher cannot find `nvidia-smi`, it now warns that the local path may fail or fall back to very slow CPU inference
+
 If you are using the direct `AI_PROVIDER=ollama` fallback instead of LiteLLM, the same app startup commands still work.
 
 ## Default Test Workflow

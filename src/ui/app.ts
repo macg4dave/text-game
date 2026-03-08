@@ -272,7 +272,8 @@ function renderPreflightPanel(): void {
   }
 
   preflightPanelEl.hidden = false;
-  preflightTitleEl.textContent = preflight.status === "checking" ? "Checking setup" : "Setup required";
+  preflightTitleEl.textContent =
+    preflight.status === "checking" ? "Checking setup" : preflight.ok ? "Setup notes" : "Setup required";
   preflightSummaryEl.textContent = preflight.summary || "The app needs setup changes before the first turn.";
   preflightIssuesEl.innerHTML = "";
 
@@ -296,7 +297,7 @@ function renderSessionSummary(): void {
   const runtimeParts: string[] = [];
   if (runtime && typeof runtime.provider === "string") runtimeParts.push(runtime.provider);
   if (runtime && typeof runtime.chat_model === "string") runtimeParts.push(runtime.chat_model);
-  if (preflight?.status === "blocked") runtimeParts.push("setup required");
+  if (preflight?.status === "action-required") runtimeParts.push("setup required");
   if (preflight?.status === "checking") runtimeParts.push("checking AI");
   if (session && typeof session.player_id === "string") runtimeParts.push(`player ${session.player_id.slice(0, 8)}`);
   runtimeSummaryEl.textContent = runtimeParts.length ? runtimeParts.join(" / ") : "Waiting for session...";
@@ -391,7 +392,7 @@ async function ensurePlayer({ force = false, showStatus = false, announce = fals
 
   if (showStatus) {
     const preflight = getRuntimePreflight();
-    if (preflight?.status === "blocked") {
+    if (preflight?.status === "action-required") {
       setStatus("Setup required", "error");
     } else if (preflight?.status === "checking") {
       setStatus("Checking AI setup", "working");
@@ -433,7 +434,7 @@ async function requestAssist(): Promise<void> {
 function setPending(pending: boolean): void {
   state.pending = pending;
   const preflight = getRuntimePreflight();
-  const setupBlocked = preflight?.status === "blocked";
+  const setupBlocked = preflight?.status === "action-required";
   sendButtonEl.disabled = pending || setupBlocked;
   inputEl.disabled = pending || setupBlocked;
   refreshSessionButtonEl.disabled = pending;
@@ -531,7 +532,7 @@ refreshSessionButtonEl.addEventListener("click", async () => {
     await ensurePlayer({ force: true });
     addEntry("System", "Session state refreshed.", "system");
     const preflight = getRuntimePreflight();
-    if (preflight?.status === "blocked") {
+    if (preflight?.status === "action-required") {
       setStatus("Setup required", "error");
     } else if (preflight?.status === "checking") {
       setStatus("Checking AI setup", "working");
