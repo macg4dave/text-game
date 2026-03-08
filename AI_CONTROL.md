@@ -1,9 +1,11 @@
 # AI Control System
 
 ## Purpose
+
 Keep the narrative flexible while ensuring the story advances toward the end goal using deterministic, server-side rules.
 
 ## Control Layers
+
 1. **State Source of Truth**
    - All facts live in SQLite. The model only reads a compact state pack.
 
@@ -18,11 +20,13 @@ Keep the narrative flexible while ensuring the story advances toward the end goa
    - End goal is immutable.
 
 ## Beat Progression Rules
+
 - A beat advances only when the model adds an `unlock_flag` for the current beat.
 - The server automatically moves to the next beat that meets its `required_flags`.
 - Beat progression is limited to `max_beats_per_turn` (default 1).
 
 ## Director State Fields
+
 - `end_goal`
 - `current_act_id`, `current_act`
 - `current_beat_id`, `current_beat_label`
@@ -40,7 +44,7 @@ The model must return JSON:
 - `director_updates.end_goal_progress`
 - `memory_updates`
 
-TypeScript source in `src/*.ts` helps keep the codebase honest, but it does not replace runtime validation. The browser still serves an emitted `public/app.js` asset compiled from `public/app.ts`, and model responses must still be sanitized and validated server-side before state mutation.
+TypeScript source in `src/**/*.ts` helps keep the codebase honest, but it does not replace runtime validation. The browser still serves an emitted `public/app.js` asset compiled from `src/ui/app.ts`, and model responses must still be sanitized and validated server-side before state mutation.
 
 ## Why This Works
 

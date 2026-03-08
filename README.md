@@ -4,7 +4,35 @@ A portable, text-based adventure with a director layer that nudges the story tow
 
 The project uses the OpenAI Node SDK through a provider-neutral config layer, with LiteLLM as the default AI control plane so the same app code can target hosted providers and optional local model paths through one gateway-first contract.
 
-The application source is TypeScript-first: server code lives in `src/*.ts`, browser source lives in `public/app.ts`, and the browser still loads the emitted `public/app.js` asset.
+The application source is TypeScript-first and module-oriented: server, state, AI, rules, and browser authoring code now live under `src/**`, with the browser still loading the emitted `public/app.js` asset.
+
+## Source Layout
+
+Current authoring layout:
+
+- `src/core/` - shared config, DB, types, and config tests
+- `src/server/` - server entrypoint and HTTP lifecycle
+- `src/state/` - game state mutation and retrieval
+- `src/story/` - director and quest specs plus progression helpers
+- `src/rules/` - validation rules
+- `src/ai/` - AI service integration
+- `src/utils/` - local helper utilities such as assist text logic
+- `src/ui/` - browser TypeScript authoring source
+- `public/` - static browser assets plus emitted `app.js`
+
+Legacy path translation for older notes and backlog entries:
+
+- `src/server.ts` -> `src/server/index.ts`
+- `src/config.ts` -> `src/core/config.ts`
+- `src/db.ts` -> `src/core/db.ts`
+- `src/types.ts` -> `src/core/types.ts`
+- `src/game.ts` -> `src/state/game.ts`
+- `src/director.ts` -> `src/story/director.ts`
+- `src/quest.ts` -> `src/story/quest.ts`
+- `src/validator.ts` -> `src/rules/validator.ts`
+- `src/assist.ts` -> `src/utils/assist.ts`
+- `src/ai.ts` -> `src/ai/service.ts`
+- `public/app.ts` -> `src/ui/app.ts`
 
 ## Local Development
 
@@ -29,7 +57,7 @@ npm test
 
 What each command does:
 
-- `npm run type-check` validates all TypeScript source in `src/` and `public/`
+- `npm run type-check` validates all TypeScript source in `src/`
 - `npm run test:config` runs the focused config-module checks after type-checking
 - `npm run build` compiles the server to `dist/` and rebuilds the browser asset at `public/app.js`
 - `npm run dev` rebuilds the browser asset once, then starts the TypeScript server directly through `tsx`
@@ -38,7 +66,7 @@ What each command does:
 
 Current limitation of the browser asset path:
 
-- `npm run dev` rebuilds `public/app.js` when it starts, but it does not yet watch `public/app.ts` continuously during the same session
+- `npm run dev` rebuilds `public/app.js` when it starts, but it does not yet watch `src/ui/app.ts` continuously during the same session
 
 ## Docker And Launcher Runtime
 
@@ -213,6 +241,7 @@ npm run dev:windows
 The launcher:
 
 - checks Docker and Compose
+- reuses shared PowerShell helper functions from `scripts/lib/shared.ps1` for dotenv parsing and HTTP readiness checks
 - reads `.env` when present
 - falls back to the LiteLLM defaults when `.env` is missing
 - uses the LiteLLM stack for the supported Docker launcher modes even if an older `.env` still contains a direct-provider experiment
@@ -229,6 +258,17 @@ Useful flags:
 - `-NoBrowser` skips opening the webpage
 - `-Rebuild` forces a Docker image rebuild before launch
 - `-AiStack local-gpu` enables the optional Docker GPU override for a local Ollama backend
+
+## Script Layout
+
+Script organization is now split between small entry scripts and shared helpers:
+
+- `scripts/start-dev.ps1` - launcher orchestration
+- `scripts/test-local-ai-workflow.ps1` - local AI contract harness
+- `scripts/start-desktop-prototype.ps1` - Electron prototype wrapper
+- `scripts/lib/shared.ps1` - shared PowerShell helpers for dotenv parsing, config lookup, URI handling, and HTTP readiness checks
+
+When you add script behavior, prefer extending `scripts/lib/` if another script could reuse the same logic later. This keeps debugging centralized instead of scattering slightly different copies across multiple launchers.
 
 The launcher respects `PORT` from your PowerShell session or `.env`. If that port is already taken by another local service, the launcher now falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
 
@@ -355,13 +395,13 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 
 ## Key Files
 
-- `src/server.ts` - API server and routing
-- `src/config.ts` - runtime config and provider-neutral AI settings
-- `src/ai.ts` - OpenAI-compatible chat completions + JSON schema
-- `src/game.ts` - State, memory, director updates + retrieval scoring
-- `src/assist.ts` - Local spellcheck + autocomplete
-- `src/validator.ts` - Spec and update validation
-- `public/app.ts` - browser TypeScript source
+- `src/server/index.ts` - API server entrypoint and routing
+- `src/core/config.ts` - runtime config and provider-neutral AI settings
+- `src/ai/service.ts` - OpenAI-compatible chat completions + JSON schema
+- `src/state/game.ts` - State, memory, director updates + retrieval scoring
+- `src/utils/assist.ts` - Local spellcheck + autocomplete
+- `src/rules/validator.ts` - Spec and update validation
+- `src/ui/app.ts` - browser TypeScript source
 - `public/app.js` - emitted browser asset loaded by `index.html`; do not hand-edit
 - `ROADMAP.md` - Roadmap, tracker, blockers
 - `AI_CONTROL.md` - Director/AI control system design

@@ -70,4 +70,11 @@ Before starting substantial work, read:
 - Validate AI output before state mutation.
 - Run `npm` and `node` commands in Docker for this project; do not execute them directly on the host.
 - Prefer deterministic behavior and small, verifiable edits.
-- Treat `src/*.ts`, `src/**/*.test.ts`, and `public/app.ts` as the authoring surfaces. `public/app.js` is emitted build output and should not be hand-edited unless a task explicitly requires validating generated assets.
+- Treat `src/**/*.ts` as the authoring surface, including browser code under `src/ui/`. `public/app.js` is emitted build output and should not be hand-edited unless a task explicitly requires validating generated assets.
+
+## Script Structure Rules
+
+- Keep entry scripts under `scripts/` small and orchestration-focused.
+- Move reusable PowerShell functions into `scripts/lib/*.ps1` so launcher, harness, and packaging scripts can share one implementation.
+- Do not duplicate dotenv parsing, config lookup, Docker wrappers, port probing, HTTP readiness checks, or shared logging across scripts unless a task explicitly requires a one-off behavior.
+- Prefer one debugging surface per concern: fix the shared helper instead of papering over the same issue in multiple scripts.

@@ -4,7 +4,23 @@ This document is the AI-facing execution board for the project. It is optimized 
 
 If this file and [ROADMAP.md](/g:/text-game/ROADMAP.md) disagree, the roadmap wins on product scope and phase order. If this file and implementation disagree, update this file before starting new work.
 
-TypeScript source is authoritative in this repo: server code lives under `src/*.ts`, browser source lives at `public/app.ts`, and `public/app.js` is an emitted asset rather than an authoring surface.
+TypeScript source is authoritative in this repo: authoring code now lives under `src/**`, including browser UI source under `src/ui/`, and `public/app.js` is an emitted asset rather than an authoring surface.
+
+Legacy path note for older task cards and handoff notes:
+
+- `src/server.ts` now maps to `src/server/index.ts`
+- `src/config.ts` now maps to `src/core/config.ts`
+- `src/db.ts` now maps to `src/core/db.ts`
+- `src/types.ts` now maps to `src/core/types.ts`
+- `src/game.ts` now maps to `src/state/game.ts`
+- `src/director.ts` now maps to `src/story/director.ts`
+- `src/quest.ts` now maps to `src/story/quest.ts`
+- `src/validator.ts` now maps to `src/rules/validator.ts`
+- `src/assist.ts` now maps to `src/utils/assist.ts`
+- `src/ai.ts` now maps to `src/ai/service.ts`
+- `public/app.ts` now maps to `src/ui/app.ts`
+
+Treat older task cards as historical notes where needed, but use the module-first paths above for all new work.
 
 ## How Agents Must Use This File
 
@@ -78,6 +94,7 @@ Use this exact shape when adding new work:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T01 | Now | P0 | P1 | Player launch bootstrap path | Done | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
 | T41 | Now | P0 | P1 | Full TypeScript migration | Done | None | `npm run type-check`; `npm test`; `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
+| T42 | Now | P0 | P1 | Module-first source and script layout | In Progress | T41 | `npm run type-check`; `npm test`; `npm run build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T01a | Now | P0 | P1 | Runtime preflight and recovery messaging | Done | T01, T02 | Manual launcher failure checks |
 | T35 | Now | P0 | P1 | Packaging prototype and decision memo | Done | T01 | Prototype build verification |
 | T02 | Now | P0 | P1 | Config module with schema validation | Done | None | `npm test` |
@@ -310,6 +327,55 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - refreshed emitted `public/app.js` from the rebuilt Docker image because local `npm` is not installed in this shell environment
   - final closeout validation on 2026-03-08 re-ran `docker compose run --rm app npm run type-check` and `docker compose run --rm app npm test` successfully from the main workspace
   - final launcher validation on 2026-03-08 used a clean temp repo copy on `C:` so Docker bind-mount behavior from `G:` would not affect the result: with `AI_PROVIDER=openai-compatible` and no API key, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` started the app and `/api/state` returned a blocked preflight containing `missing_api_key`; with `AI_PROVIDER=litellm` and `LITELLM_PROXY_URL=http://127.0.0.1:4011`, the launcher failed before container startup with `Configured local AI endpoint did not respond`
+
+### T42 - Module-First Source And Script Layout
+
+- Status: In Progress
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Replace the flat source layout and repeated script plumbing with a module-first structure that is easier to debug and extend.
+- Scope:
+  - move TypeScript authoring code into feature folders under `src/**`
+  - move browser authoring source into `src/ui/` while continuing to emit `public/app.js`
+  - reduce repeated PowerShell launcher logic through shared helper modules under `scripts/lib/`
+  - update build, packaging, and docs to reflect the new module paths
+- Files to Touch:
+  - BACKLOG.md
+  - AGENTS.md
+  - ARCHITECTURE.md
+  - AI_CONTROL.md
+  - README.md
+  - package.json
+  - tsconfig.json
+  - tsconfig.server.json
+  - packaging/
+  - public/
+  - scripts/
+  - src/
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - T41
+- Validation:
+  - `npm run type-check`
+  - `npm test`
+  - `npm run build`
+  - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+- Definition of Done:
+  - the flat `src/*.ts` authoring layout is replaced by module folders under `src/**`
+  - browser authoring code builds from `src/ui/` to `public/app.js`
+  - startup and test scripts share common helper logic instead of duplicating config and probing behavior
+  - docs and packaging references match the new layout
+- Handoff Notes:
+  - user explicitly assigned this structural refactor on 2026-03-08, overriding normal queue order
+  - favor small compatibility-preserving moves inside the implementation, but the final authoring layout should read as module-first rather than flat
+  - first implementation pass moved authoring files into `src/core`, `src/state`, `src/story`, `src/rules`, `src/utils`, `src/ai`, `src/server`, and `src/ui`
+  - browser build input now points at `src/ui/app.ts`, while `public/app.ts` remains only as a legacy placeholder and is no longer the source of truth
+  - startup and local AI scripts now share dotenv/config/HTTP helper functions through `scripts/lib/shared.ps1`
+  - validation on 2026-03-08 passed with `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, `docker compose build app`, `docker compose run --rm app npm run build`, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+  - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` was executed after the script refactor but failed in the current shell because the active local AI config still resolved to an unreachable Ollama endpoint at `http://127.0.0.1:11434/v1`; the script now reports that failure earlier and more clearly
 
 ### T01b - Preflight Blocker Contract And Advanced Diagnostics
 

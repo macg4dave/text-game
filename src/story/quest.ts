@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { QuestSpec } from "./types.js";
+import type { QuestSpec } from "../core/types.js";
 
 const QUEST_PATH = path.resolve(process.cwd(), "data", "spec", "quests.json");
 

@@ -12,14 +12,14 @@
   "scripts": {
     "dev:windows": "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1",
     "build:server": "tsc -p tsconfig.server.json",
-    "build:client": "esbuild public/app.ts --bundle --format=iife --platform=browser --outfile=public/app.js",
+    "build:client": "esbuild src/ui/app.ts --bundle --format=iife --platform=browser --outfile=public/app.js",
     "build": "npm run build:server && npm run build:client",
     "type-check": "tsc -p tsconfig.json",
-    "test:config": "npm run type-check && tsx --test src/config.test.ts",
+    "test:config": "npm run type-check && tsx --test src/core/config.test.ts",
     "test:local-ai": "npm run type-check && powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1",
     "test": "npm run type-check && tsx --test src/**/*.test.ts",
-    "dev": "npm run build:client && tsx src/server.ts",
-    "start": "node dist/server.js",
+    "dev": "npm run build:client && tsx src/server/index.ts",
+    "start": "node dist/server/index.js",
     "desktop:prototype:dev": "npm run build && electron .",
     "desktop:prototype:dir": "npm run build && electron-builder --dir --config packaging/electron-builder.json",
     "desktop:prototype:win": "npm run build && electron-builder --config packaging/electron-builder.json --win portable"

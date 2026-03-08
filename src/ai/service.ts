@@ -1,6 +1,6 @@
 import OpenAI from "openai";
-import { config } from "./config.js";
-import type { TurnResult } from "./types.js";
+import { config } from "../core/config.js";
+import type { TurnResult } from "../core/types.js";
 
 const client = new OpenAI({
   apiKey: config.ai.apiKey,

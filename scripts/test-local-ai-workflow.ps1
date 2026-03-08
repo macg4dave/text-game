@@ -1,6 +1,10 @@
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$sharedScriptPath = Join-Path $PSScriptRoot "lib\shared.ps1"
+. $sharedScriptPath
+
 $script:Failures = New-Object System.Collections.Generic.List[string]
 
 function Add-Failure {
@@ -16,72 +20,46 @@ function Add-Pass {
   Write-Host "PASS: $Message" -ForegroundColor Green
 }
 
-function Load-DotEnv {
-  param([string]$Path)
-
-  if (-not (Test-Path -LiteralPath $Path)) {
-    return
-  }
-
-  foreach ($line in Get-Content -LiteralPath $Path) {
-    $trimmed = $line.Trim()
-    if (-not $trimmed -or $trimmed.StartsWith("#")) {
-      continue
-    }
-
-    $separator = $trimmed.IndexOf("=")
-    if ($separator -lt 1) {
-      continue
-    }
-
-    $key = $trimmed.Substring(0, $separator).Trim()
-    $value = $trimmed.Substring($separator + 1).Trim()
-    if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
-      $value = $value.Substring(1, $value.Length - 2)
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($key) -and -not (Test-Path "Env:$key")) {
-      Set-Item -Path "Env:$key" -Value $value
-    }
-  }
-}
-
 function Get-Config {
-  param([string]$RepoRoot)
+  param(
+    [string]$RepoRoot,
+    [hashtable]$DotEnv
+  )
 
-  Load-DotEnv -Path (Join-Path $RepoRoot ".env")
-
-  $provider = if ($env:AI_PROVIDER) { $env:AI_PROVIDER.Trim().ToLowerInvariant() } else { "ollama" }
-  $baseUrl = if ($env:OLLAMA_BASE_URL) {
-    $env:OLLAMA_BASE_URL.Trim()
-  } elseif ($env:AI_BASE_URL) {
-    $env:AI_BASE_URL.Trim()
-  } else {
-    "http://127.0.0.1:11434/v1"
+  $provider = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROVIDER") -Default ""
+  if ([string]::IsNullOrWhiteSpace($provider)) {
+    if (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "LITELLM_API_KEY", "LITELLM_CHAT_MODEL", "LITELLM_EMBEDDING_MODEL")) {
+      $provider = "litellm"
+    } elseif (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("OLLAMA_BASE_URL", "OLLAMA_API_KEY", "OLLAMA_CHAT_MODEL", "OLLAMA_EMBEDDING_MODEL")) {
+      $provider = "ollama"
+    } else {
+      $provider = "litellm"
+    }
   }
+  $provider = $provider.Trim().ToLowerInvariant()
 
-  $apiKey = if ($env:OLLAMA_API_KEY) {
-    $env:OLLAMA_API_KEY.Trim()
-  } elseif ($env:AI_API_KEY) {
-    $env:AI_API_KEY.Trim()
-  } else {
-    "ollama"
-  }
-
-  $chatModel = if ($env:OLLAMA_CHAT_MODEL) {
-    $env:OLLAMA_CHAT_MODEL.Trim()
-  } elseif ($env:AI_CHAT_MODEL) {
-    $env:AI_CHAT_MODEL.Trim()
-  } else {
-    "gemma3:4b"
-  }
-
-  $embeddingModel = if ($env:OLLAMA_EMBEDDING_MODEL) {
-    $env:OLLAMA_EMBEDDING_MODEL.Trim()
-  } elseif ($env:AI_EMBEDDING_MODEL) {
-    $env:AI_EMBEDDING_MODEL.Trim()
-  } else {
-    "embeddinggemma"
+  switch ($provider) {
+    "litellm" {
+      $baseUrl = Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "AI_BASE_URL", "OPENAI_BASE_URL") -Default "http://127.0.0.1:4000"
+      $apiKey = Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_API_KEY", "AI_API_KEY", "OPENAI_API_KEY") -Default "anything"
+      $chatModel = Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_CHAT_MODEL", "AI_CHAT_MODEL", "OPENAI_MODEL") -Default "game-chat"
+      $embeddingModel = Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_EMBEDDING_MODEL", "AI_EMBEDDING_MODEL", "OPENAI_EMBEDDING_MODEL") -Default "game-embedding"
+      break
+    }
+    "ollama" {
+      $baseUrl = Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_BASE_URL", "AI_BASE_URL", "OPENAI_BASE_URL") -Default "http://127.0.0.1:11434/v1"
+      $apiKey = Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_API_KEY", "AI_API_KEY", "OPENAI_API_KEY") -Default "ollama"
+      $chatModel = Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_CHAT_MODEL", "AI_CHAT_MODEL", "OPENAI_MODEL") -Default "gemma3:4b"
+      $embeddingModel = Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_EMBEDDING_MODEL", "AI_EMBEDDING_MODEL", "OPENAI_EMBEDDING_MODEL") -Default "embeddinggemma"
+      break
+    }
+    default {
+      $baseUrl = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_BASE_URL", "OPENAI_BASE_URL") -Default ""
+      $apiKey = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_API_KEY", "OPENAI_API_KEY") -Default ""
+      $chatModel = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_CHAT_MODEL", "OPENAI_MODEL") -Default "gpt-4o-mini"
+      $embeddingModel = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_EMBEDDING_MODEL", "OPENAI_EMBEDDING_MODEL") -Default "text-embedding-3-small"
+      break
+    }
   }
 
   return [ordered]@{
@@ -294,8 +272,8 @@ look around
   Add-Pass "Full game_turn response parsed successfully."
 }
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
-$config = Get-Config -RepoRoot $repoRoot
+$dotEnv = Import-DotEnvIntoSession -Path (Join-Path $repoRoot ".env")
+$config = Get-Config -RepoRoot $repoRoot -DotEnv $dotEnv
 
 Write-Host "Running local AI workflow regression harness" -ForegroundColor Cyan
 Write-Host ("Provider: {0}" -f $config.provider)
@@ -303,8 +281,12 @@ Write-Host ("Base URL: {0}" -f $config.baseUrl)
 Write-Host ("Chat model: {0}" -f $config.chatModel)
 Write-Host ("Embedding model: {0}" -f $config.embeddingModel)
 
-if ($config.provider -ne "ollama" -and -not $env:AI_BASE_URL -and -not $env:OLLAMA_BASE_URL) {
-  Add-Failure "This harness expects Ollama defaults or an explicit OpenAI-compatible base URL."
+if ([string]::IsNullOrWhiteSpace($config.baseUrl)) {
+  Add-Failure "This harness needs a reachable AI base URL from the current provider config."
+}
+
+if (-not (Wait-ForHttpReady -Uri $config.baseUrl -TimeoutSeconds 5)) {
+  Add-Failure ("Configured AI base URL did not respond before tests started: {0}" -f $config.baseUrl)
 }
 
 try {

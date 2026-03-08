@@ -43,7 +43,7 @@ The prototype shell lives under `packaging/electron/` and works like this:
 3. Mirror `dist/`, `public/`, and `data/spec/` into a writable runtime folder under Electron user data.
 4. Copy `package.json` and link the packaged `node_modules/` into that runtime folder so the staged server keeps its runtime dependency graph.
 5. Load configuration from `.env` if found beside the executable, in Electron user data, or in the repo root.
-6. Start `dist/server.js` using Electron's bundled runtime with `ELECTRON_RUN_AS_NODE=1`.
+6. Start `dist/server/index.js` using Electron's bundled runtime with `ELECTRON_RUN_AS_NODE=1`.
 7. Wait for `/api/state` readiness.
 8. Open a native window pointed at the existing local HTTP UI.
 

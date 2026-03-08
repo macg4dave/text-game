@@ -46,12 +46,20 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 
 - TypeScript compile and `npm run type-check` must pass before unit, integration, or manual validation is counted as complete for TS changes
 - Local development should execute the server directly from TypeScript, while Docker and launcher validation should exercise the compiled server output.
+- Shared script behavior should be validated through the script entrypoints that consume it after helper changes, not only by reading the helper file in isolation.
 - Unit tests for reducers, validators, ranking, and other pure functions
 - Integration tests for the turn pipeline using fixtures
 - Golden replay tests for deterministic scripted runs
 - Fuzz tests for validator and sanitizer inputs
 - CI execution on every push by Phase 4
 - Any change to AI prompts, schemas, model defaults, or adapter request shapes must run the local AI workflow harness before and after the change when a local compatible provider is available
+
+## Script Maintainability Policy
+
+- Reusable PowerShell logic belongs under `scripts/lib/`.
+- Entry scripts should orchestrate shared helpers rather than redefine them.
+- Cross-script concerns such as dotenv loading, config precedence, Docker invocation, readiness polling, and common error formatting should have one shared implementation whenever practical.
+- Script output should stay easy to debug: prefer consistent step logging, clear failure messages, and one canonical place to change shared behavior.
 
 ## AI Test-First Change Policy
 

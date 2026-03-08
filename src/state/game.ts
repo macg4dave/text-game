@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
-import { getDb } from "./db.js";
-import { getInitialDirectorState, loadDirectorSpec } from "./director.js";
+import { getDb } from "../core/db.js";
+import { getInitialDirectorState, loadDirectorSpec } from "../story/director.js";
 import type {
   DirectorState,
   EventRow,
@@ -9,7 +9,7 @@ import type {
   Player,
   PlayerRow,
   QuestUpdate
-} from "./types.js";
+} from "../core/types.js";
 
 interface ContentRow {
   content: string;

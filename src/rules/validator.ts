@@ -1,4 +1,4 @@
-import type { DirectorSpec, QuestSpec, StateUpdates, ValidationResult } from "./types.js";
+import type { DirectorSpec, QuestSpec, StateUpdates, ValidationResult } from "../core/types.js";
 
 export interface DirectorSpecValidationResult extends ValidationResult<string> {
   beatIds: string[];

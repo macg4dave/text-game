@@ -201,6 +201,11 @@ What it checks:
 - structured JSON schema output responds
 - the repo's `game_turn`-shaped contract still parses
 
+Script-maintenance note:
+
+- keep shared PowerShell behavior in `scripts/lib/shared.ps1`
+- keep `scripts/test-local-ai-workflow.ps1` focused on AI-contract checks and reporting rather than duplicating launcher helper logic
+
 Recommended loop:
 
 1. Run `npm run type-check` and the harness before you edit AI workflow code.

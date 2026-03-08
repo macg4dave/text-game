@@ -11,8 +11,8 @@ import {
   getAiEnvVarNames,
   getSafeConfigDiagnostics,
   hasBlockingPreflightIssue
-} from "./config.js";
-import { initDb } from "./db.js";
+} from "../core/config.js";
+import { initDb } from "../core/db.js";
 import {
   getOrCreatePlayer,
   getShortHistory,
@@ -23,20 +23,19 @@ import {
   updatePlayerState,
   updateDirectorState,
   updateSummary
-} from "./game.js";
-import { assistText } from "./assist.js";
+} from "../state/game.js";
+import { assistText } from "../utils/assist.js";
 import {
   applyDirectorRules,
   getCurrentBeat,
   getInitialDirectorState,
   loadDirectorSpec,
   reloadDirectorSpec
-} from "./director.js";
-import { validateDirectorSpec, validateQuestSpec, validateStateUpdates } from "./validator.js";
-import { loadQuestSpec, reloadQuestSpec } from "./quest.js";
-import { generateTurn, getEmbedding, getEmbeddings } from "./ai.js";
+} from "../story/director.js";
+import { validateDirectorSpec, validateQuestSpec, validateStateUpdates } from "../rules/validator.js";
+import { loadQuestSpec, reloadQuestSpec } from "../story/quest.js";
+import { generateTurn, getEmbedding, getEmbeddings } from "../ai/service.js";
 import type {
-  DirectorSpec,
   DirectorState,
   Player,
   QuestSpec,
@@ -45,7 +44,7 @@ import type {
   RuntimePreflightReport,
   TurnResult,
   StateUpdates
-} from "./types.js";
+} from "../core/types.js";
 
 interface TurnDebugParams {
   requestId: string;
@@ -73,7 +72,7 @@ const model = config.ai.chatModel;
 const embeddingModel = config.ai.embeddingModel;
 const PREFLIGHT_CACHE_MS = 15000;
 let directorSpec = loadDirectorSpec();
-let questSpec = loadQuestSpec();
+let questSpec: QuestSpec = loadQuestSpec();
 let runtimePreflight = createInitialRuntimePreflight();
 let runtimePreflightCheckStartedAt = 0;
 let runtimePreflightPromise: Promise<RuntimePreflightReport> | null = null;

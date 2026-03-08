@@ -104,7 +104,7 @@ async function prepareRuntime() {
 }
 
 async function startServer({ runtimeRoot, envVars, port }) {
-  const serverEntry = path.join(runtimeRoot, "dist", "server.js");
+  const serverEntry = path.join(runtimeRoot, "dist", "server", "index.js");
   if (!fs.existsSync(serverEntry)) {
     throw new Error(`Desktop prototype could not find ${serverEntry}. Run the build before launching the shell.`);
   }

@@ -5,6 +5,7 @@
 This project should treat AI access as a provider boundary, not as a product-specific dependency.
 
 Recommended approach:
+
 - Keep the game loop written against one local adapter interface: `generateTurn`, `getEmbedding`, `getEmbeddings`.
 - Prefer OpenAI-compatible HTTP APIs first because they let the same app code work with OpenAI, OpenRouter, Together-style gateways, local adapters, and similar services.
 - Prefer LiteLLM as the first multi-provider gateway when you want one endpoint to route across many upstream model vendors.
@@ -15,6 +16,7 @@ Recommended approach:
 The project is still in planning, so the main risk is locking game logic to one vendor too early.
 
 Using a provider-neutral boundary gives:
+
 - easier model swaps while tuning cost, latency, and quality
 - cleaner testing because the turn pipeline can be mocked at one seam
 - less rewrite work if the project later needs a second native provider adapter
@@ -50,7 +52,8 @@ Do not assume:
 
 ## First Decisions To Keep
 
-- Node.js + TypeScript app source, with `public/app.ts` emitted to `public/app.js`
+- Node.js + TypeScript app source, with browser authoring code under `src/ui/app.ts` emitted to `public/app.js`
+- Module-first source organization under `src/core`, `src/server`, `src/state`, `src/story`, `src/rules`, `src/ai`, `src/utils`, and `src/ui`
 - SQLite state source of truth
 - server-side director enforcement
 - provider-neutral AI config with backward compatibility for existing `OPENAI_*` env vars
@@ -70,8 +73,14 @@ It should not change:
 Current build/run contract:
 
 - local development runs the server directly from TypeScript
-- the browser still serves an emitted `public/app.js` asset compiled from `public/app.ts`
+- the browser still serves an emitted `public/app.js` asset compiled from `src/ui/app.ts`
 - Docker, launcher, and other runtime smoke paths should execute compiled server output from `dist/`
+
+## Script Structure Guidance
+
+- Shared PowerShell behavior should live under `scripts/lib/`.
+- Entry scripts under `scripts/` should stay thin and orchestration-focused.
+- Cross-script concerns such as dotenv parsing, config precedence, Docker helpers, port probing, HTTP readiness checks, and shared error formatting should be centralized when practical to improve debugging.
 
 ## Packaging Direction
 

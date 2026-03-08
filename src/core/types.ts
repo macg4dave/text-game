@@ -1,3 +1,5 @@
+import type { ProcessEnv } from "node:process";
+
 export type SupportedAiProvider = "openai-compatible" | "litellm" | "ollama";
 
 export interface ConfigError {
@@ -89,7 +91,7 @@ export interface AppConfig {
   runtime: PublicRuntimeConfig;
 }
 
-export type EnvSource = NodeJS.ProcessEnv | Record<string, string | undefined>;
+export type EnvSource = ProcessEnv | Record<string, string | undefined>;
 
 export interface QuestUpdate {
   id: string;

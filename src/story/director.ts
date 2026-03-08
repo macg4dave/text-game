@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import type { DirectorAct, DirectorBeat, DirectorSpec, DirectorState, StateUpdates } from "./types.js";
+import type { DirectorAct, DirectorBeat, DirectorSpec, DirectorState, StateUpdates } from "../core/types.js";
 
 const SPEC_PATH = path.resolve(process.cwd(), "data", "spec", "director.json");
 

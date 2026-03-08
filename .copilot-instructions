@@ -58,14 +58,27 @@ Before making substantial changes, read:
 - Run `npm` and `node` commands in Docker for this project; do not execute them directly on the host.
 - Prefer deterministic behavior, compact state, and small verifiable patches.
 
+## Script Formatting Rules
+
+- Keep top-level scripts such as files under `scripts/` thin and orchestration-focused.
+- Put reusable PowerShell logic in `scripts/lib/*.ps1` instead of copying functions between entry scripts.
+- Share dotenv loading, config resolution, Docker helpers, port probing, HTTP readiness checks, and common logging or preflight formatting whenever more than one script needs the same behavior.
+- Prefer one canonical helper function for each cross-script concern so debugging happens in one place.
+- When changing shared script behavior, update the helper first and then keep the entry script focused on intent, sequencing, and user-facing messages.
+- Favor structured, plain-language failure output that helps both end users and developers isolate the failing layer quickly.
+
 ## File Responsibilities
 
-- `src/server.js`: API routing and request lifecycle
-- `src/game.js`: core game loop and state mutation logic
-- `src/ai.js`: AI integration and structured response handling
-- `src/db.js`: SQLite access and schema-related logic
-- `src/config.js`: runtime configuration parsing and validation
-- `src/assist.js`: local text assistance features
+- `src/server/index.ts`: API routing and request lifecycle
+- `src/state/game.ts`: core game loop and state mutation logic
+- `src/ai/service.ts`: AI integration and structured response handling
+- `src/core/db.ts`: SQLite access and schema-related logic
+- `src/core/config.ts`: runtime configuration parsing and validation
+- `src/utils/assist.ts`: local text assistance features
+- `src/story/director.ts`: director spec loading and beat progression logic
+- `src/story/quest.ts`: quest spec loading
+- `src/rules/validator.ts`: spec and update validation
+- `src/ui/app.ts`: browser TypeScript authoring source
 - `public/app.js`: browser-side game loop and UI logic
 - `public/index.html`: main interface
 - `public/styles.css`: layout and presentation
