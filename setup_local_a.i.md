@@ -5,7 +5,7 @@ The default app-facing setup for this repo is still LiteLLM.
 Use this guide when you want an optional larger local model on Windows without changing the app-facing contract. The preferred shape is now:
 
 - the app stays on `AI_PROVIDER=litellm`
-- the default Docker stack still starts the app plus LiteLLM
+- the default Docker stack now starts the app plus LiteLLM and routes the stable aliases to a host-local Ollama by default
 - an optional Docker override adds a local Ollama backend
 - LiteLLM keeps the stable aliases `game-chat` and `game-embedding`
 - LiteLLM routes `game-chat` to the local model only when you intentionally opt into that path
@@ -39,7 +39,7 @@ This is the first-class developer override path for Windows:
 2. Make sure WSL2 is enabled for Docker Desktop.
 3. Install NVIDIA drivers on the host and confirm `nvidia-smi` works in PowerShell.
 4. Copy `.env.example` to `.env` if you have not already.
-5. Put your hosted embedding key in `.env`, for example `OPENAI_API_KEY`.
+5. Make sure host Ollama has `gemma3:4b` and `embeddinggemma` pulled.
 6. Start the stack with the GPU override:
 
 ```powershell
@@ -66,6 +66,7 @@ Notes:
 - The GPU reservation is attached only to the `ollama` container, not the app or LiteLLM containers.
 - `litellm.local-gpu.config.yaml` now tracks `local-gpu-8gb` as the active default profile.
 - `game-embedding` stays hosted by default in the active `local-gpu-8gb` path, so keep `OPENAI_API_KEY` populated unless you intentionally switch to the `local-gpu-20gb-plus` manual swap guidance.
+- the plain `docker compose up --build` path now uses host-local Ollama for both stable aliases through `litellm.config.yaml`
 
 ## Install Ollama On Windows
 
@@ -116,7 +117,7 @@ If you use the default Docker stack from this repo, you do not need to change th
 
 Then choose one of these LiteLLM configs:
 
-- `litellm.config.yaml` for the default hosted-first path
+- `litellm.config.yaml` for the default host-local Ollama smoke path
 - `litellm.local-gpu.config.yaml` for the Docker-backed Ollama GPU override
 
 The included `litellm.local-gpu.config.yaml` keeps `local-gpu-8gb` active and includes commented manual swap references for `local-gpu-12gb` and `local-gpu-20gb-plus`. T02g does not add runtime profile-selection env vars yet.

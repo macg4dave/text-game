@@ -57,6 +57,64 @@ test("runtime preflight reports a LiteLLM proxy auth mismatch separately from en
   });
 });
 
+test("runtime preflight retries transient LiteLLM no_db_connection responses before blocking startup", async () => {
+  const config = loadConfig({
+    AI_PROVIDER: "litellm",
+    LITELLM_PROXY_URL: "http://litellm:4000",
+    LITELLM_API_KEY: "anything",
+    LITELLM_CHAT_MODEL: "game-chat",
+    LITELLM_EMBEDDING_MODEL: "game-embedding"
+  });
+
+  let modelsCallCount = 0;
+
+  await withMockFetch(async (input) => {
+    if (input === "http://litellm:4000/models") {
+      modelsCallCount += 1;
+      if (modelsCallCount === 1) {
+        return createJsonResponse(
+          {
+            error: {
+              message: "No connected db.",
+              type: "no_db_connection",
+              code: "400"
+            }
+          },
+          400
+        );
+      }
+
+      return createJsonResponse({
+        object: "list",
+        data: [{ id: "game-chat" }, { id: "game-embedding" }]
+      });
+    }
+
+    if (input === "http://litellm:4000/health") {
+      return createJsonResponse({
+        healthy_endpoints: [
+          {
+            model: "openai/gpt-4o-mini",
+            api_base: "https://api.openai.com/v1"
+          }
+        ],
+        unhealthy_endpoints: [],
+        healthy_count: 1,
+        unhealthy_count: 0
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${input}`);
+  }, async () => {
+    const service = createRuntimePreflightService(config, 0);
+    const report = await service.ensureReport({ force: true });
+
+    assert.equal(modelsCallCount, 2);
+    assert.equal(report.ok, true);
+    assert.equal(report.issues.length, 0);
+  });
+});
+
 test("runtime preflight blocks when LiteLLM aliases exist but upstream credentials are rejected", async () => {
   const config = loadConfig({
     AI_PROVIDER: "litellm",
@@ -137,5 +195,52 @@ test("runtime preflight reports missing local models behind LiteLLM health check
 
     assert.equal(report.ok, false);
     assert.ok(report.issues.some((issue) => issue.code === "local_model_missing"));
+  });
+});
+
+test("runtime preflight ignores LiteLLM health false positives for embedding-only Ollama models", async () => {
+  const config = loadConfig({
+    AI_PROVIDER: "litellm",
+    LITELLM_PROXY_URL: "http://litellm:4000",
+    LITELLM_API_KEY: "anything",
+    LITELLM_CHAT_MODEL: "game-chat",
+    LITELLM_EMBEDDING_MODEL: "game-embedding"
+  });
+
+  await withMockFetch(async (input) => {
+    if (input === "http://litellm:4000/models") {
+      return createJsonResponse({
+        object: "list",
+        data: [{ id: "game-chat" }, { id: "game-embedding" }]
+      });
+    }
+
+    if (input === "http://litellm:4000/health") {
+      return createJsonResponse({
+        healthy_endpoints: [
+          {
+            model: "ollama/gemma3:4b",
+            api_base: "http://host.docker.internal:11434"
+          }
+        ],
+        unhealthy_endpoints: [
+          {
+            model: "ollama/embeddinggemma",
+            api_base: "http://host.docker.internal:11434",
+            error: 'litellm.APIConnectionError: OllamaException - {"error":"\\"embeddinggemma\\" does not support generate"}'
+          }
+        ],
+        healthy_count: 1,
+        unhealthy_count: 1
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${input}`);
+  }, async () => {
+    const service = createRuntimePreflightService(config, 0);
+    const report = await service.ensureReport({ force: true });
+
+    assert.equal(report.ok, true);
+    assert.equal(report.issues.length, 0);
   });
 });

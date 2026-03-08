@@ -5,32 +5,31 @@
 # - game-chat
 # - game-embedding
 #
-# Recommended baseline:
-# - route both aliases to fast hosted models first
-# - keep helper tasks and embeddings on hosted providers by default
-# - if you later want a larger optional local-model path, change the upstream
-#   target behind `game-chat` while leaving the alias name alone
+# Recommended baseline for the current Docker smoke path:
+# - route both aliases to a host-local Ollama instance first
+# - keep the app-facing alias names stable
+# - if you later want a hosted route again, change only the upstream targets
+#   behind these aliases while leaving the alias names alone
 # - the default Docker Compose stack mounts this file into the LiteLLM sidecar
 
 model_list:
-  # Default hosted route for the main turn path and small helper tasks.
+  # Default local route for the main turn path and small helper tasks.
   - model_name: game-chat
     litellm_params:
-      model: openai/gpt-4o-mini
-      api_key: os.environ/OPENAI_API_KEY
+      model: ollama_chat/gemma3:4b
+      api_base: os.environ/OLLAMA_BASE_URL
 
-  # Keep embeddings on a small hosted model unless you are intentionally
-  # validating a different embedding path.
+  # Default local embedding route for a host-local Ollama smoke path.
   - model_name: game-embedding
     litellm_params:
-      model: openai/text-embedding-3-small
-      api_key: os.environ/OPENAI_API_KEY
+      model: ollama/embeddinggemma
+      api_base: os.environ/OLLAMA_BASE_URL
 
 litellm_settings:
-  # Match this with LITELLM_API_KEY in the app's `.env` if you enable it.
+  # Match this with LITELLM_API_KEY in the app's `.env`.
   master_key: os.environ/LITELLM_MASTER_KEY
 
-# Optional larger local-model route:
+# Optional hosted or larger-model route:
 # - keep `model_name` values as `game-chat` and `game-embedding`
 # - repoint only the upstream `model` target to the provider string supported
 #   by your LiteLLM install

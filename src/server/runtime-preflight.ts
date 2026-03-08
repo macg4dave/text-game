@@ -115,7 +115,7 @@ export function createRuntimePreflightService(
       return [];
     }
 
-    const modelsProbe = await fetchJsonProbe(modelsUrl);
+    const modelsProbe = await fetchJsonProbeWithLiteLlmRetry(modelsUrl);
     if (modelsProbe instanceof Error) {
       return [buildTransportIssue(modelsUrl, modelsProbe)];
     }
@@ -170,7 +170,7 @@ export function createRuntimePreflightService(
       return [];
     }
 
-    const healthProbe = await fetchJsonProbe(healthUrl);
+    const healthProbe = await fetchJsonProbeWithLiteLlmRetry(healthUrl);
     if (healthProbe instanceof Error) {
       return [buildTransportIssue(healthUrl, healthProbe)];
     }
@@ -256,6 +256,16 @@ export function createRuntimePreflightService(
     } catch (error) {
       return error instanceof Error ? error : new Error(String(error));
     }
+  }
+
+  async function fetchJsonProbeWithLiteLlmRetry(url: string): Promise<JsonProbeResult | Error> {
+    const initialProbe = await fetchJsonProbe(url);
+    if (!shouldRetryLiteLlmNoDb(initialProbe)) {
+      return initialProbe;
+    }
+
+    await delay(250);
+    return fetchJsonProbe(url);
   }
 
   function buildLiteLlmProxyAuthIssue(probe: JsonProbeResult, probeTarget: string): RuntimePreflightIssue | null {
@@ -540,6 +550,10 @@ export function createRuntimePreflightService(
       summarizeDiagnosticNote(errorMessage)
     ].filter(Boolean);
 
+    if (isEmbeddingOnlyHealthFalsePositive(endpointModel, errorMessage)) {
+      return null;
+    }
+
     if (matchesAny(errorMessage, ["incorrect api key", "invalid_api_key", "authenticationerror", "auth_error"])) {
       return {
         code: "ai_upstream_auth_failed",
@@ -705,6 +719,14 @@ export function createRuntimePreflightService(
       })
     };
   }
+
+  function shouldRetryLiteLlmNoDb(probe: JsonProbeResult | Error): probe is JsonProbeResult {
+    if (probe instanceof Error || config.ai.provider !== "litellm") {
+      return false;
+    }
+
+    return probe.status === 400 && matchesAny(getProbeErrorMessage(probe), ["no connected db", "no_db_connection"]);
+  }
 }
 
 function createInitialRuntimePreflight(config: AppConfig): RuntimePreflightReport {
@@ -844,4 +866,14 @@ function summarizeDiagnosticNote(message: string): string {
 
 function buildIssueDetails(details: RuntimePreflightIssueDetails): RuntimePreflightIssueDetails {
   return details;
+}
+
+function isEmbeddingOnlyHealthFalsePositive(endpointModel: string, errorMessage: string): boolean {
+  return matchesAny(endpointModel, ["embedding"]) && matchesAny(errorMessage, ["does not support generate"]);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

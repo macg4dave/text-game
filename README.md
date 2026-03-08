@@ -101,6 +101,7 @@ What this gives you:
 - Node 22 is pinned inside the container
 - `better-sqlite3` builds inside the container instead of on the host
 - LiteLLM starts inside the same Compose project by default, so you no longer need to launch it separately for the supported Docker path
+- the default LiteLLM template now routes the stable `game-chat` and `game-embedding` aliases to a host-local Ollama instance for a fast local smoke path
 - the LiteLLM sidecar now bakes the repo-owned config files into its image so startup does not depend on fragile single-file bind mounts from secondary Windows drives
 - the Docker image builds the browser asset and compiled server output up front, then runs `dist/server.js`
 - the app source is baked into the image so startup works even when Docker bind mounts from a Windows secondary drive are flaky
@@ -221,7 +222,7 @@ If your distro package is too old for current packages, use the official downloa
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and start with the LiteLLM gateway settings unless you intentionally need a different provider mode.
-1. Put the hosted-provider key used by the included `litellm.config.yaml` template into `.env`, for example `OPENAI_API_KEY` for the default hosted route.
+1. Start a local Ollama instance on the host and make sure it has `gemma3:4b` plus `embeddinggemma` pulled for the default Docker smoke route.
 1. For local development, run:
 
 ```bash
@@ -336,15 +337,15 @@ Recommended baseline:
 
 1. Copy `.env.example` to `.env`.
 2. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding`.
-3. For the included template, set `OPENAI_API_KEY` in `.env`.
+3. Make sure host Ollama is reachable and has `gemma3:4b` plus `embeddinggemma` pulled.
 4. Start the Docker stack with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
 5. Start the app with `docker compose up --build`, `npm run dev`, or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
 
-Hosted-first guidance for the current MVP path:
+Current default Docker smoke guidance:
 
-- keep smaller helper work such as spellcheck and autocomplete on fast hosted routes behind LiteLLM
-- keep `game-embedding` on a small hosted embedding model by default for compatibility, speed, and cost
-- start with the hosted `game-chat` route too, then only move it to a larger optional local model when you intentionally want that trade-off
+- keep the app on LiteLLM and let LiteLLM route the stable aliases to host-local Ollama by default
+- keep `game-chat` on `gemma3:4b` and `game-embedding` on `embeddinggemma` for the simplest repo-local smoke test
+- if you want to move back to hosted providers, repoint the upstream targets in `litellm.config.yaml` without changing the app-facing alias names
 
 Optional larger local-model path through the same gateway UX:
 
@@ -541,11 +542,11 @@ Recommended local setup:
 2. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding` in `.env`.
 3. Put `OPENAI_API_KEY` in `.env` for the default hosted route.
 4. Start the supported Docker path with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
-5. If you enable `LITELLM_MASTER_KEY`, set `LITELLM_API_KEY` in `.env` to the same value.
+5. Keep `LITELLM_MASTER_KEY` equal to `LITELLM_API_KEY` in `.env`. The default Docker smoke path now uses `anything` for both unless you override them together.
 
 The runtime automatically prefers LiteLLM-specific env vars when `AI_PROVIDER=litellm`, and now falls back to LiteLLM as the blank-slate default when no provider-specific env is configured.
 
-The included template keeps both aliases on hosted providers first. When you want an optional larger local-model route, use the included `litellm.local-gpu.config.yaml` path through the Docker GPU override or mirror that pattern in your own LiteLLM config while leaving the alias names alone so the app contract stays stable.
+The included template now keeps both aliases on host-local Ollama for the default Docker smoke path. When you want an optional larger local-model route, use the included `litellm.local-gpu.config.yaml` path through the Docker GPU override or mirror that pattern in your own LiteLLM config while leaving the alias names alone so the app contract stays stable.
 
 The included local-GPU config now tracks the `local-gpu-8gb` matrix profile by default. Higher-tier manual swap references for `local-gpu-12gb` and `local-gpu-20gb-plus` are left in the file as commented guidance until launcher or UI selection work lands.
 
