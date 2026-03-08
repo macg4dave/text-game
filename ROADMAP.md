@@ -39,10 +39,10 @@ The roadmap is successful if the project reaches all of the following:
 The MVP is the first release that proves the core product loop while feeling like a normal app to the player:
 
 - Windows-first double-click launch path or packaged shell that starts the app and opens the play surface automatically.
-- First-run setup path that validates required config and offers a clear supported LiteLLM-managed AI path instead of silent failure.
+- First-run setup path that validates required config and offers a clear supported Docker-managed LiteLLM gateway path, with Docker Desktop treated as the MVP packaged prerequisite and an optional GPU-backed local inference override, instead of silent failure.
 - Start a new game with basic onboarding and tutorial guidance.
 - Submit turns through the UI.
-- Generate structured responses through a LiteLLM-managed gateway by default, whether the upstream model is local AI or a hosted provider.
+- Generate structured responses through a repo-managed LiteLLM Docker sidecar by default, whether the upstream model is local AI or a hosted provider.
 - Persist turns, state, and replayable events in SQLite.
 - Enforce server-side validation and deterministic state updates.
 - Retrieve compact memory summaries during play.
@@ -58,6 +58,8 @@ The MVP is complete only when all of the following are true:
 
 - On a clean Windows machine following the supported setup guide, a tester can reach the first playable turn from one obvious launcher without terminal interaction after prerequisite install.
 - Startup preflight catches missing env values, unreachable AI endpoints, and obvious misconfiguration before gameplay begins, with recovery steps written for non-developers.
+- The supported setup guide brings up the app plus the repo-managed LiteLLM container from one documented path, and the optional GPU override path is documented and smoke-tested.
+- The MVP packaged playtest path clearly states that the app shell is bundled but the AI gateway still depends on Docker Desktop and the repo-managed LiteLLM sidecar.
 - A new player can complete a scripted story arc without manual intervention, opening devtools, or editing config files mid-session.
 - A golden replay fixture reproduces the same final state from the stored event log.
 - Save and load work across at least one schema version change using documented migration rules.
@@ -95,7 +97,12 @@ Exit gate:
 - One Windows launcher or equivalent double-click entry point starts the app, waits for readiness, and opens the play surface.
 - Environment variables are validated at startup.
 - Missing config and missing AI connectivity produce actionable recovery output in the launcher or UI.
+- Startup preflight uses one blocker, warning, and info contract across launcher, browser, and packaged-path diagnostics.
+- Host prerequisite checks cover Docker, ports, writable data paths, and baseline disk headroom before gameplay starts.
 - Logging, migrations, and error handling are wired into the baseline app.
+- The supported AI startup path brings up the app and repo-managed LiteLLM sidecar together, and the optional GPU override for local inference is documented.
+- The optional local GPU path has a documented VRAM-tier model matrix with at least one verified low-VRAM tier and one verified high-VRAM tier.
+- AI readiness checks distinguish LiteLLM health, alias availability, network reachability, auth failures, and local-model availability before the first turn.
 - LiteLLM default alias names for chat and embeddings are documented and exercised manually.
 - A packaging spike or wrapper decision is documented well enough to unblock early playtest builds.
 - Numeric delivery budgets are added to [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md).
@@ -119,6 +126,9 @@ Exit gate:
 - Basic onboarding, tutorial guidance, and first-run troubleshooting are present in the player flow.
 - Save and load are available from the main UI.
 - The default turn path uses LiteLLM without direct provider SDK usage outside the adapter boundary.
+- The setup flow offers safe end-user profiles plus validated advanced overrides for developer-oriented configuration changes.
+- When a user opts into local GPU inference, the launcher or setup flow can recommend or auto-select a compatible model profile based on detected hardware or a manual override.
+- Common setup blockers can be retried or repaired from the player flow without reopening a terminal or deleting saves.
 - A golden replay test passes in CI for the baseline quest fixture.
 
 ### Phase 2 - Memory, Director, and Session Continuity (Weeks 6-8)
@@ -207,6 +217,9 @@ Exit gate:
 ### Now
 
 - Lock the supported Windows-first double-click target and capture the packaging or wrapper decision early.
+- Close the remaining validation and packaging implications of the Docker-managed LiteLLM sidecar plus optional GPU override.
+- Define the first GPU-tier model matrix for the optional local inference path so setup can stop depending on manual model guesswork.
+- Lock the shared blocker, warning, and info preflight policy and extend it to host, AI, storage, and save checks.
 - Finish launcher preflight, config validation, and clear recovery messaging.
 - Make onboarding, first-run troubleshooting, and save or load part of the core loop scope instead of late polish.
 - Add a clean-machine playtest checklist for the supported launch path.
@@ -214,6 +227,8 @@ Exit gate:
 ### Next
 
 - Ship the deterministic turn pipeline through the supported launched app.
+- Add automatic local-model profile selection and setup guidance for common VRAM tiers.
+- Add guided retry, auto-fix, and advanced-details setup flows on top of the shared preflight contract.
 - Add memory retrieval and director control without increasing player-facing setup friction.
 - Produce the first packaged Windows playtest build.
 
@@ -228,6 +243,9 @@ Exit gate:
 | Risk | Owner | Mitigation | Review Trigger |
 | --- | --- | --- | --- |
 | The supported launch path still depends on AI setup that feels like developer work. | Tech lead | Pick one primary MVP AI path, add first-run connection tests, and write recovery steps in player language. | First clean-machine tester fails before reaching the first turn |
+| The Docker-managed LiteLLM default may conflict with packaging assumptions or fail on machines without working Docker or NVIDIA passthrough support. | Release lead | Keep the MVP packaged contract explicit: Docker Desktop is required for AI startup, hosted-first remains the default, and GPU prerequisite failures must fall back to plain-language guidance instead of silent startup hangs. | First clean-machine launcher or packaged test fails before LiteLLM becomes ready |
+| The optional local GPU path may choose models that exceed VRAM or perform badly on common cards. | AI systems lead | Define a VRAM-tier profile matrix, add conservative defaults, and let users override the detected profile when needed. | First out-of-memory or unusably slow local-GPU smoke test on a supported tier |
+| Preflight may become either too strict for developers or too vague for end users. | Tech lead | Separate blocker versus warning policy from advanced diagnostics, keep the default surface plain-language, and validate manual overrides through the same contract. | First common setup issue requires support to explain hidden diagnostics or bypass checks manually |
 | Packaged runtime and local server coordination cause fragile startup or antivirus friction. | Release lead | Decide the wrapper early, prototype startup behavior, log launch phases, and smoke-test on clean Windows machines. | First packaged build requires manual recovery beyond the documented flow |
 | Save locations and schema migration rules confuse players in packaged builds. | Tech lead | Lock save-path conventions early, expose save slots in the UI, and require migration coverage before broader playtests. | First unreadable save or misplaced save report |
 | Structured output through LiteLLM is less reliable than expected for the chosen upstream models. | AI systems lead | Maintain strict validation, fixture-based replay tests, and a fallback response path before state mutation. | First failed replay caused by model variance |
@@ -240,7 +258,8 @@ Exit gate:
 | Node.js + TypeScript app with lightweight browser asset compilation and SQLite | Locked | Tech lead | Keeps local development on direct TypeScript, keeps player-facing runtime paths on compiled server output, and adds compile-time safety without changing the runtime boundary. | After MVP |
 | Internal runtime stays web and HTTP based, but player-facing delivery is Windows-first and double-click oriented | Locked | Tech lead | Preserves one gameplay stack while hiding implementation details from players. | End of Phase 3 |
 | Electron is the Phase 0 packaging spike direction for Windows playtest builds | Locked | Release lead | Fits the current Node plus browser stack, reduces shell complexity versus Tauri, and provides a clearer bridge from launcher to portable build. | Start of T36 |
-| LiteLLM-managed gateway is the supported MVP AI path for both local AI and hosted providers | Locked | AI systems lead | Keeps the player-facing setup centered on one provider-neutral gateway while still allowing local AI and hosted providers behind the same boundary. | End of Phase 2 |
+| LiteLLM-managed gateway runs as a repo-managed Docker sidecar by default, with an optional GPU-backed local inference override for larger local models | Locked | AI systems lead | Keeps the player-facing setup centered on one provider-neutral gateway, removes manual proxy startup from the default path, and still allows hosted and local upstreams behind the same boundary. | End of Phase 2 |
+| MVP packaged AI startup still depends on Docker Desktop and the repo-managed LiteLLM sidecar rather than bundling the gateway into Electron | Locked | Release lead | Avoids splitting AI-runtime ownership across two packaging strategies during Phase 0 and lets the launcher, setup flow, and packaged shell share one gateway contract and recovery language. | Start of T36 |
 | Provider-neutral internal adapter boundary | Locked | Tech lead | Prevents provider-specific logic from leaking across the app. | End of Phase 1 |
 | Server-side director enforcement is authoritative | Locked | Gameplay systems lead | Keeps story control and state integrity outside the client. | After first external playtest |
 | Windows is the primary supported end-user platform for MVP | Locked | Release lead | Reduces packaging surface area so launch quality can be solved properly before expanding platform support. | After first external playtest |

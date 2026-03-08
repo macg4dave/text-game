@@ -24,8 +24,13 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Director layer to track end goal, act, and remaining beats.
 - AI responses must be structured JSON with narrative + updates.
 - The default AI setup uses a LiteLLM-managed gateway that can route to local AI or hosted providers behind the same app-facing contract.
+- Startup preflight must validate host prerequisites, AI readiness, writable paths, and save or migration safety before the first turn.
+- Preflight issues must be classified as blocker, warning, or info; blockers must stop the first turn and present plain-language recovery steps.
 - Memory system with summaries and embedding-based retrieval.
 - Web UI with text log, turn input, session controls, suggestion chips, and a local debug panel.
+- The setup flow must offer a small set of safe end-user profiles plus validated advanced overrides for developer-oriented configuration changes.
+- The optional local GPU path must support VRAM-tier-based model recommendations or auto-selection, with a manual override when detection is unavailable or ambiguous.
+- Recovery actions should let users retry setup and switch supported profiles without deleting saves or reopening a terminal for normal fixes.
 - Local assist endpoint for spellcheck + autocomplete, with small helper tasks intended to prefer hosted providers through the default gateway path.
 - Delivery budgets for latency, token usage, cost, and storage must come from a config file with sane defaults and be adjustable through the web UI.
 

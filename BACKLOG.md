@@ -87,23 +87,32 @@ Use this exact shape when adding new work:
 | T02f | Now | P0 | P1 | Docker-first LiteLLM sidecar and GPU override | Review | T02a, T02b | `docker compose up --build`; `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
+| T01b | Now | P0 | P1 | Preflight blocker contract and advanced diagnostics | Ready | T01a, T02 | `npm test`; manual blocked and warning preflight check |
+| T01c | Now | P0 | P1 | Host runtime and path prerequisite checks | Ready | T01, T01b | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
+| T02i | Now | P0 | P1 | AI readiness, network, and model-availability probes | Ready | T01b, T02f | Manual LiteLLM readiness probe |
 | T03 | Now | P0 | P1 | Logging with levels and redaction | Ready | None | `npm test` |
 | T04 | Now | P0 | P1 | DB migrations and seed flow | Ready | None | Manual DB reset verification |
+| T04a | Now | P0 | P1 | Storage, save, and migration preflight | Ready | T04, T01b | Manual DB and save preflight smoke test |
+| T02j | Now | P0 | P1 | End-user config profiles and validated developer overrides | Ready | T01b, T02a, T02g | `npm test`; manual profile resolution check |
 | T05 | Next | P0 | P2 | Error boundary and global handler | Ready | None | `npm test` |
+| T35a | Next | P0 | P1 | Packaged AI runtime decision for Docker LiteLLM | Done | T35, T02f | Decision memo review |
+| T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Ready | T02f | Matrix review |
 | T06 | Next | P1 | P1 | Turn input, output, and state schemas | Ready | T02 | `npm test` |
 | T07 | Next | P1 | P1 | Turn handler and model orchestration | Ready | T06 | `npm test` |
-| T07a | Next | P1 | P1 | LiteLLM default chat route for turn generation | Ready | T02b, T07 | Manual turn submission against LiteLLM |
+| T02h | Next | P1 | P1 | Auto-select local GPU model profile | Ready | T02g, T02j, T12b | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`; manual local GPU startup check |
+| T07a | Next | P1 | P1 | LiteLLM default chat route for turn generation | Ready | T02f, T07 | Manual turn submission against LiteLLM |
 | T08 | Next | P1 | P1 | Deterministic state reducer | Ready | T06 | `npm test` |
 | T09 | Next | P1 | P1 | Event log persistence and replay | Ready | T04, T08 | Replay fixture execution |
 | T10 | Next | P1 | P1 | Output validator and sanitizer | Ready | T06 | `npm test` |
 | T11 | Next | P1 | P1 | Minimal player UI loop | Review | T06 | Manual browser smoke test |
 | T12 | Next | P1 | P1 | New game onboarding | Ready | T06 | Manual new-game flow check |
-| T12b | Next | P1 | P1 | First-run setup wizard and connection test | Ready | T02, T11, T12 | Manual first-run flow check |
+| T12b | Next | P1 | P1 | First-run setup wizard and connection test | Ready | T02f, T11, T12 | Manual first-run flow check |
+| T12c | Next | P1 | P1 | Guided recovery actions and advanced setup details | Ready | T12b, T01c, T02i, T04a, T02j | Manual recovery flow check |
 | T29 | Next | P1 | P1 | Save slots UI | Ready | T08, T09 | Manual save/load check |
 | T34 | Next | P1 | P1 | Tutorial and first-run guidance | Ready | T11, T12 | Manual onboarding smoke test |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
 | T13 | Later | P2 | P1 | Embeddings pipeline | Ready | T07a | Manual embedding call verification |
-| T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Ready | T02b | Manual embedding route verification |
+| T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Ready | T02f | Manual embedding route verification |
 | T14 | Later | P2 | P1 | Retrieval and top-k ranking | Ready | T13, T13a | Retrieval fixture check |
 | T15 | Later | P2 | P1 | Memory summarizer job | Ready | T09 | `npm test` |
 | T16 | Later | P2 | P1 | Director spec format and versioning | Ready | T06, D02 | Schema validation check |
@@ -113,7 +122,7 @@ Use this exact shape when adding new work:
 | T31 | Later | P3 | P2 | Optional save encryption | Ready | T29 | Encryption or decryption smoke test |
 | T32 | Later | P3 | P1 | Accessibility pass | Ready | T11, T34 | Accessibility checklist |
 | T33 | Later | P3 | P2 | Theme and typography pass | Ready | T11 | Manual readability review |
-| T36 | Later | P3 | P1 | Windows playtest build | Ready | T35, T12b, T29 | Build or install verification |
+| T36 | Later | P3 | P1 | Windows playtest build | Ready | T35a, T12c, T29 | Build or install verification |
 | T38 | Later | P3 | P1 | Installer packaging | Ready | T36 | Installer smoke test |
 | T19 | Later | P4 | P1 | Quest schema and validation | Ready | T16 | Schema validation check |
 | T20 | Later | P4 | P1 | Quest state transitions | Ready | T19 | `npm test` |
@@ -302,6 +311,84 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - final closeout validation on 2026-03-08 re-ran `docker compose run --rm app npm run type-check` and `docker compose run --rm app npm test` successfully from the main workspace
   - final launcher validation on 2026-03-08 used a clean temp repo copy on `C:` so Docker bind-mount behavior from `G:` would not affect the result: with `AI_PROVIDER=openai-compatible` and no API key, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` started the app and `/api/state` returned a blocked preflight containing `missing_api_key`; with `AI_PROVIDER=litellm` and `LITELLM_PROXY_URL=http://127.0.0.1:4011`, the launcher failed before container startup with `Configured local AI endpoint did not respond`
 
+### T01b - Preflight Blocker Contract And Advanced Diagnostics
+
+- Status: Ready
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Make every startup check resolve to one shared blocker, warning, or info contract that stays simple for end users and rich enough for developers.
+- Scope:
+  - define one preflight result schema shared by launcher, server, browser UI, and future packaged shell
+  - classify checks as `blocker`, `warning`, or `info`, with explicit rules for what stops the first turn versus what only warns
+  - keep the player-facing summary plain-language while exposing advanced diagnostics such as resolved config sources and exact probe targets behind an expandable details surface
+  - document the preflight policy so later tasks can add checks without inventing new severity rules
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - README.md
+  - src/config.ts
+  - src/server.ts
+  - public/app.ts
+  - public/index.html
+  - scripts/start-dev.ps1
+  - packaging/
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - T01a
+  - T02
+- Validation:
+  - `npm test`
+  - manual blocked and warning preflight check
+- Definition of Done:
+  - launcher, API, browser UI, and packaged path can speak the same preflight severity language
+  - end users see one recommended fix for each blocker without raw implementation jargon
+  - developers can inspect advanced details without changing the end-user-first default surface
+  - later checks can declare blocker or warning behavior without redefining the contract
+- Handoff Notes:
+  - user requested on 2026-03-08 that startup should be easy for end users while still allowing dev-friendly config changes
+  - treat blocker classification as a product policy, not just a logging detail
+  - prefer conservative blocking on write, save, and AI-startup failures; prefer warnings for likely performance issues and optional tuning gaps
+
+### T01c - Host Runtime And Path Prerequisite Checks
+
+- Status: Ready
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Detect the host prerequisites that commonly fail before the app becomes reachable, then stop early with plain-language fixes.
+- Scope:
+  - validate Docker, Compose, and Windows-specific prerequisites such as WSL2 or equivalent runtime requirements for the supported path
+  - detect port conflicts, missing browser or desktop-shell launch capability, unwritable app-data paths, and low free disk before runtime startup proceeds
+  - cover local GPU prerequisites for the optional path without turning them into blockers for the hosted-default path
+  - expose the results through the shared preflight contract so launcher and UI wording stay aligned
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - scripts/start-dev.ps1
+  - src/server.ts
+  - src/config.ts
+  - packaging/
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - T01
+  - T01b
+- Validation:
+  - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+  - manual port, path, and missing-runtime smoke checks
+- Definition of Done:
+  - the supported launch path fails early for missing host prerequisites instead of timing out later
+  - write-path and disk-space failures are explained before saves or logs are attempted
+  - optional local GPU prerequisites are warnings or blockers only when that mode is selected
+  - launcher and packaged-path wording can reuse the same host-prerequisite results
+- Handoff Notes:
+  - keep the hosted-default path tolerant of missing GPU tooling
+  - prioritize early detection of issues that would otherwise look like random startup hangs
+
 ### T35 - Packaging Prototype And Decision Memo
 
 - Status: Done
@@ -349,6 +436,212 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - validated on 2026-03-08 with `docker compose build app` and `docker compose run --rm app npm run desktop:prototype:dir`; the Electron builder path completed in-container after rebuilding native dependencies for Electron
   - host Windows validation completed on 2026-03-08 from a clean temp copy with official Node `v22.22.1`: `npm run type-check`, `npm run desktop:prototype:dir`, direct launch of `packaging/out/electron/win-unpacked/Text Game Prototype.exe`, packaged preflight check with a missing API key, and `powershell -ExecutionPolicy Bypass -File scripts/start-desktop-prototype.ps1`
   - the unpacked Windows shell created `%APPDATA%\\text-game\\runtime\\data\\game.db` and `%APPDATA%\\text-game\\logs\\desktop-shell.log`, read `.env` beside the executable, kept save data out of the install directory, preserved the same DB across restart, and exercised fallback port selection to `3002` on this machine because lower ports were already busy
+
+### T35a - Packaged AI Runtime Decision For Docker LiteLLM
+
+- Status: Done
+- Queue: Next
+- Phase: P0
+- Priority: P1
+- Owner Role: Release lead
+- Goal: Lock how the Windows launcher and packaged build relate to the repo-managed LiteLLM Docker sidecar and its optional GPU override.
+- Scope:
+  - decide whether the MVP packaged path requires Docker Desktop as a prerequisite or stages LiteLLM differently while keeping the same app-facing contract
+  - document how the launcher, setup flow, and packaged shell should detect and explain missing Docker, missing LiteLLM readiness, and unsupported GPU prerequisites
+  - update the packaging decision memo and roadmap notes so T36 inherits one explicit AI-runtime contract
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - README.md
+  - packaging/decision-memo.md
+- Do Not Touch:
+  - src/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T35
+  - T02f
+- Validation:
+  - decision memo review
+  - clean-machine checklist update review
+- Definition of Done:
+  - the supported packaged path clearly states whether Docker Desktop is required for MVP AI startup
+  - launcher and packaged-path prerequisite messaging covers Docker and optional GPU failures in plain language
+  - T36 no longer has to infer how LiteLLM is expected to start in the playtest build
+- Handoff Notes:
+  - user directed on 2026-03-08 that LiteLLM should default to the repo-managed Docker path with GPU-capable support available
+  - keep the app-facing contract stable at `game-chat` and `game-embedding` even if the packaged runtime eventually stops using Docker internally
+  - treat hosted-first startup as the default supported path and the GPU-backed local model route as an explicit opt-in
+  - locked D06 on 2026-03-08: the MVP packaged playtest path requires Docker Desktop for AI startup and reuses the repo-managed LiteLLM sidecar instead of bundling LiteLLM or Ollama into the Electron shell
+  - the packaged shell remains responsible for the app window plus compiled local server only; AI startup stays external so T36 can reuse the same app-facing gateway contract and recovery language as the launcher
+  - plain-language prerequisite messaging now needs to distinguish three cases for T36 and T12b: Docker Desktop missing or not running, LiteLLM sidecar not ready, and optional local GPU prerequisites missing for the `local-gpu` path
+  - hosted-first remains the default supported packaged route; the local GPU path stays an explicit opt-in that requires Docker Desktop, WSL2 backend support, compatible NVIDIA drivers, and a supported GPU-capable host
+  - validation for this decision slice was a doc review of `packaging/decision-memo.md`, `README.md`, and `ROADMAP.md` to ensure the packaged AI contract, prerequisite wording, and clean-machine checklist all agree
+
+### T02g - GPU Tier Matrix And Local Model Profiles
+
+- Status: Ready
+- Queue: Next
+- Phase: P0
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Define one conservative model-profile matrix for the optional local GPU path so setup can choose sane defaults by VRAM tier instead of by guesswork.
+- Scope:
+  - document the first supported VRAM tiers for local inference, including at minimum one low-VRAM tier and one high-VRAM tier
+  - assign recommended chat and embedding model profiles for each supported tier behind the stable `game-chat` and `game-embedding` aliases
+  - add a repo-owned mapping format that can later drive launcher and setup auto-selection
+  - avoid relying only on GPU marketing names; use detected VRAM as the primary selection key with optional SKU aliases for convenience
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - README.md
+  - setup_local_a.i.md
+  - litellm.local-gpu.config.yaml
+  - .env.example
+  - scripts/
+- Do Not Touch:
+  - public/
+  - data/spec/
+- Dependencies:
+  - T02f
+- Validation:
+  - matrix review
+  - manual local GPU profile sanity check
+- Definition of Done:
+  - the repo documents a first-pass GPU tier matrix for the optional local inference path
+  - each supported tier has a conservative recommended model profile and fallback notes
+  - the mapping is defined in a format that later tasks can consume programmatically
+  - the docs explicitly warn when a profile is heuristic rather than fully verified
+- Handoff Notes:
+  - user requested on 2026-03-08 that the roadmap and backlog cover auto-setup for different GPU capabilities
+  - do not hardcode incorrect SKU-to-VRAM assumptions into the matrix; treat VRAM as authoritative and model names as convenience labels only
+  - examples should be expressed as tiers such as `8 GB`, `12 GB`, and `20 GB+` even when common cards are listed alongside them
+
+### T02h - Auto-Select Local GPU Model Profile
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Let the launcher and setup flow detect local GPU capability and auto-select a compatible local model profile for the LiteLLM GPU path.
+- Scope:
+  - start by adding or tightening a deterministic fixture or scripted harness step for GPU profile selection before implementation
+  - detect local GPU memory or consume a manual override when auto-detection is unavailable
+  - choose the local chat-model profile from the T02g matrix and apply the matching LiteLLM local-GPU config path
+  - show the selected profile, allow user override, and explain when the detected tier may still be too small
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - setup_local_a.i.md
+  - .env.example
+  - scripts/start-dev.ps1
+  - scripts/test-local-ai-workflow.ps1
+  - src/config.ts
+  - src/config.test.ts
+  - src/server.ts
+  - public/app.ts
+  - public/index.html
+  - litellm.local-gpu.config.yaml
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - T02g
+  - T02j
+  - T12b
+- Validation:
+  - `npm run type-check`
+  - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`
+  - manual local GPU startup check
+- Definition of Done:
+  - the launcher or setup flow can select a local model profile from detected VRAM tiers or an explicit user override
+  - the selected profile is surfaced in plain language before gameplay starts
+  - unsupported or ambiguous hardware falls back to guided manual selection instead of silent failure
+  - the AI test harness covers the profile-selection behavior that was added first
+- Handoff Notes:
+  - keep hosted-first LiteLLM as the default path; this task only improves the optional local GPU route
+  - prefer conservative selection over aggressive maximum-size choices because startup reliability matters more than squeezing the largest possible model onto the card
+  - the first implementation can target NVIDIA on Windows through Docker Desktop and WSL2 before expanding the detection story
+
+### T02i - AI Readiness, Network, And Model-Availability Probes
+
+- Status: Ready
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Catch AI-stack failures before the first turn by probing LiteLLM health, network reachability, aliases, upstream auth, and required local model availability.
+- Scope:
+  - verify LiteLLM readiness, required alias existence, and upstream connectivity separately so failures are specific
+  - detect common DNS, TLS, proxy, credential, and rate-limit style failures and convert them into preflight issues with end-user-safe wording
+  - for the optional local GPU path, verify whether the selected local model is installed or can be pulled, rather than failing only at first generation time
+  - surface non-blocking performance warnings such as CPU fallback, undersized VRAM, or likely slow local inference separately from true blockers
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - scripts/start-dev.ps1
+  - src/server.ts
+  - src/config.ts
+  - public/app.ts
+  - setup_local_a.i.md
+  - litellm.local-gpu.config.yaml
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - T01b
+  - T02f
+- Validation:
+  - manual LiteLLM readiness probe
+  - manual unreachable-network and missing-model smoke checks
+- Definition of Done:
+  - startup can distinguish LiteLLM-not-ready, alias-missing, upstream-auth-failed, and local-model-missing cases
+  - common network failures are mapped to plain-language recovery steps
+  - likely performance problems appear as warnings instead of silent degradation
+  - the first turn is blocked only when the selected AI path cannot reasonably succeed
+- Handoff Notes:
+  - keep messages provider-neutral where possible, but be specific about the failing layer
+  - prefer separate probes over one catch-all AI health error because supportability matters here
+
+### T02j - End-User Config Profiles And Validated Developer Overrides
+
+- Status: Ready
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Give end users a few safe startup profiles while still letting developers override the underlying config with validation and clear diagnostics.
+- Scope:
+  - define supported end-user profiles such as hosted default, local GPU small, local GPU medium or large, and custom
+  - validate manual overrides against the same config contract so advanced users can change behavior without bypassing preflight
+  - show which values came from the selected profile and which came from explicit overrides
+  - keep the profile system provider-neutral internally even when LiteLLM is the default surface
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - README.md
+  - .env.example
+  - src/config.ts
+  - src/config.test.ts
+  - public/app.ts
+  - public/index.html
+  - scripts/start-dev.ps1
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - T01b
+  - T02a
+  - T02g
+- Validation:
+  - `npm test`
+  - manual profile resolution check
+- Definition of Done:
+  - end users can choose from a small number of safe startup profiles without editing raw env vars
+  - developer overrides remain possible but validated and visible in diagnostics
+  - the runtime can explain which values come from defaults, profiles, and explicit overrides
+  - the profile system does not create a second hidden config path outside the main contract
+- Handoff Notes:
+  - the main value here is reducing blank-slate config ambiguity, not adding endless profile permutations
+  - keep the end-user surface small and move complexity behind the advanced override path
 
 ### T02 - Config Module With Schema Validation
 
@@ -444,9 +737,10 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Phase: P0
 - Priority: P1
 - Owner Role: Tech lead
-- Goal: Make the LiteLLM gateway path easy to start and understand without requiring guesswork or README archaeology.
+- Goal: Make the Docker-backed LiteLLM gateway path easy to start and understand without requiring guesswork or README archaeology.
 - Scope:
   - tighten the LiteLLM proxy template around the locked default aliases
+  - document the repo-managed Docker sidecar as the supported startup path, with external host proxies treated as advanced overrides
   - update startup docs to present LiteLLM as the default control plane for both hosted and optional local-model paths
   - explain the hosted-provider-first path for small helper tasks such as autocomplete and spellcheck
   - document the optional large local-model path through Ollama or another external AI agent behind the same gateway-oriented UX
@@ -462,9 +756,9 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Dependencies:
   - T02a
 - Validation:
-  - manual LiteLLM startup verification
+  - manual LiteLLM startup verification through Docker
 - Definition of Done:
-  - LiteLLM startup docs match the default env template and alias contract
+  - LiteLLM startup docs match the default env template, alias contract, and repo-managed Docker sidecar flow
   - the docs explain hosted small-task routing versus optional large local-model routing in plain language
   - the gateway template is usable without reverse-engineering repo conventions
 - Handoff Notes:
@@ -477,54 +771,54 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - refreshed `setup_local_a.i.md` so Windows local-model guidance now starts from the LiteLLM path first and keeps the older direct `AI_PROVIDER=ollama` route as a smoke-test fallback
   - manual LiteLLM startup verification is still pending; this session focused on tightening the template and docs so the gateway path is easier to follow before the next runtime check
 
-  ### T02f - Docker-First LiteLLM Sidecar And GPU Override
+### T02f - Docker-First LiteLLM Sidecar And GPU Override
 
-  - Status: Review
-  - Queue: Now
-  - Phase: P0
-  - Priority: P1
-  - Owner Role: Tech lead
-  - Goal: Make Docker the default LiteLLM startup path while keeping a clean developer override for optional local GPU-backed inference.
-  - Scope:
-    - add a LiteLLM sidecar service to the default Compose runtime so the app no longer expects a separately started host proxy by default
-    - add an optional Compose override for a local inference backend with NVIDIA GPU passthrough on Windows via Docker Desktop and WSL2
-    - update the Windows launcher so hosted-default remains simple while developers can opt into the local GPU override without editing multiple files
-    - refresh env templates and docs so the supported Docker-first path and the optional GPU path are both clear
-  - Files to Touch:
-    - BACKLOG.md
-    - Dockerfile.litellm
-    - docker-compose.yml
-    - docker-compose.gpu.yml
-    - .env.example
-    - README.md
-    - litellm.config.yaml
-    - litellm.local-gpu.config.yaml
-    - setup_local_a.i.md
-    - scripts/start-dev.ps1
-  - Do Not Touch:
-    - src/
-    - public/
-    - data/spec/
-  - Dependencies:
-    - T02a
-    - T02b
-  - Validation:
-    - `docker compose up --build`
-    - `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`
-    - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
-  - Definition of Done:
-    - default Docker startup brings up both the app and LiteLLM without a separate manual proxy step
-    - developers can opt into a local GPU-backed model path through one extra Compose override or launcher option
-    - GPU passthrough is documented and wired only to the local inference container that needs it
-    - app-facing aliases remain `game-chat` and `game-embedding` across both modes
-  - Handoff Notes:
-    - user explicitly assigned implementation on 2026-03-08 after confirming a Docker-first default, easy developer overrides, and GPU passthrough support
-    - treat NVIDIA on Docker Desktop and WSL2 as the first officially supported GPU path for the optional local inference override
-    - implemented a repo-owned LiteLLM sidecar image in `Dockerfile.litellm` so startup no longer depends on fragile single-file bind mounts from the `G:` workspace drive
-    - default `docker-compose.yml` now starts the app plus LiteLLM sidecar, and `docker-compose.gpu.yml` adds an optional Ollama backend with Docker GPU reservations
-    - `scripts/start-dev.ps1` now supports `-AiStack hosted` and `-AiStack local-gpu`; both launcher modes force the supported LiteLLM stack instead of inheriting stale direct-provider `.env` experiments
-    - validated on 2026-03-08 with `docker compose config`, `docker compose -f docker-compose.yml -f docker-compose.gpu.yml config`, `$env:PORT='3300'; docker compose up --build -d`, `Invoke-WebRequest http://127.0.0.1:3300/api/state?name=ComposeSmoke`, `$env:PORT='3301'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, `$env:PORT='3302'; docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`, `Invoke-WebRequest http://127.0.0.1:3302/api/state?name=GpuSmoke`, and `$env:PORT='3303'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu -NoBrowser`
-    - current limitation: without a real hosted provider key, runtime preflight still reports the AI service as blocked before the first turn because LiteLLM returns HTTP 400 during the app's startup connectivity probe; container startup and launcher orchestration are verified, but real turn-generation validation still needs a valid upstream credential
+- Status: Review
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Make Docker the default LiteLLM startup path while keeping a clean developer override for optional local GPU-backed inference.
+- Scope:
+  - add a LiteLLM sidecar service to the default Compose runtime so the app no longer expects a separately started host proxy by default
+  - add an optional Compose override for a local inference backend with NVIDIA GPU passthrough on Windows via Docker Desktop and WSL2
+  - update the Windows launcher so hosted-default remains simple while developers can opt into the local GPU override without editing multiple files
+  - refresh env templates and docs so the supported Docker-first path and the optional GPU path are both clear
+- Files to Touch:
+  - BACKLOG.md
+  - Dockerfile.litellm
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+  - .env.example
+  - README.md
+  - litellm.config.yaml
+  - litellm.local-gpu.config.yaml
+  - setup_local_a.i.md
+  - scripts/start-dev.ps1
+- Do Not Touch:
+  - src/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T02a
+  - T02b
+- Validation:
+  - `docker compose up --build`
+  - `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`
+  - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+- Definition of Done:
+  - default Docker startup brings up both the app and LiteLLM without a separate manual proxy step
+  - developers can opt into a local GPU-backed model path through one extra Compose override or launcher option
+  - GPU passthrough is documented and wired only to the local inference container that needs it
+  - app-facing aliases remain `game-chat` and `game-embedding` across both modes
+- Handoff Notes:
+  - user explicitly assigned implementation on 2026-03-08 after confirming a Docker-first default, easy developer overrides, and GPU passthrough support
+  - treat NVIDIA on Docker Desktop and WSL2 as the first officially supported GPU path for the optional local inference override
+  - implemented a repo-owned LiteLLM sidecar image in `Dockerfile.litellm` so startup no longer depends on fragile single-file bind mounts from the `G:` workspace drive
+  - default `docker-compose.yml` now starts the app plus LiteLLM sidecar, and `docker-compose.gpu.yml` adds an optional Ollama backend with Docker GPU reservations
+  - `scripts/start-dev.ps1` now supports `-AiStack hosted` and `-AiStack local-gpu`; both launcher modes force the supported LiteLLM stack instead of inheriting stale direct-provider `.env` experiments
+  - validated on 2026-03-08 with `docker compose config`, `docker compose -f docker-compose.yml -f docker-compose.gpu.yml config`, `$env:PORT='3300'; docker compose up --build -d`, `Invoke-WebRequest http://127.0.0.1:3300/api/state?name=ComposeSmoke`, `$env:PORT='3301'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, `$env:PORT='3302'; docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`, `Invoke-WebRequest http://127.0.0.1:3302/api/state?name=GpuSmoke`, and `$env:PORT='3303'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu -NoBrowser`
+  - current limitation: without a real hosted provider key, runtime preflight still reports the AI service as blocked before the first turn because LiteLLM returns HTTP 400 during the app's startup connectivity probe; container startup and launcher orchestration are verified, but real turn-generation validation still needs a valid upstream credential
 
 ### T03 - Logging With Levels And Redaction
 
@@ -585,6 +879,44 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - local docs describe the reset path
 - Handoff Notes:
   - note any schema assumptions that later migrations must preserve
+
+### T04a - Storage, Save, And Migration Preflight
+
+- Status: Ready
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Catch save, DB, and writable-storage failures before a player loses progress or hits a migration error mid-session.
+- Scope:
+  - check writable save, DB, and log locations before gameplay starts
+  - warn or block on low free disk, unreadable existing DB files, incompatible save schema, or corrupted save metadata
+  - verify backup or recovery behavior around migrations and reset flows
+  - expose storage and save health through the shared preflight contract and startup UI
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - src/db.ts
+  - src/server.ts
+  - public/app.ts
+  - public/index.html
+  - scripts/start-dev.ps1
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - T04
+  - T01b
+- Validation:
+  - manual DB and save preflight smoke test
+  - manual incompatible-save or unwritable-path check
+- Definition of Done:
+  - players are warned before a broken save or unwritable path causes data loss
+  - migration-sensitive failures surface before the first turn or before load
+  - save-path health is visible without requiring a terminal or direct file browsing
+  - the launcher and in-app setup flow agree on storage-related blockers
+- Handoff Notes:
+  - classify actual write-risk issues as blockers
+  - save compatibility messaging should stay readable to non-developers even when schema versions are involved
 
 ### T06 - Turn Input, Output, And State Schemas
 
@@ -700,8 +1032,9 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Owner Role: Product/UI lead
 - Goal: Turn configuration and AI connectivity into a guided first-run flow instead of README-only work.
 - Scope:
-  - add guided checks for the supported AI provider and config before the first turn
+  - add guided checks for the supported Docker-backed LiteLLM provider path and config before the first turn
   - expose a safe connection test and plain-language error states
+  - explain missing Docker, missing LiteLLM readiness, and optional GPU override prerequisites without requiring terminal knowledge
   - allow retrying setup without deleting saves or reopening the terminal
   - document the supported MVP AI path in the UI and README
 - Files to Touch:
@@ -716,7 +1049,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - data/spec/
   - src/game.ts
 - Dependencies:
-  - T02
+  - T02f
   - T11
   - T12
 - Validation:
@@ -731,6 +1064,49 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - treat the supported AI path as a product decision, not just a config screen
   - the user confirmed on 2026-03-08 that setup and diagnostics should stay UI-first for now
   - the user confirmed on 2026-03-08 that LiteLLM is the default AI control plane the setup flow should steer toward
+  - treat the repo-managed Docker LiteLLM sidecar as the default recovery path, with GPU-backed local inference explained as an explicit opt-in
+
+### T12c - Guided Recovery Actions And Advanced Setup Details
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Product/UI lead
+- Goal: Turn setup blockers and warnings into a guided recovery flow with retry actions for end users and expandable advanced details for developers.
+- Scope:
+  - present blockers, warnings, and info in the setup UI with short summaries and one recommended action each
+  - add retry flows and the smallest safe auto-fix actions for common issues such as restarting checks, choosing a smaller local profile, or switching back to hosted default
+  - expose advanced setup details on demand so developers can inspect resolved config, probe targets, and failing subsystems without overwhelming end users
+  - keep save data intact while users retry setup or switch profiles
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - README.md
+  - public/index.html
+  - public/app.ts
+  - public/styles.css
+  - src/server.ts
+  - src/config.ts
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - T12b
+  - T01c
+  - T02i
+  - T04a
+  - T02j
+- Validation:
+  - manual recovery flow check
+  - manual retry and profile-switch smoke test
+- Definition of Done:
+  - common setup blockers can be retried without reopening the terminal
+  - end users get one obvious next step per issue while advanced users can expand for deeper diagnostics
+  - setup repair flows do not require deleting saves or editing hidden files during normal recovery
+  - the browser and launcher recovery language stay aligned
+- Handoff Notes:
+  - avoid turning the first-run screen into a wall of diagnostics
+  - auto-fix actions should stay reversible and conservative
 
 ### T29 - Save Slots UI
 
@@ -922,7 +1298,10 @@ When a human assigns a task directly, the assigned task overrides queue order.
 | D02 | Director spec format: JSON or YAML | Before T16 starts | Gameplay systems lead | Open |
 | D03 | Sample MVP quest or story arc definition | Before Phase 1 exit | Product/UI lead | Open |
 | D04 | MVP packaging shell: launcher-only, Tauri, or Electron | Before Phase 0 exit | Release lead | Locked |
-| D05 | Default end-user AI setup: LiteLLM-managed gateway as the default control plane, with hosted small-task routing and an optional large local-model path | Before Phase 0 exit | Tech lead | Locked |
+| D05 | Default end-user AI setup: repo-managed LiteLLM Docker sidecar as the default control plane, with hosted small-task routing and an optional GPU-backed local-model path | Before Phase 0 exit | Tech lead | Locked |
+| D06 | MVP packaged AI runtime: require Docker Desktop for the LiteLLM sidecar, or stage the gateway another way while preserving the same app-facing contract | Before T36 starts | Release lead | Locked |
+| D07 | Initial local GPU tier matrix: which VRAM tiers are officially supported first, and which model profiles map to them | Before T02h starts | AI systems lead | Open |
+| D08 | Preflight policy: which startup failures are blockers versus warnings versus info in end-user mode, and which actions can auto-fix safely | Before T01b starts | Tech lead | Open |
 
 ## Agent Execution Rules
 

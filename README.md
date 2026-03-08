@@ -289,6 +289,30 @@ Examples:
 
 The current packaging spike uses Electron as a thin Windows-first shell around the existing compiled server and browser UI.
 
+### MVP packaged AI contract
+
+For the MVP playtest path, the packaged app and the AI runtime are intentionally split:
+
+- the Electron shell bundles the app window and compiled local game server
+- Docker Desktop remains a required Windows prerequisite for AI startup
+- LiteLLM continues to run as the repo-managed Docker sidecar instead of being embedded into the packaged shell
+- hosted-first LiteLLM routing remains the default supported packaged setup
+- the optional `local-gpu` path stays an explicit opt-in for compatible Windows machines instead of becoming the baseline requirement
+
+Why keep that split for now:
+
+- it preserves one AI contract across the Windows launcher, setup flow, and packaged shell
+- it avoids shipping and supporting two different LiteLLM ownership models during Phase 0
+- it keeps T36 focused on the playtest shell and first-run clarity instead of silently turning into a gateway repackaging project
+
+What the packaged path should tell the player in plain language:
+
+- if Docker Desktop is missing or not running: install or start Docker Desktop, then retry the game
+- if the LiteLLM sidecar did not become ready: the game app opened, but the AI service is still starting or failed to start; retry after Docker is healthy
+- if the player selects the optional local GPU route on unsupported hardware: switch back to the hosted default path or install the required NVIDIA/WSL2 prerequisites first
+
+The packaged MVP does **not** bundle LiteLLM or Ollama yet. That may change later, but T36 should assume the supported AI startup contract is still Docker Desktop plus the repo-managed LiteLLM stack.
+
 Prototype commands once Node.js and npm are available on the host:
 
 ```powershell
@@ -311,6 +335,7 @@ What the prototype does:
 Current prototype caveats:
 
 - this path is experimental and was added to de-risk packaging direction rather than replace the documented Docker launcher today
+- the MVP packaged playtest path still depends on Docker Desktop for AI startup; the app shell is bundled, but the AI gateway is not
 - code signing, icons, installer polish, and first-run config repair UX are still follow-on work
 - containerized packaging verification passed in this session with `docker compose run --rm app npm run desktop:prototype:dir`, but the host Windows shell path still needs a real dry run because host `node` and `npm` were unavailable here
 
