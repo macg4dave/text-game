@@ -51,7 +51,7 @@ Set your `.env` file like this:
 
 ```env
 AI_PROVIDER=ollama
-OLLAMA_BASE_URL=http://127.0.0.1:11434/v1
+OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
 OLLAMA_API_KEY=ollama
 OLLAMA_CHAT_MODEL=gemma3:4b
 OLLAMA_EMBEDDING_MODEL=embeddinggemma
@@ -63,15 +63,21 @@ Notes:
 - `OLLAMA_API_KEY` is required by the OpenAI SDK shape but ignored by Ollama.
 - If you switch to `gemma3:1b`, change only `OLLAMA_CHAT_MODEL`.
 - If you use a non-default Ollama host, update `OLLAMA_BASE_URL`.
+- `host.docker.internal` is the right default when the app runs in Docker and Ollama runs on the host machine.
 
 ## Start The App
 
 ```powershell
-npm install
-npm run dev
+docker compose up --build
 ```
 
 Then open `http://localhost:3000`.
+
+On Windows, you can use the launcher instead:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+```
 
 ## Default Test Workflow
 

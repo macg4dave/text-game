@@ -66,7 +66,7 @@ Use this exact shape when adding new work:
 
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T01 | Now | P0 | P1 | Dev environment bootstrap script | Review | None | `npm install`; `npm run dev`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
+| T01 | Now | P0 | P1 | Dev environment bootstrap script | Review | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
 | T02 | Now | P0 | P1 | Config module with schema validation | Ready | None | `npm test` |
 | T02a | Now | P0 | P1 | LiteLLM env contract and alias defaults | Ready | T02 | Manual config verification |
 | T02b | Now | P0 | P1 | LiteLLM proxy template and startup docs | Ready | T02a | Manual LiteLLM startup verification |
@@ -139,6 +139,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Goal: Make local setup and startup reproducible with the fewest manual steps possible.
 - Scope:
   - define a one-command local startup path
+  - add a Docker-based cross-platform startup path that keeps Node/npm and native builds inside containers
   - add a Windows launcher that checks prerequisites, verifies the configured AI path, starts the app server, and opens the browser
   - document the expected local prerequisites
   - ensure the startup path matches the README
@@ -148,26 +149,32 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - .env.example
   - BACKLOG.md
   - scripts/start-dev.ps1
+  - Dockerfile
+  - docker-compose.yml
+  - .dockerignore
 - Do Not Touch:
   - src/
   - public/
 - Dependencies:
   - None
 - Validation:
-  - `npm install`
-  - `npm run dev`
+  - `docker compose up --build`
   - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`
 - Definition of Done:
-  - one documented command starts the app locally
+  - one documented Docker command starts the app locally across supported desktop platforms
   - the Windows launcher checks the expected local prerequisites and opens the app automatically
   - required environment variables are documented
   - setup instructions match the current repository
 - Handoff Notes:
   - user assigned the Windows startup script directly on 2026-03-07
-  - added `scripts/start-dev.ps1` plus `npm run dev:windows`
-  - the launcher reads `.env` when present, falls back to the Ollama local preset when `.env` is missing, checks the configured AI path, starts the app server in a new PowerShell window, waits for readiness, and opens the browser
-  - validation completed: PowerShell syntax parse for `scripts/start-dev.ps1`, direct launcher run through the prerequisite check, and `git diff --check`
-  - full validation is still pending because `node` and `npm` are unavailable in this shell, so `npm install`, `npm run dev`, and end-to-end browser startup could not be executed here
+  - added Docker-first dev startup with `Dockerfile`, `docker-compose.yml`, and `.dockerignore`
+  - updated `scripts/start-dev.ps1` to launch the Docker path instead of requiring host Node/npm
+  - kept `npm run dev:windows` as a convenience wrapper for the Windows launcher when local npm exists
+  - README now includes a cross-platform Node.js and npm install guide for Windows, macOS, and Linux
+  - the launcher now checks Docker, probes the configured AI path, translates local host AI URLs to Docker-reachable URLs when needed, starts the app container, waits for readiness, and opens the browser
+  - Docker-based startup was requested on 2026-03-08 to avoid host Node/npm and native addon issues across Windows, macOS, and Linux
+  - validation completed: PowerShell syntax parse for `scripts/start-dev.ps1`, `docker compose config`, direct launcher run through the Docker engine prerequisite check, and `git diff --check`
+  - full runtime validation is still pending because the Docker CLI is installed but the Docker Desktop Linux engine was not running in this shell, so `docker compose build app`, `docker compose up --build`, and end-to-end browser startup could not be completed here
 
 ### T02 - Config Module With Schema Validation
 

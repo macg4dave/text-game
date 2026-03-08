@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev:windows": "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1",
     "test:local-ai": "powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1",

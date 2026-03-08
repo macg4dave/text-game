@@ -1,16 +1,14 @@
 param(
   [switch]$NoBrowser,
-  [switch]$SkipInstall,
-  [switch]$ForceInstall
+  [switch]$Rebuild,
+  [switch]$Detached = $true
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$nodeModulesPath = Join-Path $repoRoot "node_modules"
 $dotEnvPath = Join-Path $repoRoot ".env"
-$litellmConfigPath = Join-Path $repoRoot "litellm.config.yaml"
 
 Set-Location -LiteralPath $repoRoot
 
@@ -30,6 +28,18 @@ function Fail {
   param([string]$Message)
 
   throw $Message
+}
+
+function Invoke-Native {
+  param(
+    [string]$FilePath,
+    [string[]]$Arguments
+  )
+
+  & $FilePath @Arguments
+  if ($LASTEXITCODE -ne 0) {
+    Fail ("Command failed: {0} {1}" -f $FilePath, ($Arguments -join " "))
+  }
 }
 
 function Get-CommandPath {
@@ -112,24 +122,18 @@ function Get-PortValue {
   return 3000
 }
 
-function Resolve-LocalHealthUrl {
-  param([string]$BaseUrl)
+function Get-UriObject {
+  param([string]$Text)
 
-  if ([string]::IsNullOrWhiteSpace($BaseUrl)) {
+  if ([string]::IsNullOrWhiteSpace($Text)) {
     return $null
   }
 
-  $uri = [System.Uri]$BaseUrl
-  if ($uri.Host -notin @("127.0.0.1", "localhost")) {
+  try {
+    return [System.Uri]$Text
+  } catch {
     return $null
   }
-
-  $baseRoot = $BaseUrl.TrimEnd("/")
-  if ($baseRoot.EndsWith("/v1")) {
-    $baseRoot = $baseRoot.Substring(0, $baseRoot.Length - 3)
-  }
-
-  return "$baseRoot/api/version"
 }
 
 function Test-HttpReady {
@@ -149,7 +153,7 @@ function Test-HttpReady {
 function Wait-ForHttpReady {
   param(
     [string]$Uri,
-    [int]$TimeoutSeconds = 45,
+    [int]$TimeoutSeconds = 60,
     [int]$PollMilliseconds = 1000
   )
 
@@ -165,374 +169,178 @@ function Wait-ForHttpReady {
   return $false
 }
 
-function Test-TcpOpen {
-  param(
-    [string]$ComputerName,
-    [int]$Port,
-    [int]$TimeoutMilliseconds = 1500
-  )
-
-  $client = New-Object System.Net.Sockets.TcpClient
-  try {
-    $async = $client.BeginConnect($ComputerName, $Port, $null, $null)
-    $connected = $async.AsyncWaitHandle.WaitOne($TimeoutMilliseconds, $false)
-    if (-not $connected) {
-      return $false
-    }
-
-    $client.EndConnect($async)
-    return $true
-  } catch {
-    return $false
-  } finally {
-    $client.Dispose()
-  }
-}
-
-function Wait-ForTcpOpen {
-  param(
-    [string]$ComputerName,
-    [int]$Port,
-    [int]$TimeoutSeconds = 25,
-    [int]$PollMilliseconds = 1000
-  )
-
-  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-  while ((Get-Date) -lt $deadline) {
-    if (Test-TcpOpen -ComputerName $ComputerName -Port $Port) {
-      return $true
-    }
-
-    Start-Sleep -Milliseconds $PollMilliseconds
-  }
-
-  return $false
-}
-
-function Get-LocalUri {
-  param([string]$UriText)
-
-  if ([string]::IsNullOrWhiteSpace($UriText)) {
-    return $null
-  }
-
-  $uri = [System.Uri]$UriText
-  if ($uri.Host -notin @("127.0.0.1", "localhost")) {
-    return $null
-  }
-
-  return $uri
-}
-
-function Get-StartupConfig {
+function Resolve-ProviderConfig {
   param([hashtable]$DotEnv)
 
   $hasDotEnv = Test-Path -LiteralPath $dotEnvPath
-  $fallbackProvider = if ($hasDotEnv) { "openai-compatible" } else { "ollama" }
-  $provider = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROVIDER") -Default $fallbackProvider
+  $provider = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROVIDER") -Default ($(if ($hasDotEnv) { "openai-compatible" } else { "ollama" }))
   $provider = $provider.Trim().ToLowerInvariant()
-
   $port = Get-PortValue (Get-ConfigValue -DotEnv $DotEnv -Keys @("PORT") -Default "3000")
-  $appUrl = "http://127.0.0.1:$port/"
-
-  $defaults = switch ($provider) {
-    "litellm" {
-      @{
-        baseUrl = "http://127.0.0.1:4000"
-        apiKey = "anything"
-        chatModel = "game-chat"
-        embeddingModel = "game-embedding"
-      }
-    }
-    "ollama" {
-      @{
-        baseUrl = "http://127.0.0.1:11434/v1"
-        apiKey = "ollama"
-        chatModel = "gemma3:4b"
-        embeddingModel = "embeddinggemma"
-      }
-    }
-    default {
-      @{
-        baseUrl = ""
-        apiKey = ""
-        chatModel = "gpt-4o-mini"
-        embeddingModel = "text-embedding-3-small"
-      }
-    }
-  }
 
   $baseUrl = switch ($provider) {
     "litellm" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "AI_BASE_URL", "OPENAI_BASE_URL") -Default $defaults.baseUrl
+      Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "AI_BASE_URL") -Default "http://127.0.0.1:4000"
     }
     "ollama" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_BASE_URL", "AI_BASE_URL", "OPENAI_BASE_URL") -Default $defaults.baseUrl
+      Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_BASE_URL", "AI_BASE_URL") -Default "http://127.0.0.1:11434/v1"
     }
     default {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_BASE_URL", "OPENAI_BASE_URL") -Default $defaults.baseUrl
-    }
-  }
-
-  $apiKey = switch ($provider) {
-    "litellm" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_API_KEY", "AI_API_KEY", "OPENAI_API_KEY") -Default $defaults.apiKey
-    }
-    "ollama" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_API_KEY", "AI_API_KEY", "OPENAI_API_KEY") -Default $defaults.apiKey
-    }
-    default {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_API_KEY", "OPENAI_API_KEY") -Default $defaults.apiKey
-    }
-  }
-
-  $chatModel = switch ($provider) {
-    "litellm" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_CHAT_MODEL", "AI_CHAT_MODEL", "OPENAI_MODEL") -Default $defaults.chatModel
-    }
-    "ollama" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_CHAT_MODEL", "AI_CHAT_MODEL", "OPENAI_MODEL") -Default $defaults.chatModel
-    }
-    default {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_CHAT_MODEL", "OPENAI_MODEL") -Default $defaults.chatModel
-    }
-  }
-
-  $embeddingModel = switch ($provider) {
-    "litellm" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_EMBEDDING_MODEL", "AI_EMBEDDING_MODEL", "OPENAI_EMBEDDING_MODEL") -Default $defaults.embeddingModel
-    }
-    "ollama" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_EMBEDDING_MODEL", "AI_EMBEDDING_MODEL", "OPENAI_EMBEDDING_MODEL") -Default $defaults.embeddingModel
-    }
-    default {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_EMBEDDING_MODEL", "OPENAI_EMBEDDING_MODEL") -Default $defaults.embeddingModel
-    }
-  }
-
-  $launchOverrides = @{}
-  if (-not $hasDotEnv) {
-    $launchOverrides["AI_PROVIDER"] = $provider
-    $launchOverrides["PORT"] = [string]$port
-    if ($provider -eq "ollama") {
-      $launchOverrides["OLLAMA_BASE_URL"] = $baseUrl
-      $launchOverrides["OLLAMA_API_KEY"] = $apiKey
-      $launchOverrides["OLLAMA_CHAT_MODEL"] = $chatModel
-      $launchOverrides["OLLAMA_EMBEDDING_MODEL"] = $embeddingModel
-    } elseif ($provider -eq "litellm") {
-      $launchOverrides["LITELLM_PROXY_URL"] = $baseUrl
-      $launchOverrides["LITELLM_API_KEY"] = $apiKey
-      $launchOverrides["LITELLM_CHAT_MODEL"] = $chatModel
-      $launchOverrides["LITELLM_EMBEDDING_MODEL"] = $embeddingModel
-    } else {
-      if ($baseUrl) {
-        $launchOverrides["AI_BASE_URL"] = $baseUrl
-      }
-      if ($apiKey) {
-        $launchOverrides["AI_API_KEY"] = $apiKey
-      }
-      $launchOverrides["AI_CHAT_MODEL"] = $chatModel
-      $launchOverrides["AI_EMBEDDING_MODEL"] = $embeddingModel
+      Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_BASE_URL") -Default ""
     }
   }
 
   return [ordered]@{
     hasDotEnv = $hasDotEnv
     provider = $provider
+    baseUrl = $baseUrl
     port = $port
-    appUrl = $appUrl
-    baseUrl = $baseUrl.TrimEnd("/")
-    healthUrl = if ($provider -eq "ollama") { Resolve-LocalHealthUrl -BaseUrl $baseUrl } else { $null }
-    apiKey = $apiKey
-    chatModel = $chatModel
-    embeddingModel = $embeddingModel
-    launchOverrides = $launchOverrides
+    appUrl = "http://127.0.0.1:$port/"
   }
 }
 
-function Ensure-NodeTooling {
-  $nodePath = Get-CommandPath -Name "node"
-  $npmPath = Get-CommandPath -Name "npm"
+function Convert-ToDockerReachableUrl {
+  param([string]$Url)
 
-  if (-not $nodePath) {
-    Fail "Node.js was not found on PATH. Install Node.js for Windows, then rerun this script."
+  $uri = Get-UriObject -Text $Url
+  if ($null -eq $uri) {
+    return $Url
   }
 
-  if (-not $npmPath) {
-    Fail "npm was not found on PATH. Install Node.js for Windows, then rerun this script."
+  if ($uri.Host -notin @("127.0.0.1", "localhost")) {
+    return $Url
   }
 
-  Write-Info ("node: {0}" -f $nodePath)
-  Write-Info ("npm: {0}" -f $npmPath)
+  return $Url.Replace($uri.Host, "host.docker.internal")
 }
 
-function Ensure-Dependencies {
-  if ($SkipInstall) {
-    Write-Info "Skipping npm install because -SkipInstall was provided."
-    return
+function Ensure-DockerTooling {
+  $dockerPath = Get-CommandPath -Name "docker"
+  if (-not $dockerPath) {
+    Fail "Docker was not found on PATH. Install Docker Desktop or Docker Engine with Compose support, then rerun this script."
   }
 
-  $needsInstall = $ForceInstall -or -not (Test-Path -LiteralPath $nodeModulesPath)
-  if (-not $needsInstall) {
-    Write-Info "Using existing node_modules."
-    return
-  }
+  Write-Info ("docker: {0}" -f $dockerPath)
 
-  Write-Step "Installing npm dependencies"
-  & npm install
-}
-
-function Ensure-OllamaReady {
-  param($Config)
-
-  $ollamaPath = Get-CommandPath -Name "ollama"
-  if (-not $ollamaPath) {
-    Fail "AI_PROVIDER=ollama but the Ollama CLI was not found on PATH."
-  }
-
-  if (-not $Config.healthUrl) {
-    Fail "AI_PROVIDER=ollama expects a local OLLAMA_BASE_URL."
-  }
-
-  Write-Info ("ollama: {0}" -f $ollamaPath)
-  Write-Info ("base URL: {0}" -f $Config.baseUrl)
-
-  if (-not (Test-HttpReady -Uri $Config.healthUrl)) {
-    Write-Step "Starting Ollama background server"
-    Start-Process -FilePath $ollamaPath -ArgumentList "serve" -WindowStyle Hidden | Out-Null
-  }
-
-  if (-not (Wait-ForHttpReady -Uri $Config.healthUrl -TimeoutSeconds 25)) {
-    Fail ("Ollama did not become ready at {0}." -f $Config.healthUrl)
-  }
-
-  Write-Info "Ollama API is reachable."
-
-  $tags = Invoke-RestMethod -Uri ($Config.healthUrl -replace "/api/version$", "/api/tags") -Method Get
-  $availableModels = @($tags.models | ForEach-Object { $_.name })
-
-  if ($availableModels -notcontains $Config.chatModel) {
-    Fail ("Missing Ollama chat model '{0}'. Run: ollama pull {0}" -f $Config.chatModel)
-  }
-
-  if ($availableModels -notcontains $Config.embeddingModel) {
-    Fail ("Missing Ollama embedding model '{0}'. Run: ollama pull {0}" -f $Config.embeddingModel)
-  }
-
-  Write-Info ("Ollama models ready: {0}, {1}" -f $Config.chatModel, $Config.embeddingModel)
-}
-
-function Ensure-LiteLlmReady {
-  param($Config)
-
-  $uri = [System.Uri]$Config.baseUrl
-  if (Test-TcpOpen -ComputerName $uri.Host -Port $uri.Port) {
-    Write-Info ("LiteLLM proxy reachable at {0}" -f $Config.baseUrl)
-    return
-  }
-
-  $liteLlmPath = Get-CommandPath -Name "litellm"
-  if (-not $liteLlmPath) {
-    Fail ("AI_PROVIDER=litellm but LiteLLM is not reachable at {0} and the litellm CLI was not found on PATH." -f $Config.baseUrl)
-  }
-
-  if (-not (Test-Path -LiteralPath $litellmConfigPath)) {
-    Fail ("AI_PROVIDER=litellm but {0} is missing." -f $litellmConfigPath)
-  }
-
-  Write-Step "Starting LiteLLM proxy"
-  Start-Process -FilePath $liteLlmPath -ArgumentList @("--config", $litellmConfigPath, "--port", [string]$uri.Port) -WindowStyle Hidden | Out-Null
-
-  if (-not (Wait-ForTcpOpen -ComputerName $uri.Host -Port $uri.Port -TimeoutSeconds 25)) {
-    Fail ("LiteLLM did not become ready at {0}." -f $Config.baseUrl)
-  }
-
-  Write-Info ("LiteLLM proxy reachable at {0}" -f $Config.baseUrl)
+  Invoke-Native -FilePath "docker" -Arguments @("info")
+  Invoke-Native -FilePath "docker" -Arguments @("compose", "version")
 }
 
 function Ensure-ProviderReady {
   param($Config)
 
   Write-Step ("Checking AI provider: {0}" -f $Config.provider)
-  Write-Info ("chat model: {0}" -f $Config.chatModel)
-  Write-Info ("embedding model: {0}" -f $Config.embeddingModel)
-
-  switch ($Config.provider) {
-    "ollama" {
-      Ensure-OllamaReady -Config $Config
-      return
-    }
-    "litellm" {
-      Ensure-LiteLlmReady -Config $Config
-      return
-    }
-    default {
-      if ([string]::IsNullOrWhiteSpace($Config.baseUrl) -and [string]::IsNullOrWhiteSpace($Config.apiKey)) {
-        Fail "No AI credentials were found. Set AI_API_KEY or create a .env file before starting the app."
-      }
-
-      $localUri = Get-LocalUri -UriText $Config.baseUrl
-      if ($localUri -and -not (Wait-ForTcpOpen -ComputerName $localUri.Host -Port $localUri.Port -TimeoutSeconds 10)) {
-        Fail ("Configured local AI endpoint did not respond at {0}." -f $Config.baseUrl)
-      }
-
-      Write-Info "Using configured OpenAI-compatible provider."
-    }
-  }
-}
-
-function Start-AppServer {
-  param($Config)
-
-  if (Test-HttpReady -Uri $Config.appUrl) {
-    Write-Info ("App server already responding at {0}" -f $Config.appUrl)
+  if ([string]::IsNullOrWhiteSpace($Config.baseUrl)) {
+    Write-Info "No local AI base URL to probe from the host."
     return
   }
 
-  Write-Step "Starting app server in a new PowerShell window"
-
-  $commandLines = New-Object System.Collections.Generic.List[string]
-  $commandLines.Add(("Set-Location -LiteralPath '{0}'" -f $repoRoot.Replace("'", "''")))
-  foreach ($entry in $Config.launchOverrides.GetEnumerator()) {
-    $escapedValue = $entry.Value.Replace("'", "''")
-    $commandLines.Add(('$env:{0} = ''{1}''' -f $entry.Key, $escapedValue))
+  $uri = Get-UriObject -Text $Config.baseUrl
+  if ($null -eq $uri) {
+    Write-Info ("Skipping AI reachability check because base URL is not a valid URI: {0}" -f $Config.baseUrl)
+    return
   }
-  $commandLines.Add("npm run dev")
-  $commandText = [string]::Join("; ", $commandLines)
 
-  $bytes = [System.Text.Encoding]::Unicode.GetBytes($commandText)
-  $encodedCommand = [Convert]::ToBase64String($bytes)
+  if ($uri.Host -notin @("127.0.0.1", "localhost")) {
+    Write-Info ("Using remote/non-local AI endpoint: {0}" -f $Config.baseUrl)
+    return
+  }
 
-  Start-Process -FilePath "powershell.exe" -ArgumentList @(
-    "-NoExit",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-EncodedCommand",
-    $encodedCommand
-  ) -WorkingDirectory $repoRoot | Out-Null
+  $probeUrl = switch ($Config.provider) {
+    "ollama" { "http://127.0.0.1:11434/api/version" }
+    default { "{0}://{1}:{2}/" -f $uri.Scheme, $uri.Host, $uri.Port }
+  }
 
-  if (-not (Wait-ForHttpReady -Uri $Config.appUrl -TimeoutSeconds 45)) {
-    Fail ("App server did not become ready at {0}. Check the new PowerShell window for errors." -f $Config.appUrl)
+  if (-not (Wait-ForHttpReady -Uri $probeUrl -TimeoutSeconds 10)) {
+    if ($Config.provider -eq "ollama") {
+      $ollamaPath = Get-CommandPath -Name "ollama"
+      if ($ollamaPath) {
+        Write-Step "Starting Ollama background server"
+        Start-Process -FilePath $ollamaPath -ArgumentList "serve" -WindowStyle Hidden | Out-Null
+        if (Wait-ForHttpReady -Uri $probeUrl -TimeoutSeconds 20) {
+          Write-Info "Ollama API is reachable."
+          return
+        }
+      }
+    }
+
+    Fail ("Configured local AI endpoint did not respond at {0}." -f $probeUrl)
+  }
+
+  Write-Info ("AI endpoint is reachable: {0}" -f $probeUrl)
+}
+
+function Set-ComposeOverrides {
+  param($Config)
+
+  if ($Config.provider -eq "ollama") {
+    $translated = Convert-ToDockerReachableUrl -Url $(if ($Config.baseUrl) { $Config.baseUrl } else { "http://127.0.0.1:11434/v1" })
+    if ($translated -ne $Config.baseUrl) {
+      Write-Info ("Container AI URL override: {0}" -f $translated)
+    }
+    $env:OLLAMA_BASE_URL = $translated
+    return
+  }
+
+  if ($Config.provider -eq "litellm") {
+    $translated = Convert-ToDockerReachableUrl -Url $(if ($Config.baseUrl) { $Config.baseUrl } else { "http://127.0.0.1:4000" })
+    if ($translated -ne $Config.baseUrl) {
+      Write-Info ("Container LiteLLM URL override: {0}" -f $translated)
+    }
+    $env:LITELLM_PROXY_URL = $translated
+    return
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($Config.baseUrl)) {
+    $translated = Convert-ToDockerReachableUrl -Url $Config.baseUrl
+    if ($translated -ne $Config.baseUrl) {
+      Write-Info ("Container AI URL override: {0}" -f $translated)
+    }
+    $env:AI_BASE_URL = $translated
+  }
+}
+
+function Start-AppContainer {
+  param($Config)
+
+  $args = @("compose", "up")
+  if ($Rebuild) {
+    $args += "--build"
+  }
+  if ($Detached) {
+    $args += "-d"
+  }
+  $args += "app"
+
+  Write-Step "Starting app container"
+  Invoke-Native -FilePath "docker" -Arguments $args
+
+  if (-not (Wait-ForHttpReady -Uri $Config.appUrl -TimeoutSeconds 90)) {
+    Write-Host ""
+    & docker compose ps
+    Write-Host ""
+    & docker compose logs --tail 100 app
+    Fail ("App did not become ready at {0}." -f $Config.appUrl)
   }
 
   Write-Info ("App server is ready at {0}" -f $Config.appUrl)
 }
 
 $dotEnv = Load-DotEnvMap -Path $dotEnvPath
-$config = Get-StartupConfig -DotEnv $dotEnv
+$config = Resolve-ProviderConfig -DotEnv $dotEnv
 
-Write-Host "Text Game Windows startup" -ForegroundColor Green
+Write-Host "Text Game Docker startup" -ForegroundColor Green
 Write-Info ("repo: {0}" -f $repoRoot)
+Write-Info ("provider: {0}" -f $config.provider)
 if ($config.hasDotEnv) {
   Write-Info "configuration: using .env"
 } else {
-  Write-Info "configuration: no .env found, launcher will use local defaults for this run"
+  Write-Info "configuration: no .env found, using Docker-side local defaults for this run"
 }
 
-Ensure-NodeTooling
-Ensure-Dependencies
+Ensure-DockerTooling
 Ensure-ProviderReady -Config $config
-Start-AppServer -Config $config
+Set-ComposeOverrides -Config $config
+Start-AppContainer -Config $config
 
 if (-not $NoBrowser) {
   Write-Step "Opening browser"

@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    command: sh -lc "npm install && npm run dev"
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+    environment:
+      PORT: "${PORT:-3000}"
+      AI_PROVIDER: "${AI_PROVIDER:-ollama}"
+      AI_API_KEY: "${AI_API_KEY:-}"
+      AI_BASE_URL: "${AI_BASE_URL:-}"
+      AI_CHAT_MODEL: "${AI_CHAT_MODEL:-gpt-4o-mini}"
+      AI_EMBEDDING_MODEL: "${AI_EMBEDDING_MODEL:-text-embedding-3-small}"
+      LITELLM_PROXY_URL: "${LITELLM_PROXY_URL:-http://host.docker.internal:4000}"
+      LITELLM_API_KEY: "${LITELLM_API_KEY:-anything}"
+      LITELLM_CHAT_MODEL: "${LITELLM_CHAT_MODEL:-game-chat}"
+      LITELLM_EMBEDDING_MODEL: "${LITELLM_EMBEDDING_MODEL:-game-embedding}"
+      OLLAMA_BASE_URL: "${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}"
+      OLLAMA_API_KEY: "${OLLAMA_API_KEY:-ollama}"
+      OLLAMA_CHAT_MODEL: "${OLLAMA_CHAT_MODEL:-gemma3:4b}"
+      OLLAMA_EMBEDDING_MODEL: "${OLLAMA_EMBEDDING_MODEL:-embeddinggemma}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/state').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  node_modules:

@@ -4,17 +4,118 @@ A portable, text-based adventure with a director layer that nudges the story tow
 
 The project uses the OpenAI Node SDK through a provider-neutral config layer, so you can keep the same app code while swapping between providers that support OpenAI-compatible generation and embeddings endpoints.
 
-## Quick Start
+## Preferred Dev Runtime
 
-1. Copy `.env.example` to `.env` and choose either hosted API credentials or the local Ollama settings.
-2. Install dependencies and start the server.
+The preferred development path is Docker. The app server, `npm install`, and all Node-based commands should run inside containers so host Node/npm versions and native addon toolchains do not block startup.
+
+Required host tool:
+
+- Docker Desktop on Windows or macOS, or Docker Engine with Compose on Linux
+
+Primary startup command:
 
 ```bash
-npm install
-npm run dev
+docker compose up --build
 ```
 
-Open `http://localhost:3000`.
+Then open `http://localhost:3000`.
+
+What this gives you:
+
+- Node 22 is pinned inside the container
+- `better-sqlite3` builds inside the container instead of on the host
+- `node_modules` live in a Docker volume, not on the host
+- the repo source and SQLite data stay mounted from your working tree
+
+On Windows, the launcher wraps the same Docker path and opens the browser for you:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+```
+
+## Install Node.js And npm
+
+You only need a local Node.js install if you explicitly want to run the app outside Docker. The recommended path is still Docker.
+
+If you do want a host install, this project expects Node.js 22 LTS. `npm` is included with standard Node.js installs.
+
+Official references:
+
+- Node.js downloads: https://nodejs.org/en/download
+- Node.js release lines and LTS status: https://nodejs.org/en/download/releases/
+- npm overview: https://nodejs.org/en/learn/getting-started/an-introduction-to-the-npm-package-manager
+
+### Windows
+
+1. Open the official Node.js downloads page.
+2. Download the Windows `.msi` installer for the current LTS release that matches your machine (`x64` for most PCs, `arm64` for ARM devices).
+3. Run the installer with the default options.
+4. Close and reopen PowerShell or Command Prompt.
+5. Verify the install:
+
+```powershell
+node -v
+npm -v
+```
+
+If both commands print versions, you are ready to run the repo.
+
+### macOS
+
+Use one of these paths:
+
+1. Official installer:
+   Download the macOS `.pkg` for the current LTS release from the official downloads page, run it, then reopen Terminal.
+2. Homebrew:
+
+```bash
+brew install node
+```
+
+Then verify:
+
+```bash
+node -v
+npm -v
+```
+
+If you use Apple Silicon, prefer the `arm64` installer when downloading directly.
+
+### Linux
+
+Use one of these paths:
+
+1. Official binaries or package-manager options from the Node.js downloads page if you want the Node project's current release line directly.
+2. Your distribution package manager if it provides a recent enough Node.js LTS for your workflow.
+
+After install, verify:
+
+```bash
+node -v
+npm -v
+```
+
+If your distro package is too old for current packages, use the official download options instead of the distro default.
+
+## Quick Start
+
+1. Copy `.env.example` to `.env` and choose either hosted API credentials or the local AI settings you want.
+2. Start the app in Docker:
+
+```bash
+docker compose up --build
+```
+
+3. Open `http://localhost:3000`.
+
+Useful Docker commands:
+
+```bash
+docker compose up --build
+docker compose up -d
+docker compose logs -f app
+docker compose down
+```
 
 On Windows, the repo now has a one-command launcher:
 
@@ -30,19 +131,17 @@ npm run dev:windows
 
 The launcher:
 
-- checks `node` and `npm`
-- runs `npm install` when `node_modules/` is missing
+- checks Docker and Compose
 - reads `.env` when present
 - falls back to the local Ollama preset for that run when `.env` is missing
-- checks the configured AI path and starts local Ollama or LiteLLM when possible
-- starts the app server in a new PowerShell window
+- checks the configured AI path and starts local Ollama when possible
+- starts the app container through `docker compose`
 - waits for the app to respond, then opens the browser automatically
 
 Useful flags:
 
 - `-NoBrowser` skips opening the webpage
-- `-SkipInstall` skips `npm install`
-- `-ForceInstall` forces `npm install` before launch
+- `-Rebuild` forces a Docker image rebuild before launch
 
 The browser UI includes:
 
@@ -86,6 +185,16 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 - `OLLAMA_EMBEDDING_MODEL` - Ollama embedding model; defaults to `embeddinggemma`
 - Legacy `OPENAI_*` env vars still work for backward compatibility
 
+### Docker note for local AI
+
+When the app runs in Docker, `localhost` inside the container is not your host machine.
+
+- For Ollama in Docker, use `OLLAMA_BASE_URL=http://host.docker.internal:11434/v1`
+- For LiteLLM in Docker, use `LITELLM_PROXY_URL=http://host.docker.internal:4000`
+- For any other local OpenAI-compatible gateway, use `host.docker.internal` instead of `127.0.0.1` or `localhost`
+
+The Windows launcher auto-translates local host URLs to Docker-reachable URLs for the container path. Raw `docker compose` usage expects your `.env` values to already be Docker-safe.
+
 ### Provider notes
 
 - Default setup works with OpenAI directly.
@@ -124,6 +233,8 @@ The repo now includes an `ollama` preset intended for local smoke tests on Windo
 Setup steps and download links live in [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md). Treat this path as a cheap local test harness, not as the default production-quality model setup.
 
 Once Ollama and the models are installed, the quickest Windows startup path is `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+
+If you use raw Docker commands instead of the launcher, prefer `OLLAMA_BASE_URL=http://host.docker.internal:11434/v1` in `.env`.
 
 ## AI Workflow Test Loop
 
