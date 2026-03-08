@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   assertValidConfig,
+  buildConfigPreflightIssues,
   ConfigValidationError,
   formatConfigErrors,
   getPublicRuntimeConfig,
@@ -91,4 +92,22 @@ test("public runtime config omits secrets but keeps actionable validation detail
   assert.equal("apiKey" in runtime, false);
   assert.equal(runtime.validation.ok, false);
   assert.match(runtime.validation.errors[0]?.message ?? "", /AI_API_KEY is required/i);
+});
+
+test("buildConfigPreflightIssues turns config failures into player-facing recovery steps", () => {
+  const loaded = loadConfig({
+    AI_PROVIDER: "openai-compatible",
+    AI_BASE_URL: "not-a-url",
+    PORT: "banana"
+  });
+
+  const issues = buildConfigPreflightIssues(loaded);
+
+  assert.equal(issues.length, 3);
+  assert.deepEqual(
+    issues.map((issue) => issue.title),
+    ["Fix the app port", "Add an API key", "Fix the AI service URL"]
+  );
+  assert.match(issues[1]?.recovery.join(" "), /AI_API_KEY/i);
+  assert.match(issues[2]?.recovery.join(" "), /host\.docker\.internal/i);
 });

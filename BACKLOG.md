@@ -78,7 +78,7 @@ Use this exact shape when adding new work:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T01 | Now | P0 | P1 | Player launch bootstrap path | Review | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
 | T41 | Now | P0 | P1 | Full TypeScript migration | Done | None | `npm run type-check`; `npm test`; `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
-| T01a | Now | P0 | P1 | Runtime preflight and recovery messaging | Ready | T01, T02 | Manual launcher failure checks |
+| T01a | Now | P0 | P1 | Runtime preflight and recovery messaging | Review | T01, T02 | Manual launcher failure checks |
 | T35 | Now | P0 | P1 | Packaging prototype and decision memo | Ready | T01 | Prototype build verification |
 | T02 | Now | P0 | P1 | Config module with schema validation | Review | None | `npm test` |
 | T02a | Now | P0 | P1 | LiteLLM env contract and alias defaults | Ready | T02 | Manual config verification |
@@ -256,7 +256,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T01a - Runtime Preflight And Recovery Messaging
 
-- Status: Ready
+- Status: Review
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -273,6 +273,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - public/index.html
   - public/app.ts
   - src/config.ts
+  - src/config.test.ts
   - src/server.ts
 - Do Not Touch:
   - data/spec/
@@ -289,6 +290,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - launcher and browser surfaces agree on the same recovery guidance
 - Handoff Notes:
   - keep player-facing wording plain and avoid implementation jargon unless it helps support reproduce the issue
+  - the server no longer exits immediately on config validation failure; `/api/state` now returns safe runtime preflight status and the browser blocks the first turn with recovery guidance instead
+  - startup preflight now distinguishes config errors, credential rejection, unreachable AI URLs, and model-alias mismatches returned by `/models`
+  - the browser play surface now renders a setup panel and disables turn submission while startup preflight is blocked
+  - launcher validation on 2026-03-08 covered two cases: missing `AI_API_KEY` with `AI_PROVIDER=openai-compatible` now surfaces browser preflight guidance at `/api/state`, and unreachable `LITELLM_PROXY_URL=http://127.0.0.1:4011` still fails fast in `scripts/start-dev.ps1`
+  - validated on 2026-03-08 with `docker compose build app`, `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, and a focused `docker run --rm text-game-app sh -lc 'npm exec tsx -- --test src/config.test.ts'` check because the current Docker-shell `npm test` output still reports only the older test count even after the new test is present in the built image
+  - refreshed emitted `public/app.js` from the rebuilt Docker image because local `npm` is not installed in this shell environment
 
 ### T35 - Packaging Prototype And Decision Memo
 

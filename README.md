@@ -191,6 +191,7 @@ The launcher:
 - automatically picks a free local port for that run if the configured port is already occupied by another service
 - starts the app container through `docker compose`
 - waits for the app container to become healthy, confirms the player surface is actually being served, then opens the browser automatically
+- stops early with a plain error when a configured local AI URL is unreachable
 
 Useful flags:
 
@@ -203,6 +204,7 @@ The browser UI includes:
 
 - a text log for player and narrator turns
 - player naming plus a multiline turn input with local assist chips
+- a startup setup panel that explains missing API keys, bad AI URLs, and common model-name mistakes before the first turn
 - `Refresh State` and `New Session` controls for quick local iteration
 - a debug panel showing the active provider/model config, current player state, and the last turn payload returned by the server
 
@@ -323,5 +325,20 @@ If `npm` is available on your machine, the same check is exposed as `npm run tes
 The browser client is intentionally useful for local AI debugging:
 
 - `GET /api/state` returns the current player plus safe runtime/session debug data
+- runtime debug now includes a non-secret `preflight` block with startup status, plain-language recovery steps, and the env vars involved
 - `POST /api/turn` returns the narrator payload plus safe debug details such as request id, latency, prompt preview, embedding fallback status, validation result, and before/after player state
 - API keys are not returned by the debug payload; only non-secret runtime metadata is exposed
+
+## Startup Recovery
+
+First-turn setup problems now split into two paths:
+
+- the Windows launcher stops before opening the app when a configured local LiteLLM or Ollama URL is unreachable
+- the browser shows a setup panel when config is incomplete or the server can prove the configured model names do not exist on the AI service
+
+Common fixes:
+
+- add `AI_API_KEY` or `OPENAI_API_KEY` when `AI_PROVIDER=openai-compatible`
+- use a full AI base URL such as `https://api.openai.com/v1`, `http://127.0.0.1:4000`, or `http://127.0.0.1:11434/v1`
+- when the app runs in Docker against a host-local AI service, use `host.docker.internal` instead of `localhost`
+- if LiteLLM or Ollama reports different model names than the ones in `.env`, update the configured chat and embedding model vars to match

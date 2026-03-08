@@ -55,6 +55,7 @@ Before making substantial changes, read:
 - Validate AI output before state mutation.
 - Keep provider-specific behavior behind a provider-neutral boundary.
 - Treat LiteLLM as the default external AI interface.
+- Run `npm` and `node` commands in Docker for this project; do not execute them directly on the host.
 - Prefer deterministic behavior, compact state, and small verifiable patches.
 
 ## File Responsibilities

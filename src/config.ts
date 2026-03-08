@@ -8,6 +8,15 @@ export const SUPPORTED_AI_PROVIDERS = ["openai-compatible", "litellm", "ollama"]
 type ProviderDefaults = Omit<AiConfig, "provider">;
 type ConfigLike = Pick<AppConfig, "port" | "ai" | "validation">;
 
+export interface RuntimePreflightIssue {
+  code: string;
+  severity: "error" | "warning";
+  title: string;
+  message: string;
+  recovery: string[];
+  env_vars: string[];
+}
+
 function readEnv(env: EnvSource, ...keys: Array<string | undefined>): string | undefined {
   for (const key of keys) {
     if (!key) continue;
@@ -48,6 +57,117 @@ function buildConfigError({
     envVars,
     code
   };
+}
+
+function getProviderLabel(provider: string): string {
+  if (provider === "litellm") return "LiteLLM";
+  if (provider === "ollama") return "Ollama";
+  return "the AI provider";
+}
+
+function getUrlExample(provider: string): string {
+  if (provider === "litellm") return "http://127.0.0.1:4000";
+  if (provider === "ollama") return "http://127.0.0.1:11434/v1";
+  return "https://api.openai.com/v1";
+}
+
+function buildIssueFromConfigError(configToSummarize: ConfigLike, error: ConfigError): RuntimePreflightIssue {
+  const provider = configToSummarize.ai.provider;
+
+  switch (error.code) {
+    case "missing_api_key":
+      return {
+        code: error.code,
+        severity: "error",
+        title: "Add an API key",
+        message:
+          provider === "openai-compatible"
+            ? "The app does not have an API key for the configured AI provider yet."
+            : `The ${getProviderLabel(provider)} setup is missing an API key.`,
+        recovery:
+          provider === "openai-compatible"
+            ? [
+                "Set AI_API_KEY in .env for your OpenAI-compatible provider.",
+                "If you are using OpenAI directly, OPENAI_API_KEY still works.",
+                "If you meant to use LiteLLM or Ollama, set AI_PROVIDER first so the right defaults apply."
+              ]
+            : [
+                `Add the missing key in .env for ${getProviderLabel(provider)}.`,
+                "Restart the launcher after saving the file."
+              ],
+        env_vars: error.envVars
+      };
+    case "unsupported_provider":
+      return {
+        code: error.code,
+        severity: "error",
+        title: "Choose a supported AI provider",
+        message: "AI_PROVIDER is set to a value this build does not recognize.",
+        recovery: [
+          `Use one of these values: ${SUPPORTED_AI_PROVIDERS.join(", ")}.`,
+          "Save .env and start the app again."
+        ],
+        env_vars: error.envVars
+      };
+    case "missing_chat_model":
+      return {
+        code: error.code,
+        severity: "error",
+        title: "Choose a chat model",
+        message: "The AI chat model name is missing, so the first story turn cannot start.",
+        recovery: [
+          "Set the chat model env var for your provider in .env.",
+          "Use the provider-specific default alias if you are following the README setup."
+        ],
+        env_vars: error.envVars
+      };
+    case "missing_embedding_model":
+      return {
+        code: error.code,
+        severity: "error",
+        title: "Choose an embedding model",
+        message: "The memory retrieval model name is missing.",
+        recovery: [
+          "Set the embedding model env var for your provider in .env.",
+          "Use the provider-specific default alias if you are following the README setup."
+        ],
+        env_vars: error.envVars
+      };
+    case "invalid_url":
+    case "invalid_url_protocol":
+      return {
+        code: error.code,
+        severity: "error",
+        title: "Fix the AI service URL",
+        message: `${getProviderLabel(provider)} is configured with an invalid base URL.`,
+        recovery: [
+          `Use a full URL such as ${getUrlExample(provider)}.`,
+          "If the app runs in Docker and the AI service runs on your PC, use host.docker.internal instead of localhost."
+        ],
+        env_vars: error.envVars
+      };
+    case "invalid_port":
+      return {
+        code: error.code,
+        severity: "error",
+        title: "Fix the app port",
+        message: "PORT must be a whole number between 1 and 65535.",
+        recovery: [
+          "Update PORT in .env or remove it to use the default port 3000.",
+          "Start the app again after saving the change."
+        ],
+        env_vars: error.envVars
+      };
+    default:
+      return {
+        code: error.code,
+        severity: "error",
+        title: "Fix startup configuration",
+        message: error.message,
+        recovery: ["Update the listed env vars and restart the app."],
+        env_vars: error.envVars
+      };
+  }
 }
 
 function getProviderDefaults(provider: string): ProviderDefaults {
@@ -260,6 +380,12 @@ export function getPublicRuntimeConfig(configToSummarize: ConfigLike): PublicRun
       }))
     }
   };
+}
+
+export function buildConfigPreflightIssues(configToSummarize: ConfigLike): RuntimePreflightIssue[] {
+  return (configToSummarize.validation?.errors || []).map((error) =>
+    buildIssueFromConfigError(configToSummarize, error)
+  );
 }
 
 export function formatConfigErrors(errors: ConfigError[] = []): string {

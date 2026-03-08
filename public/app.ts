@@ -13,6 +13,19 @@ interface SessionDebugPayload {
   session?: Record<string, unknown> | null;
 }
 
+interface RuntimePreflightIssue {
+  title?: string;
+  message?: string;
+  recovery?: string[];
+}
+
+interface RuntimePreflightPayload {
+  ok?: boolean;
+  status?: string;
+  summary?: string;
+  issues?: RuntimePreflightIssue[];
+}
+
 interface TurnDebugPayload extends SessionDebugPayload {
   request_id?: string | null;
   turn?: Record<string, unknown> | null;
@@ -54,6 +67,10 @@ const sendButtonEl = getElement<HTMLButtonElement>("send-button");
 const optionsEl = getElement<HTMLElement>("options");
 const assistEl = getElement<HTMLElement>("assist");
 const statusPillEl = getElement<HTMLElement>("status-pill");
+const preflightPanelEl = getElement<HTMLElement>("preflight-panel");
+const preflightTitleEl = getElement<HTMLElement>("preflight-title");
+const preflightSummaryEl = getElement<HTMLElement>("preflight-summary");
+const preflightIssuesEl = getElement<HTMLElement>("preflight-issues");
 const runtimeSummaryEl = getElement<HTMLElement>("runtime-summary");
 const sessionSummaryEl = getElement<HTMLElement>("session-summary");
 const connectionDebugEl = getElement<HTMLElement>("connection-debug");
@@ -83,6 +100,8 @@ const state: {
 nameEl.value = state.playerName;
 renderDebugPanels();
 renderSessionSummary();
+renderPreflightPanel();
+setPending(false);
 
 function addEntry(label: string, text: string, tone = "neutral"): void {
   const entry = document.createElement("article");
@@ -103,6 +122,20 @@ function addEntry(label: string, text: string, tone = "neutral"): void {
 function setStatus(text: string, tone = "idle"): void {
   statusPillEl.textContent = text;
   statusPillEl.dataset.tone = tone;
+}
+
+function getRuntimePreflight(): RuntimePreflightPayload | null {
+  const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
+  if (!runtime || typeof runtime !== "object") {
+    return null;
+  }
+
+  const candidate = (runtime as { preflight?: unknown }).preflight;
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  return candidate as RuntimePreflightPayload;
 }
 
 function setOptions(options: string[] = []): void {
@@ -229,14 +262,42 @@ function renderDebugPanels(): void {
   turnDebugEl.textContent = formatJson(state.lastTurnDebug, "Turn debug will appear here after the first request.");
 }
 
+function renderPreflightPanel(): void {
+  const preflight = getRuntimePreflight();
+  if (!preflight || (preflight.ok && !(preflight.issues || []).length)) {
+    preflightPanelEl.hidden = true;
+    preflightSummaryEl.textContent = "";
+    preflightIssuesEl.innerHTML = "";
+    return;
+  }
+
+  preflightPanelEl.hidden = false;
+  preflightTitleEl.textContent = preflight.status === "checking" ? "Checking setup" : "Setup required";
+  preflightSummaryEl.textContent = preflight.summary || "The app needs setup changes before the first turn.";
+  preflightIssuesEl.innerHTML = "";
+
+  (preflight.issues || []).forEach((issue) => {
+    const item = document.createElement("li");
+    const parts = [issue.title, issue.message].filter((value): value is string => Boolean(value));
+    const recovery = Array.isArray(issue.recovery) ? issue.recovery.filter(Boolean) : [];
+    item.textContent = recovery.length
+      ? `${parts.join(": ")} Fix: ${recovery.join(" ")}`
+      : parts.join(": ");
+    preflightIssuesEl.appendChild(item);
+  });
+}
+
 function renderSessionSummary(): void {
   const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
   const session = state.sessionDebug?.session || state.lastTurnDebug?.session;
+  const preflight = getRuntimePreflight();
   const beat = state.player?.director_state?.current_beat_label;
 
   const runtimeParts: string[] = [];
   if (runtime && typeof runtime.provider === "string") runtimeParts.push(runtime.provider);
   if (runtime && typeof runtime.chat_model === "string") runtimeParts.push(runtime.chat_model);
+  if (preflight?.status === "blocked") runtimeParts.push("setup required");
+  if (preflight?.status === "checking") runtimeParts.push("checking AI");
   if (session && typeof session.player_id === "string") runtimeParts.push(`player ${session.player_id.slice(0, 8)}`);
   runtimeSummaryEl.textContent = runtimeParts.length ? runtimeParts.join(" / ") : "Waiting for session...";
 
@@ -263,6 +324,7 @@ function updateSessionData(data: StateApiResponse): void {
   }
   rememberPlayerName();
   renderSessionSummary();
+  renderPreflightPanel();
   renderDebugPanels();
 }
 
@@ -327,7 +389,16 @@ async function ensurePlayer({ force = false, showStatus = false, announce = fals
     addEntry("System", `${state.player.name} is ready in ${state.player.location}.`);
   }
 
-  if (showStatus) setStatus("Session ready", "ok");
+  if (showStatus) {
+    const preflight = getRuntimePreflight();
+    if (preflight?.status === "blocked") {
+      setStatus("Setup required", "error");
+    } else if (preflight?.status === "checking") {
+      setStatus("Checking AI setup", "working");
+    } else {
+      setStatus("Session ready", "ok");
+    }
+  }
   return state.player;
 }
 
@@ -361,12 +432,15 @@ async function requestAssist(): Promise<void> {
 
 function setPending(pending: boolean): void {
   state.pending = pending;
-  sendButtonEl.disabled = pending;
+  const preflight = getRuntimePreflight();
+  const setupBlocked = preflight?.status === "blocked";
+  sendButtonEl.disabled = pending || setupBlocked;
+  inputEl.disabled = pending || setupBlocked;
   refreshSessionButtonEl.disabled = pending;
   newSessionButtonEl.disabled = pending;
 
   Array.from(optionsEl.querySelectorAll("button")).forEach((button) => {
-    button.disabled = pending;
+    button.disabled = pending || setupBlocked;
   });
 }
 
@@ -407,6 +481,7 @@ formEl.addEventListener("submit", async (event) => {
       state.player = result.data.player;
     }
     renderSessionSummary();
+    renderPreflightPanel();
     renderDebugPanels();
 
     if (!result.ok) {
@@ -455,7 +530,14 @@ refreshSessionButtonEl.addEventListener("click", async () => {
     setStatus("Refreshing state", "working");
     await ensurePlayer({ force: true });
     addEntry("System", "Session state refreshed.", "system");
-    setStatus("Session ready", "ok");
+    const preflight = getRuntimePreflight();
+    if (preflight?.status === "blocked") {
+      setStatus("Setup required", "error");
+    } else if (preflight?.status === "checking") {
+      setStatus("Checking AI setup", "working");
+    } else {
+      setStatus("Session ready", "ok");
+    }
   } catch (error) {
     addEntry("System", error instanceof Error ? error.message : "Refresh failed.", "system");
     setStatus("Refresh failed", "error");
@@ -472,6 +554,7 @@ newSessionButtonEl.addEventListener("click", async () => {
   setOptions([]);
   setAssist([], []);
   renderSessionSummary();
+  renderPreflightPanel();
   renderDebugPanels();
 
   try {

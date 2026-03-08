@@ -29,7 +29,7 @@ Before starting substantial work, read:
 2. Confirm dependencies are satisfied.
 3. For AI-related work, start by adding or tightening a test, fixture, or scripted harness step that defines the expected behavior before changing implementation.
 4. Keep edits inside `Files to Touch` unless the task card is updated first.
-5. If TypeScript source changed, run `npm run type-check` before the listed validation commands.
+5. If TypeScript source changed, run `npm run type-check` in Docker before the listed validation commands.
 6. Update docs affected by the change.
 7. Move the task to `Review` or `Done`.
 
@@ -68,5 +68,6 @@ Before starting substantial work, read:
 - Keep the app provider-neutral internally even when LiteLLM is the default external interface.
 - Keep authoritative state server-side and replayable.
 - Validate AI output before state mutation.
+- Run `npm` and `node` commands in Docker for this project; do not execute them directly on the host.
 - Prefer deterministic behavior and small, verifiable edits.
 - Treat `src/*.ts`, `src/**/*.test.ts`, and `public/app.ts` as the authoring surfaces. `public/app.js` is emitted build output and should not be hand-edited unless a task explicitly requires validating generated assets.
