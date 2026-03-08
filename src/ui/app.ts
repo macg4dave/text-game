@@ -1,106 +1,30 @@
 import { createFatalUiErrorState, registerGlobalErrorHandlers, type FatalUiErrorState } from "./global-error.js";
-
-interface PlayerState {
-  id: string;
-  name: string;
-  location: string;
-  director_state?: {
-    current_beat_label?: string;
-  };
-  [key: string]: unknown;
-}
-
-interface SessionDebugPayload {
-  runtime?: Record<string, unknown> | null;
-  session?: Record<string, unknown> | null;
-}
-
-interface RuntimePreflightIssue {
-  severity?: string;
-  title?: string;
-  message?: string;
-  recovery?: string[];
-  recommended_fix?: string | null;
-  env_vars?: string[];
-  details?: Record<string, unknown> | null;
-}
-
-interface RuntimePreflightPayload {
-  ok?: boolean;
-  status?: string;
-  summary?: string;
-  issues?: RuntimePreflightIssue[];
-}
-
-interface RuntimeConfigProfile {
-  id?: string;
-  label?: string;
-  description?: string;
-  recommended_ai_stack?: string | null;
-  override_count?: number;
-}
-
-interface RuntimeLocalGpuSelection {
-  requested?: boolean;
-  requested_profile?: string | null;
-  status?: string | null;
-  selection_source?: string | null;
-  profile_id?: string | null;
-  profile_label?: string | null;
-  verification_status?: string | null;
-  detected_vram_gb?: number | null;
-  manual_vram_gb?: number | null;
-  chat_model?: string | null;
-  embedding_mode?: string | null;
-  embedding_model?: string | null;
-  message?: string | null;
-  notes?: string[];
-}
-
-interface RuntimeConfigDiagnosticsProfile {
-  value?: string;
-  label?: string;
-  description?: string;
-  recommended_ai_stack?: string | null;
-  source?: string;
-  env_var?: string | null;
-}
-
-interface RuntimeConfigDiagnosticsOverride {
-  field?: string;
-  source?: string;
-  env_var?: string | null;
-}
-
-interface RuntimeConfigDiagnostics {
-  profile?: RuntimeConfigDiagnosticsProfile;
-  profile_overrides?: RuntimeConfigDiagnosticsOverride[];
-}
-
-interface TurnDebugPayload extends SessionDebugPayload {
-  request_id?: string | null;
-  turn?: Record<string, unknown> | null;
-}
-
-interface StateApiResponse {
-  player?: PlayerState | null;
-  debug?: SessionDebugPayload;
-  error?: string;
-  detail?: string | string[];
-}
-
-interface AssistApiResponse {
-  corrections?: Array<{ token: string; suggestions: string[] }>;
-  completions?: string[];
-}
-
-interface TurnApiResponse extends StateApiResponse {
-  narrative?: string;
-  player_options?: string[];
-  state_updates?: Record<string, unknown>;
-  director_updates?: Record<string, unknown>;
-  debug?: TurnDebugPayload;
-}
+import {
+  type AssistApiResponse,
+  type PlayerState,
+  type RuntimeConfigDiagnostics,
+  type RuntimeConfigProfile,
+  type RuntimeLocalGpuSelection,
+  type RuntimePreflightPayload,
+  type SessionDebugPayload,
+  type SetupStatus,
+  type SetupStatusPayload,
+  type StateApiResponse,
+  type TurnApiResponse,
+  type TurnDebugPayload
+} from "./contracts.js";
+import { getElement } from "./dom.js";
+import { renderDebugPanels as renderDebugView } from "./debug-view.js";
+import { fetchJson, formatErrorMessage } from "./http-client.js";
+import { getStoredPlayerName, rememberPlayerName as persistPlayerName } from "./player-name.js";
+import {
+  formatLocalGpuSummary,
+  getRuntimeConfigDiagnostics as selectRuntimeConfigDiagnostics,
+  getRuntimeLocalGpuSelection as selectRuntimeLocalGpuSelection,
+  getRuntimePreflight as selectRuntimePreflight,
+  getRuntimeProfile as selectRuntimeProfile
+} from "./session-data.js";
+import { renderPreflightPanel as renderPreflightView, renderSetupWizard as renderSetupView } from "./setup-view.js";
 
 let activeFatalUiError: FatalUiErrorState | null = null;
 
@@ -142,6 +66,15 @@ function initializeApp(): void {
   const launchResumeButtonEl = getElement<HTMLButtonElement>("launch-resume");
   const launchResumeNoteEl = getElement<HTMLElement>("launch-resume-note");
   const actionFieldEl = getElement<HTMLElement>("action-field");
+  const setupTitleEl = getElement<HTMLElement>("setup-title");
+  const setupSummaryEl = getElement<HTMLElement>("setup-summary");
+  const setupCheckButtonEl = getElement<HTMLButtonElement>("setup-check-button");
+  const setupCurrentProfileEl = getElement<HTMLElement>("setup-current-profile");
+  const setupSupportedTitleEl = getElement<HTMLElement>("setup-supported-title");
+  const setupSupportedSummaryEl = getElement<HTMLElement>("setup-supported-summary");
+  const setupLauncherEl = getElement<HTMLElement>("setup-launcher");
+  const setupServicesEl = getElement<HTMLElement>("setup-services");
+  const setupGuidanceEl = getElement<HTMLElement>("setup-guidance");
 
   const state: {
     playerId: string;
@@ -149,16 +82,20 @@ function initializeApp(): void {
     player: PlayerState | null;
     sessionDebug: SessionDebugPayload | null;
     lastTurnDebug: TurnDebugPayload | null;
+    setupStatus: SetupStatus | null;
+    setupError: string | null;
     assistTimer: number | null;
     hasEnteredFlow: boolean;
     pending: boolean;
     fatalError: FatalUiErrorState | null;
   } = {
     playerId: localStorage.getItem("playerId") || "",
-    playerName: localStorage.getItem("playerName") || "",
+    playerName: getStoredPlayerName(localStorage),
     player: null,
     sessionDebug: null,
     lastTurnDebug: null,
+    setupStatus: null,
+    setupError: null,
     assistTimer: null,
     hasEnteredFlow: false,
     pending: false,
@@ -169,6 +106,7 @@ function initializeApp(): void {
   setAssist([], []);
   renderDebugPanels();
   renderLaunchPanel();
+  renderSetupWizard();
   renderPlaySurface();
   renderSessionSummary();
   renderPreflightPanel();
@@ -196,87 +134,67 @@ function initializeApp(): void {
   }
 
   function getRuntimePreflight(): RuntimePreflightPayload | null {
-    const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
-    if (!runtime || typeof runtime !== "object") {
-      return null;
-    }
-
-    const candidate = (runtime as { preflight?: unknown }).preflight;
-    if (!candidate || typeof candidate !== "object") {
-      return null;
-    }
-
-    return candidate as RuntimePreflightPayload;
+    return selectRuntimePreflight(state.setupStatus, state.sessionDebug, state.lastTurnDebug);
   }
 
   function getRuntimeConfigDiagnostics(): RuntimeConfigDiagnostics | null {
-    const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
-    if (!runtime || typeof runtime !== "object") {
-      return null;
-    }
-
-    const candidate = (runtime as { config_diagnostics?: unknown }).config_diagnostics;
-    if (!candidate || typeof candidate !== "object") {
-      return null;
-    }
-
-    return candidate as RuntimeConfigDiagnostics;
+    return selectRuntimeConfigDiagnostics(state.sessionDebug, state.lastTurnDebug);
   }
 
   function getRuntimeProfile(): RuntimeConfigProfile | null {
-    const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
-    if (!runtime || typeof runtime !== "object") {
-      return null;
-    }
-
-    const candidate = (runtime as { profile?: unknown }).profile;
-    if (!candidate || typeof candidate !== "object") {
-      return null;
-    }
-
-    return candidate as RuntimeConfigProfile;
+    return selectRuntimeProfile(state.sessionDebug, state.lastTurnDebug);
   }
 
   function getRuntimeLocalGpuSelection(): RuntimeLocalGpuSelection | null {
-    const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
-    if (!runtime || typeof runtime !== "object") {
-      return null;
-    }
-
-    const candidate = (runtime as { local_gpu?: unknown }).local_gpu;
-    if (!candidate || typeof candidate !== "object") {
-      return null;
-    }
-
-    return candidate as RuntimeLocalGpuSelection;
-  }
-
-  function formatLocalGpuSummary(selection: RuntimeLocalGpuSelection | null): string | null {
-    if (!selection || !selection.requested) {
-      return null;
-    }
-
-    const label = selection.profile_label || selection.profile_id || "Local GPU profile";
-    const source = selection.selection_source ? selection.selection_source.replace(/-/g, " ") : "local GPU";
-    const vram = typeof selection.detected_vram_gb === "number" ? `${selection.detected_vram_gb} GB detected` : null;
-    const parts = [label, source, vram].filter((value): value is string => Boolean(value));
-    return parts.join(" | ");
+    return selectRuntimeLocalGpuSelection(state.sessionDebug, state.lastTurnDebug);
   }
 
   function hasSavedSession(): boolean {
     return Boolean(state.playerId);
   }
 
+  function isSetupReady(): boolean {
+    return state.setupStatus?.status === "ready";
+  }
+
   function renderLaunchPanel(): void {
     const fatalBlocked = Boolean(state.fatalError || activeFatalUiError);
     const resumeAvailable = hasSavedSession();
+    const setupReady = isSetupReady();
+    const setupKnown = Boolean(state.setupStatus);
 
     launchPanelEl.hidden = state.hasEnteredFlow || fatalBlocked;
-    launchNewGameButtonEl.disabled = state.pending || fatalBlocked;
-    launchResumeButtonEl.disabled = state.pending || fatalBlocked || !resumeAvailable;
-    launchResumeNoteEl.textContent = resumeAvailable
-      ? "Resume uses the last game saved in this browser."
-      : "No saved game is stored in this browser yet. Start a new game to begin.";
+    launchNewGameButtonEl.disabled = state.pending || fatalBlocked || !setupKnown || !setupReady;
+    launchResumeButtonEl.disabled = state.pending || fatalBlocked || !setupKnown || !setupReady || !resumeAvailable;
+    launchResumeNoteEl.textContent = !setupKnown
+      ? "Finish the setup check before starting."
+      : !setupReady
+        ? "Fix the setup items below, then run the connection test again."
+        : resumeAvailable
+          ? "Resume uses the last game saved in this browser."
+          : "No saved game is stored in this browser yet. Start a new game to begin.";
+  }
+
+  function renderSetupWizard(): void {
+    renderSetupView(
+      {
+        setupTitleEl,
+        setupSummaryEl,
+        setupCheckButtonEl,
+        setupCurrentProfileEl,
+        setupSupportedTitleEl,
+        setupSupportedSummaryEl,
+        setupLauncherEl,
+        setupServicesEl,
+        setupGuidanceEl
+      },
+      {
+        setupStatus: state.setupStatus,
+        setupError: state.setupError,
+        pending: state.pending,
+        fatalBlocked: Boolean(state.fatalError || activeFatalUiError)
+      }
+    );
   }
 
   function renderPlaySurface(): void {
@@ -370,12 +288,7 @@ function initializeApp(): void {
   }
 
   function rememberPlayerName(): void {
-    const name = nameEl.value.trim();
-    if (name) {
-      localStorage.setItem("playerName", name);
-    } else {
-      localStorage.removeItem("playerName");
-    }
+    state.playerName = persistPlayerName(localStorage, nameEl.value);
   }
 
   function replaceToken(token: string, replacement: string): void {
@@ -394,91 +307,43 @@ function initializeApp(): void {
     return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
-  function formatJson(value: unknown, fallbackMessage: string): string {
-    if (value === null || value === undefined) {
-      return JSON.stringify({ message: fallbackMessage }, null, 2);
-    }
-
-    return JSON.stringify(value, null, 2);
-  }
-
   function renderDebugPanels(): void {
-    const connectionSnapshot = {
-      runtime: state.sessionDebug?.runtime || state.lastTurnDebug?.runtime || null,
-      session: state.sessionDebug?.session || state.lastTurnDebug?.session || null,
-      last_request_id: state.lastTurnDebug?.request_id || null,
-      fatal_error: state.fatalError || activeFatalUiError
-    };
-
-    connectionDebugEl.textContent = formatJson(connectionSnapshot, "Session data will appear here.");
-    stateDebugEl.textContent = formatJson(state.player, "Player state will appear here.");
-    turnDebugEl.textContent = formatJson(state.lastTurnDebug, "Turn debug will appear here after the first request.");
+    renderDebugView(
+      {
+        connectionDebugEl,
+        stateDebugEl,
+        turnDebugEl
+      },
+      {
+        setupStatus: state.setupStatus,
+        sessionDebug: state.sessionDebug,
+        lastTurnDebug: state.lastTurnDebug,
+        player: state.player,
+        fatalError: state.fatalError,
+        activeFatalUiError
+      }
+    );
   }
 
   function renderPreflightPanel(): void {
-    const preflight = getRuntimePreflight();
-    const diagnostics = getRuntimeConfigDiagnostics();
-    const localGpu = getRuntimeLocalGpuSelection();
-    if (!preflight || (preflight.ok && !(preflight.issues || []).length)) {
-      preflightPanelEl.hidden = true;
-      preflightSummaryEl.textContent = "";
-      preflightProfileEl.textContent = "";
-      preflightIssuesEl.innerHTML = "";
-      preflightAdvancedEl.hidden = true;
-      preflightAdvancedEl.open = false;
-      preflightAdvancedJsonEl.textContent = "";
-      return;
-    }
-
-    preflightPanelEl.hidden = false;
-    preflightTitleEl.textContent = preflight.status === "checking" ? "Checking setup" : "Setup required";
-    preflightSummaryEl.textContent = preflight.summary || "The app needs setup changes before the first turn.";
-    const profileLabel = diagnostics?.profile?.label || getRuntimeProfile()?.label || "Setup profile";
-    const overrideCount = diagnostics?.profile_overrides?.length || 0;
-    const localGpuSummary = formatLocalGpuSummary(localGpu);
-    preflightProfileEl.textContent = overrideCount
-      ? `${profileLabel} with ${overrideCount} advanced override${overrideCount === 1 ? "" : "s"}.${localGpuSummary ? ` ${localGpuSummary}.` : ""}`
-      : `${profileLabel} is active.${localGpuSummary ? ` ${localGpuSummary}.` : ""}`;
-    preflightIssuesEl.innerHTML = "";
-    const advancedIssues: Array<Record<string, unknown>> = [];
-
-    (preflight.issues || []).forEach((issue) => {
-      const item = document.createElement("li");
-      const severity = typeof issue.severity === "string" ? `[${issue.severity.toUpperCase()}] ` : "";
-      const parts = [issue.title, issue.message].filter((value): value is string => Boolean(value));
-      const recovery = Array.isArray(issue.recovery) ? issue.recovery.filter(Boolean) : [];
-      const recommendedFix = issue.recommended_fix || recovery[0] || "";
-      item.textContent = recommendedFix
-        ? `${severity}${parts.join(": ")} Recommended next step: ${recommendedFix}`
-        : `${severity}${parts.join(": ")}`;
-      preflightIssuesEl.appendChild(item);
-
-      if (issue.details || (issue.env_vars && issue.env_vars.length)) {
-        advancedIssues.push({
-          title: issue.title || null,
-          severity: issue.severity || null,
-          env_vars: issue.env_vars || [],
-          details: issue.details || null
-        });
+    renderPreflightView(
+      {
+        preflightPanelEl,
+        preflightTitleEl,
+        preflightSummaryEl,
+        preflightProfileEl,
+        preflightIssuesEl,
+        preflightAdvancedEl,
+        preflightAdvancedJsonEl
+      },
+      {
+        preflight: getRuntimePreflight(),
+        diagnostics: getRuntimeConfigDiagnostics(),
+        profile: getRuntimeProfile(),
+        setupStatus: state.setupStatus,
+        localGpu: getRuntimeLocalGpuSelection()
       }
-    });
-
-    if (advancedIssues.length) {
-      preflightAdvancedEl.hidden = false;
-      preflightAdvancedJsonEl.textContent = JSON.stringify(
-        {
-          status: preflight.status || null,
-          summary: preflight.summary || null,
-          issues: advancedIssues
-        },
-        null,
-        2
-      );
-    } else {
-      preflightAdvancedEl.hidden = true;
-      preflightAdvancedEl.open = false;
-      preflightAdvancedJsonEl.textContent = "";
-    }
+    );
   }
 
   function renderSessionSummary(): void {
@@ -488,11 +353,14 @@ function initializeApp(): void {
     const profile = getRuntimeProfile();
     const localGpu = getRuntimeLocalGpuSelection();
     const diagnostics = getRuntimeConfigDiagnostics();
+    const setupProfile = state.setupStatus?.current_profile;
     const beat = state.player?.director_state?.current_beat_label;
 
     const runtimeParts: string[] = [];
     if (runtime && typeof runtime.provider === "string") runtimeParts.push(runtime.provider);
     if (runtime && typeof runtime.chat_model === "string") runtimeParts.push(runtime.chat_model);
+    if (!runtime && setupProfile?.provider) runtimeParts.push(setupProfile.provider);
+    if (!runtime && setupProfile?.chat_model) runtimeParts.push(setupProfile.chat_model);
     if (localGpu?.profile_label) runtimeParts.push(localGpu.profile_label);
     if (preflight?.status === "action-required") runtimeParts.push("setup required");
     if (preflight?.status === "checking") runtimeParts.push("checking AI");
@@ -506,7 +374,9 @@ function initializeApp(): void {
     const localGpuSummary = formatLocalGpuSummary(localGpu);
     profileSummaryEl.textContent = profile
       ? `${profile.label || profile.id || "Setup profile"}${overrideCount ? ` | ${overrideCount} override${overrideCount === 1 ? "" : "s"}` : ""}${localGpuSummary ? ` | ${localGpuSummary}` : ""}`
-      : localGpuSummary || (state.hasEnteredFlow ? "Setup profile loading..." : "No session loaded yet.");
+      : setupProfile
+        ? `${setupProfile.label || setupProfile.id || "Setup profile"}${localGpuSummary ? ` | ${localGpuSummary}` : ""}`
+        : localGpuSummary || (state.hasEnteredFlow ? "Setup profile loading..." : "No session loaded yet.");
 
     if (!state.player) {
       sessionSummaryEl.textContent = state.hasEnteredFlow
@@ -552,36 +422,20 @@ function initializeApp(): void {
     setPending(state.pending);
   }
 
-  async function fetchJson<T>(url: string, options?: RequestInit): Promise<{
-    ok: boolean;
-    status: number;
-    data: T;
-    requestId: string | null;
-  }> {
-    const response = await fetch(url, options);
-    const rawText = await response.text();
-    let data: unknown = {};
-
-    if (rawText) {
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        data = { error: rawText };
-      }
+  async function loadSetupStatus({ force = false } = {}): Promise<void> {
+    const suffix = force ? "?refresh=1" : "";
+    const result = await fetchJson<SetupStatusPayload>(`/api/setup/status${suffix}`);
+    if (!result.ok || !result.data?.setup) {
+      throw new Error(formatErrorMessage(result.data, `Setup request failed (${result.status})`));
     }
 
-    return {
-      ok: response.ok,
-      status: response.status,
-      data: data as T,
-      requestId: response.headers.get("x-request-id")
-    };
-  }
-
-  function formatErrorMessage(data: { detail?: string | string[]; error?: string } | undefined, fallback: string): string {
-    if (!data) return fallback;
-    if (Array.isArray(data.detail)) return data.detail.join(", ");
-    return data.detail || data.error || fallback;
+    state.setupStatus = result.data.setup;
+    state.setupError = null;
+    renderLaunchPanel();
+    renderSetupWizard();
+    renderSessionSummary();
+    renderPreflightPanel();
+    renderDebugPanels();
   }
 
   async function ensurePlayer({ force = false, showStatus = false } = {}): Promise<PlayerState | null> {
@@ -663,12 +517,23 @@ function initializeApp(): void {
       return;
     }
 
-    state.hasEnteredFlow = true;
-    clearSessionView({ clearSavedPlayerId: mode === "new" });
     setPending(true);
     setStatus(mode === "resume" ? "Resuming game" : "Starting new game", "working");
 
     try {
+      if (!isSetupReady()) {
+        await loadSetupStatus({ force: true });
+      }
+
+      if (!isSetupReady()) {
+        setStatus("Setup required", "error");
+        return;
+      }
+
+      state.hasEnteredFlow = true;
+      clearSessionView({ clearSavedPlayerId: mode === "new" });
+      setPending(true);
+
       const player = await ensurePlayer({ force: true });
       if (!player) {
         setStatus("Setup required", "error");
@@ -729,6 +594,7 @@ function initializeApp(): void {
     const readyForTurns = state.hasEnteredFlow && Boolean(state.player) && !setupBlocked && !fatalBlocked && !pending;
 
     renderLaunchPanel();
+    renderSetupWizard();
     renderPlaySurface();
 
     sendButtonEl.disabled = !readyForTurns;
@@ -836,6 +702,27 @@ function initializeApp(): void {
   nameEl.addEventListener("change", rememberPlayerName);
   nameEl.addEventListener("blur", rememberPlayerName);
 
+  setupCheckButtonEl.addEventListener("click", async () => {
+    if (state.fatalError || activeFatalUiError) return;
+
+    try {
+      setPending(true);
+      setStatus("Checking AI setup", "working");
+      await loadSetupStatus({ force: true });
+      if (isSetupReady()) {
+        setStatus("Setup ready", "ok");
+      } else {
+        setStatus("Setup required", "error");
+      }
+    } catch (error) {
+      state.setupError = error instanceof Error ? error.message : "Setup check failed.";
+      renderSetupWizard();
+      setStatus("Setup check failed", "error");
+    } finally {
+      setPending(false);
+    }
+  });
+
   launchNewGameButtonEl.addEventListener("click", () => {
     startGameFlow("new").catch((error) => {
       addEntry("System", error instanceof Error ? error.message : "Failed to start a new game.", "system");
@@ -885,21 +772,28 @@ function initializeApp(): void {
   });
 
   async function bootstrap(): Promise<void> {
-    setStatus(hasSavedSession() ? "Resume or start new" : "Start a new game", "idle");
+    setPending(true);
+    setStatus("Checking supported setup", "working");
+    try {
+      await loadSetupStatus();
+      if (isSetupReady()) {
+        setStatus(hasSavedSession() ? "Resume or start new" : "Start a new game", "idle");
+      } else {
+        setStatus("Setup required", "error");
+      }
+    } catch (error) {
+      state.setupError = error instanceof Error ? error.message : "Setup check failed.";
+      renderSetupWizard();
+      setStatus("Setup check failed", "error");
+    } finally {
+      setPending(false);
+    }
     nameEl.focus();
   }
 
   bootstrap().catch((error) => {
     handleFatalError(createFatalUiErrorState(error));
   });
-}
-
-function getElement<T extends HTMLElement>(id: string): T {
-  const element = document.getElementById(id);
-  if (!(element instanceof HTMLElement)) {
-    throw new Error(`Missing required element: ${id}`);
-  }
-  return element as T;
 }
 
 function renderAppFatalError(state: FatalUiErrorState): void {

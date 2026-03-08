@@ -464,6 +464,7 @@ The browser UI includes:
 
 - a first-screen onboarding panel with `Start New Game` and `Resume Last Game` actions instead of auto-starting a session on page load
 - one short turn-loop explainer on the launch screen so players can begin without opening project docs
+- a first-run setup wizard on the launch screen with a retryable connection test for the supported Docker Desktop plus LiteLLM plus GPU-backed Ollama path
 - a text log for player and narrator turns
 - player naming plus a multiline turn input with local assist chips
 - a startup setup panel that uses one shared preflight contract with `blocker`, `warning`, and `info` issues before the first turn
@@ -623,6 +624,7 @@ If `npm` is available on your machine, the same check is exposed as `npm run tes
 
 The browser client is intentionally useful for local AI debugging:
 
+- `GET /api/setup/status` returns the current first-run setup envelope, including the supported MVP AI path, the current profile summary, and the latest safe preflight report without creating or resuming a player
 - `GET /api/state` returns the current player plus safe runtime/session debug data
 - runtime debug now includes a non-secret `preflight` block with one shared contract:
   - `status`: `checking`, `ready`, or `action-required`

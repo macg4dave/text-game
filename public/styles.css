@@ -189,6 +189,74 @@ button {
   line-height: 1.55;
 }
 
+.setup-wizard {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(78, 58, 40, 0.12);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.setup-wizard-header h4 {
+  margin: 2px 0 0;
+  font-size: 1.1rem;
+}
+
+.setup-wizard-header p:last-child,
+#setup-current-profile,
+#setup-supported-summary,
+.setup-guidance {
+  color: var(--muted);
+}
+
+.setup-wizard-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.setup-wizard-toolbar p {
+  margin: 0;
+}
+
+.setup-supported-path {
+  display: grid;
+  gap: 8px;
+}
+
+.setup-supported-path strong {
+  font-size: 0.94rem;
+}
+
+.setup-supported-path p {
+  margin: 0;
+}
+
+.setup-supported-path code {
+  display: inline-block;
+  width: fit-content;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(78, 58, 40, 0.14);
+  background: var(--panel-strong);
+  color: #1c3a51;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.83rem;
+}
+
+.setup-supported-path ul,
+.setup-guidance {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.setup-supported-path li,
+.setup-guidance li {
+  line-height: 1.5;
+}
+
 .launch-actions {
   display: flex;
   flex-wrap: wrap;

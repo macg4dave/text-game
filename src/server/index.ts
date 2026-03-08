@@ -30,6 +30,7 @@ import { assistText } from "../utils/assist.js";
 import { applyDirectorRules, getCurrentBeat, loadDirectorSpec, reloadDirectorSpec } from "../story/director.js";
 import {
   parseTurnInput,
+  validateSetupStatusResponse,
   validateDirectorSpec,
   validateQuestSpec,
   validateStateResponse,
@@ -47,6 +48,7 @@ import { createRuntimePreflightService } from "./runtime-preflight.js";
 import { sanitizeTurnResult } from "./turn-result.js";
 import { createGlobalProcessHandler } from "./global-handler.js";
 import { createAuthoritativePlayerState, createStateResponsePayload, createTurnResponsePayload } from "./http-contract.js";
+import { createSetupStatusPayload } from "./setup-status.js";
 
 type ServerTurnDebugParams = Omit<TurnDebugParams, "config" | "runtimePreflight">;
 
@@ -87,6 +89,34 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 app.use(express.static(path.resolve(process.cwd(), "public")));
+
+app.get("/api/setup/status", async (req: Request, res: Response) => {
+  const refreshRequested = matchesRefreshRequest(readQueryValue(req.query.refresh));
+  let preflight = await runtimePreflight.ensureReport({
+    force: refreshRequested || !runtimePreflight.getCurrentReport().checked_at
+  });
+
+  if (!hasStorageBlocker(preflight)) {
+    const dbIssue = ensureDatabaseReady();
+    if (dbIssue) {
+      preflight = await runtimePreflight.ensureReport({ force: true });
+    }
+  }
+
+  const setupStatus = createSetupStatusPayload(config, preflight);
+  const validation = validateSetupStatusResponse(setupStatus);
+  if (!validation.ok) {
+    getRequestLogger(res).error("setup status request produced invalid response payload", {
+      validationErrors: validation.errors
+    });
+    return res.status(500).json({
+      error: "Invalid setup status response",
+      detail: validation.errors
+    });
+  }
+
+  return res.json(setupStatus);
+});
 
 app.get("/api/state", async (req: Request, res: Response) => {
   let preflight = await runtimePreflight.ensureReport();
@@ -600,6 +630,14 @@ function readQueryValue(value: unknown): string | undefined {
   }
 
   return undefined;
+}
+
+function matchesRefreshRequest(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  return value === "1" || value.toLowerCase() === "true";
 }
 
 function getErrorMessage(error: unknown): string {

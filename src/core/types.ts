@@ -139,6 +139,36 @@ export interface PublicRuntimeConfig {
   };
 }
 
+export interface SetupSupportedPath {
+  provider: string;
+  title: string;
+  summary: string;
+  launcher: string;
+  services: string[];
+}
+
+export interface SetupCurrentProfile {
+  id: SupportedAiProfile;
+  label: string;
+  provider: string;
+  chat_model: string;
+  embedding_model: string;
+}
+
+export interface SetupStatus {
+  status: RuntimePreflightStatus;
+  summary: string;
+  checked_at: string | null;
+  can_retry: boolean;
+  current_profile: SetupCurrentProfile;
+  supported_path: SetupSupportedPath;
+  preflight: RuntimePreflightReport;
+}
+
+export interface SetupStatusPayload {
+  setup: SetupStatus;
+}
+
 export interface AppConfig {
   port: number;
   profile: ConfigProfileSelection;

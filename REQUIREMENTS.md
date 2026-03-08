@@ -32,6 +32,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Memory system with summaries and embedding-based retrieval.
 - Web UI with text log, turn input, session controls, suggestion chips, and a local debug panel.
 - The setup flow must offer a small set of safe end-user profiles plus validated advanced overrides for developer-oriented configuration changes.
+- The first-run setup flow must provide a safe connection test for the supported Docker-backed LiteLLM path before the first turn.
 - The default launcher path must use the GPU-backed Docker Ollama service and support VRAM-tier-based model recommendations or manual tier selection when detection is unavailable.
 - Recovery actions should let users retry setup and switch supported profiles without deleting saves or reopening a terminal for normal fixes.
 - Local assist endpoint for spellcheck + autocomplete, with small helper tasks intended to prefer hosted providers through the default gateway path.

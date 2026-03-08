@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  type SetupStatusPayload,
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
@@ -12,6 +13,7 @@ import {
 import {
   parseTurnInput,
   validateAuthoritativePlayerState,
+  validateSetupStatusResponse,
   validateStateResponse,
   validateTurnResponse,
   validateTurnOutput
@@ -281,4 +283,43 @@ test("validateTurnResponse rejects missing full turn fields and invalid authorit
   assert.equal(result.ok, false);
   assert.match(result.errors.join(" "), /memory_updates/i);
   assert.match(result.errors.join(" "), /player\.id/i);
+});
+
+test("validateSetupStatusResponse accepts a guided setup envelope", () => {
+  const payload: SetupStatusPayload = {
+    setup: {
+      status: "ready",
+      summary: "Setup looks ready. Extra notes are available if you want more detail.",
+      checked_at: "2026-03-08T00:00:00.000Z",
+      can_retry: true,
+      current_profile: {
+        id: "local-gpu-small",
+        label: "Local GPU small",
+        provider: "litellm",
+        chat_model: "game-chat",
+        embedding_model: "game-embedding"
+      },
+      supported_path: {
+        provider: "LiteLLM",
+        title: "Supported MVP AI path",
+        summary: "Use the Windows launcher with Docker Desktop so the app, LiteLLM, and the GPU-backed Ollama route start together.",
+        launcher: "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1",
+        services: ["Docker Desktop", "LiteLLM sidecar", "GPU-backed Ollama service"]
+      },
+      preflight: {
+        ok: true,
+        status: "ready",
+        summary: "Setup looks ready. Extra notes are available if you want more detail.",
+        issues: [],
+        counts: {
+          blocker: 0,
+          warning: 0,
+          info: 0
+        },
+        checked_at: "2026-03-08T00:00:00.000Z"
+      }
+    }
+  };
+
+  assert.deepEqual(validateSetupStatusResponse(payload), { ok: true, errors: [] });
 });

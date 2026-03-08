@@ -112,8 +112,11 @@ Use this exact shape when adding new work:
 | T09 | Next | P1 | P1 | Event log persistence and replay | Ready | T04, T08 | Replay fixture execution |
 | T10 | Next | P1 | P1 | Output validator and sanitizer | Ready | T06 | `npm test` |
 | T11 | Next | P1 | P1 | Minimal player UI loop | Done | T06 | `docker compose run --rm --no-deps app npm test` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + manual browser smoke test |
+| T11a | Now | P1 | P2 | Browser UI module decomposition groundwork | Done | T11, T12b | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/global-error.test.ts src/ui/http-client.test.ts src/ui/player-name.test.ts src/ui/session-data.test.ts src/ui/setup-view.test.ts src/ui/debug-view.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
 | T12 | Next | P1 | P1 | New game onboarding | Review | T06 | Manual new-game flow check |
-| T12b | Next | P1 | P1 | First-run setup wizard and connection test | Ready | T02f, T11, T12 | Manual first-run flow check |
+| T12b | Next | P1 | P1 | First-run setup wizard and connection test | Review | T02f, T11, T12 | Manual first-run flow check |
+| T11b | Next | P1 | P2 | Turn surface renderer extraction | Ready | T11a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
+| T12d | Next | P1 | P2 | First-run setup browser smoke harness | Ready | T12b | Browser setup smoke path |
 | T12c | Next | P1 | P1 | Guided recovery actions and advanced setup details | Ready | T12b, T01c, T02i, T04a, T02j | Manual recovery flow check |
 | T29 | Next | P1 | P1 | Save slots UI | Ready | T08, T09 | Manual save/load check |
 | T34 | Next | P1 | P1 | Tutorial and first-run guidance | Ready | T11, T12 | Manual onboarding smoke test |
@@ -401,6 +404,101 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - validation completed on 2026-03-08 with `docker compose run --rm --no-deps app npm test`, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, a page-load smoke at `http://127.0.0.1:3100/`, and a live `/api/turn` submission returning narrative, options, debug payload, and versioned player state through the LiteLLM plus Ollama path
   - no additional implementation changes were required in this session because the existing UI loop already satisfied the task once the supported Docker-backed validation path was available
 
+### T11a - Browser UI Module Decomposition Groundwork
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P2
+- Owner Role: Product/UI lead
+- Goal: Break `src/ui/app.ts` into browser-only modules that preserve the current player flow while creating stable homes for future setup, recovery, tutorial, and save-surface work.
+- Scope:
+  - extract low-risk browser-side modules first, starting with DTO contracts, DOM lookup, HTTP helpers, storage helpers, and runtime-session selectors
+  - reduce duplication inside `src/ui/app.ts` without changing the current HTTP contract, DOM ids, launch flow semantics, or localStorage keys
+  - add focused tests for the extracted low-risk modules before larger controller or renderer splits begin
+  - leave `src/ui/app.ts` as the active composition root during the groundwork phase rather than attempting the full controller split in one step
+- Files to Touch:
+  - BACKLOG.md
+  - src/ui/app.ts
+  - src/ui/contracts.ts
+  - src/ui/debug-view.ts
+  - src/ui/debug-view.test.ts
+  - src/ui/dom.ts
+  - src/ui/http-client.ts
+  - src/ui/http-client.test.ts
+  - src/ui/player-name.ts
+  - src/ui/player-name.test.ts
+  - src/ui/session-data.ts
+  - src/ui/session-data.test.ts
+  - src/ui/setup-view.ts
+  - src/ui/setup-view.test.ts
+- Do Not Touch:
+  - data/spec/
+  - src/server/
+  - src/state/
+  - src/story/
+- Dependencies:
+  - T11
+  - T12b
+- Validation:
+  - `docker compose build app`
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/ui/global-error.test.ts src/ui/http-client.test.ts src/ui/player-name.test.ts src/ui/session-data.test.ts`
+  - `docker compose run --rm --no-deps app npm run build:client`
+  - `docker compose run --rm --no-deps app npm test`
+- Definition of Done:
+  - `src/ui/app.ts` no longer owns the low-risk DTO, DOM, storage, fetch, and runtime-selector logic directly
+  - extracted modules have focused automated coverage where practical
+  - the browser bundle still builds and the current launch/setup/play flow remains behaviorally unchanged
+  - the refactor leaves clean seams for later controller and view extraction work
+- Handoff Notes:
+  - user explicitly requested on 2026-03-08 to start implementation of the `src/ui/app.ts` breakup plan
+  - first extraction batch on 2026-03-08 created `src/ui/contracts.ts`, `src/ui/dom.ts`, `src/ui/http-client.ts`, `src/ui/player-name.ts`, and `src/ui/session-data.ts`, and rewired `src/ui/app.ts` to consume them
+  - focused tests were added for the new modules in `src/ui/http-client.test.ts`, `src/ui/player-name.test.ts`, and `src/ui/session-data.test.ts`
+  - validation on 2026-03-08 passed with `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/ui/global-error.test.ts src/ui/http-client.test.ts src/ui/player-name.test.ts src/ui/session-data.test.ts`, and `docker compose run --rm --no-deps app npm run build:client`
+  - second extraction batch on 2026-03-08 created `src/ui/setup-view.ts` and `src/ui/debug-view.ts`, moved setup/preflight rendering plus debug snapshot rendering out of `src/ui/app.ts`, and added focused tests in `src/ui/setup-view.test.ts` and `src/ui/debug-view.test.ts`
+  - second-batch validation on 2026-03-08 passed with `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/ui/global-error.test.ts src/ui/http-client.test.ts src/ui/player-name.test.ts src/ui/session-data.test.ts src/ui/setup-view.test.ts src/ui/debug-view.test.ts`, `docker compose run --rm --no-deps app npm run build:client`, and `docker compose run --rm --no-deps app npm test`
+  - completed on 2026-03-08 after a follow-up selector fix that makes the preflight panel prefer the freshest runtime debug over the bootstrap setup snapshot while still falling back safely when runtime data is absent
+  - the shared `/api/setup/status` contract now lives in `src/core/types.ts`; `src/ui/contracts.ts` keeps only UI-local response widening for error payloads
+  - next safe extractions are tracked in `T11b` rather than as open-ended handoff notes
+
+### T11b - Turn Surface Renderer Extraction
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P2
+- Owner Role: Product/UI lead
+- Goal: Continue shrinking `src/ui/app.ts` by moving turn-surface rendering into browser-only view modules without changing the async controller flow.
+- Scope:
+  - extract rendering helpers for the turn log, suggestion options, assist chips, and session summary text
+  - keep DOM ids, CSS hooks, localStorage keys, and HTTP request timing unchanged
+  - add focused tests for any new view-model or renderer helpers before rewiring `src/ui/app.ts`
+  - leave network requests, retry logic, and state transitions in `src/ui/app.ts` for this slice
+- Files to Touch:
+  - BACKLOG.md
+  - src/ui/app.ts
+  - src/ui/
+- Do Not Touch:
+  - data/spec/
+  - src/server/
+  - src/state/
+  - src/story/
+- Dependencies:
+  - T11a
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts`
+  - `docker compose run --rm --no-deps app npm run build:client`
+- Definition of Done:
+  - `src/ui/app.ts` no longer owns the direct rendering logic for the turn log, suggestion options, assist chips, and session summary
+  - new renderer or view-model helpers have focused automated coverage
+  - the turn surface remains behaviorally unchanged in the browser bundle
+  - the async orchestration stays centralized enough that later controller work can proceed in a separate task
+- Handoff Notes:
+  - this task is intentionally the next narrow slice after `T11a`; do not mix it with setup-flow or save-slot behavior work
+  - prefer pure renderer helpers or view-model builders over stateful mini-controllers in this phase
+
 ### T12 - New Game Onboarding
 
 - Status: Review
@@ -416,6 +514,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Files to Touch:
   - BACKLOG.md
   - README.md
+  - REQUIREMENTS.md
   - public/index.html
   - public/app.js
   - src/ui/app.ts
@@ -440,7 +539,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T12b - First-Run Setup Wizard And Connection Test
 
-- Status: Ready
+- Status: Review
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -456,13 +555,21 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - BACKLOG.md
   - README.md
   - public/index.html
-  - public/app.ts
+  - public/app.js
+  - src/ui/app.ts
   - public/styles.css
-  - src/config.ts
-  - src/server.ts
+  - src/core/types.ts
+  - src/core/config.ts
+  - src/rules/validator.ts
+  - src/rules/validator.test.ts
+  - src/server/index.ts
+  - src/server/setup-status.ts
+  - src/server/setup-status.test.ts
+  - src/server/runtime-preflight.ts
+  - src/server/runtime-preflight.test.ts
 - Do Not Touch:
   - data/spec/
-  - src/game.ts
+  - src/state/game.ts
 - Dependencies:
   - T02f
   - T11
@@ -477,9 +584,53 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - the setup flow matches launcher behavior and README guidance
 - Handoff Notes:
   - treat the supported AI path as a product decision, not just a config screen
+  - updated on 2026-03-08 with a new `/api/setup/status` route plus `src/server/setup-status.ts` so the browser can check setup and retry AI connectivity without creating or resuming a player session
+  - the launch screen in `src/ui/app.ts` and `public/index.html` now includes a first-run setup wizard with a retryable connection test, supported-path messaging, and plain-language guidance derived from the shared preflight issue contract
+  - `src/rules/validator.ts`, `src/rules/validator.test.ts`, and `src/server/setup-status.test.ts` now cover the setup-status response envelope before the browser consumes it
+  - `README.md` and `REQUIREMENTS.md` were updated to document the launch-screen connection test and the new setup-status API surface
+  - validation on 2026-03-08 passed with `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/setup-status.test.ts src/server/runtime-preflight.test.ts`, `docker compose run --rm --no-deps app npm run build:client`, and `docker compose run --rm --no-deps app npm test`
+  - manual reachable-path smoke on 2026-03-08 used `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` plus `GET /api/setup/status` and confirmed a `ready` setup payload for the supported Docker Desktop plus LiteLLM plus GPU-backed Ollama path
+  - manual unreachable-path smoke on 2026-03-08 used a detached `docker compose run --service-ports --no-deps` app container with `AI_PROFILE=custom` and `LITELLM_PROXY_URL=http://host.docker.internal:59999`; querying `/api/setup/status` inside that container returned `action-required` with the expected `ai_endpoint_unreachable` blocker
+  - leave this task in `Review` until a quick interactive browser smoke confirms the rendered launch screen shows the setup wizard, disables start while blocked, and allows retry to recover without clearing the saved browser session
+  - a follow-up harness task is tracked as `T12d` so this review item can close against a repeatable browser check instead of relying on memory
   - the user confirmed on 2026-03-08 that setup and diagnostics should stay UI-first for now
   - the user confirmed on 2026-03-08 that LiteLLM is the default AI control plane the setup flow should steer toward
   - treat the repo-managed Docker LiteLLM sidecar as the default recovery path, with GPU-backed local inference explained as an explicit opt-in
+
+### T12d - First-Run Setup Browser Smoke Harness
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P2
+- Owner Role: Product/UI lead
+- Goal: Give the setup wizard one repeatable browser-level smoke path so `T12b` can close against a documented check instead of an ad hoc manual read-through.
+- Scope:
+  - define one repeatable browser smoke path for the launch-screen setup wizard in both a ready and blocked state, using the lightest feasible tooling
+  - verify the launch screen disables start or resume while setup is blocked and re-enables the path after a successful retry
+  - verify the saved browser session id is preserved across setup retries
+  - document how the smoke path is run so later agents can repeat it before touching setup UX
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - scripts/
+  - src/ui/
+- Do Not Touch:
+  - data/spec/
+  - src/state/
+  - src/story/
+- Dependencies:
+  - T12b
+- Validation:
+  - browser setup smoke path
+- Definition of Done:
+  - one documented smoke path exercises the setup wizard in a blocked state and a recovered ready state
+  - the smoke path proves start gating and retry behavior without clearing the saved browser session
+  - later setup-flow changes can point to this repeatable check instead of a one-off manual note
+  - the chosen approach stays lightweight enough to run during normal UI refactor work
+- Handoff Notes:
+  - keep this as a smoke path, not a full end-to-end framework migration
+  - prefer reusing the existing Docker or launcher setup contracts rather than inventing a UI-only fake backend unless deterministic blocking states require one
 
 ### T12c - Guided Recovery Actions And Advanced Setup Details
 

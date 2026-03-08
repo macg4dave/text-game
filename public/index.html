@@ -52,6 +52,24 @@
               <h3>Start new or jump back in.</h3>
               <p>Choose a character name if you want one, then start a new game or resume the last game saved in this browser.</p>
             </div>
+            <section class="setup-wizard" aria-live="polite">
+              <div class="setup-wizard-header">
+                <p class="stack-label">Setup Check</p>
+                <h4 id="setup-title">Checking the supported AI path</h4>
+                <p id="setup-summary">The app is checking Docker, LiteLLM, and the supported local AI route before the first turn.</p>
+              </div>
+              <div class="setup-wizard-toolbar">
+                <button type="button" class="secondary" id="setup-check-button">Run Connection Test</button>
+                <p id="setup-current-profile"></p>
+              </div>
+              <div class="setup-supported-path">
+                <strong id="setup-supported-title">Supported MVP AI path</strong>
+                <p id="setup-supported-summary"></p>
+                <code id="setup-launcher"></code>
+                <ul id="setup-services"></ul>
+              </div>
+              <ul class="setup-guidance" id="setup-guidance"></ul>
+            </section>
             <div class="launch-actions">
               <button type="button" id="launch-new-game">Start New Game</button>
               <button type="button" class="secondary" id="launch-resume">Resume Last Game</button>
