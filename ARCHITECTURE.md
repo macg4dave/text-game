@@ -50,6 +50,73 @@ Do not assume:
 - provider-specific role semantics
 - provider-specific safety metadata
 
+## Authority Boundary
+
+- The model is a narrator plus proposal engine, not a hidden game engine.
+- The model may suggest consequences, pacing, options, and memory candidates, but those suggestions are not authoritative state.
+- The server must validate and adjudicate proposed consequences before mutating player state, director state, quest progress, or persisted memory.
+- Player-facing narrative should be derived or reconciled after the authoritative commit so prose cannot smuggle in unearned world facts.
+- Event log, replay, and save behavior should treat committed state and accepted consequences as truth; raw model claims are debug data unless the server accepted them.
+
+## Turn Layering
+
+- The turn pipeline should be split into three responsibilities:
+  - freeform intent interpretation
+  - world simulation resolution
+  - story pacing or framing
+- Intent interpretation turns broad player input into one or more candidate intents without deciding story pacing.
+- World simulation resolution decides plausibility, accepted consequences, failures, and side effects against authoritative state and rules.
+- Director logic should consume accepted simulation outcomes and decide how to frame, emphasize, or pace them toward the end goal.
+- Beat controls such as `required_flags`, `unlock_flags`, and `max_beats_per_turn` are pacing tools. They should not be the primary reason an otherwise plausible action succeeds or fails.
+
+## Model Turn Schema Boundary
+
+- The model-facing schema is a transport contract, not the game's design language.
+- Prefer a compact turn payload built around narrative, candidate actions, structured intents, and proposed deltas.
+- Keep scene modeling, simulation rules, quest logic, beat policy, and other gameplay semantics in server-owned modules or content specs rather than encoding them as schema shape.
+- If a proposed schema field exists mainly to teach game rules to the model, treat that as a boundary smell and move the logic into validators, adjudication, reducer code, or authored specs instead.
+- Compact schemas should be translated into richer authoritative domain concepts server-side after validation, not by making the model output mirror the whole engine state machine.
+
+## Replay Record Model
+
+- Replay must be driven by committed semantic events, not by rerunning model generation from stored prompts or prose.
+- The canonical event record should capture, at minimum:
+  - the player attempt or interpreted intent
+  - the server-resolved accepted or rejected outcome
+  - the authoritative state or director transitions committed under the active ruleset or schema version
+- Raw prompts, raw model responses, and final prose are useful diagnostics or presentation artifacts, but they are not sufficient as the replay source of truth.
+- Save migration, replay fixtures, and debugging surfaces should treat semantic event records as canonical and any raw transcript data as supplementary.
+
+## Memory Model
+
+- Memory is a narration and continuity aid, not an independent truth authority.
+- The memory system should support explicit classes with different authority and retrieval policy, including:
+  - hard canon facts
+  - quest progression facts
+  - relationship facts
+  - world discoveries
+  - soft flavor recollections
+- Authority-relevant classes should be admitted only from server-accepted outcomes or trusted derivation paths.
+- Retrieval policy should be class-aware so each turn pulls the smallest useful set instead of treating all memories as equivalent.
+- Soft flavor recollections may enrich narration, but they must not mutate or override authoritative state on their own.
+- Treat memory as a storage hierarchy:
+  - hot live context for the current turn
+  - warm structured facts and rolling summaries
+  - cold history retained for replay, debugging, or explicit recovery use
+- Default live context should contain only the current scene, current goal, nearby world state, and a small set of high-priority recalled facts.
+- Durable memory should be split across distinct buckets such as hard canon facts, quest or progression facts, relationship summaries, and cold history logs rather than one monolithic prompt payload.
+- Raw history should remain out of the live prompt by default; if a transcript slice is needed, it should be requested as an explicit retrieval mode with its own budget.
+- Summary and recap artifacts should be versioned so later recomputation can rebuild them from canonical event data and committed facts when summarization logic changes.
+- NPC continuity should flow through four layers:
+  - transcript or event-log retention for replay and debugging
+  - structured encounter facts extracted from committed scenes
+  - long-lived NPC memory records admitted only above a significance threshold
+  - short-lived scene context used only for the current conversation
+- A server-side significance evaluator should score encounter facts after dialogue scenes using committed signals such as stable identity, repeated meaningful exchange, relationship change, clues, promises, quest hooks, unique role, and later voluntary player return.
+- NPC importance tiers should control what is persisted and how aggressively it is retrieved, from ambient presence through anchor-cast history.
+- World memory, NPC memory, and player journal memory should remain separate retrieval domains even if they share lower-level storage primitives.
+- Context assembly should be budgeted by bucket and remain inspectable enough to explain which facts entered the model context, why they were selected, and what token cost they consumed.
+
 ## First Decisions To Keep
 
 - Node.js + TypeScript app source, with browser authoring code under `src/ui/app.ts` emitted to `public/app.js`
@@ -97,3 +164,9 @@ Implications for follow-on work:
 - packaged runtime files should be staged into a writable user-data area instead of writing into install resources
 - setup and recovery flows should assume the player may never see a terminal
 - launcher-only and Docker paths remain useful development and support fallbacks, but they are no longer the preferred long-term packaged direction
+
+## Architecture Change Intake
+
+- Update this document when a future issue changes runtime boundaries, module ownership, provider boundaries, packaging shape, or other architecture-level contracts.
+- Mirror architecture-affecting issues in [BACKLOG.md](/g:/text-game/BACKLOG.md) as a parent item plus child tasks so boundary decisions and implementation work stay linked.
+- Keep purely strategic sequencing, validation policy, or user-copy updates out of this document unless they materially change the architecture boundary itself.

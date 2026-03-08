@@ -1,29 +1,24 @@
 import { createFatalUiErrorState, registerGlobalErrorHandlers, type FatalUiErrorState } from "./global-error.js";
 import {
-  type AssistApiResponse,
-  type PlayerState,
   type RuntimeConfigDiagnostics,
   type RuntimeConfigProfile,
   type RuntimeLocalGpuSelection,
-  type RuntimePreflightPayload,
-  type SessionDebugPayload,
-  type SetupStatus,
-  type SetupStatusPayload,
-  type StateApiResponse,
-  type TurnApiResponse,
-  type TurnDebugPayload
+  type RuntimePreflightPayload
 } from "./contracts.js";
+import { createInitialAppState, hasSavedSession } from "./app-state.js";
 import { getElement } from "./dom.js";
 import { renderDebugPanels as renderDebugView } from "./debug-view.js";
 import { fetchJson, formatErrorMessage } from "./http-client.js";
 import { renderLaunchPanel as renderLaunchView } from "./launch-view.js";
 import { getStoredPlayerName, rememberPlayerName as persistPlayerName } from "./player-name.js";
+import { runRecoveryAction } from "./recovery-actions.js";
 import {
   getRuntimeConfigDiagnostics as selectRuntimeConfigDiagnostics,
   getRuntimeLocalGpuSelection as selectRuntimeLocalGpuSelection,
   getRuntimePreflight as selectRuntimePreflight,
   getRuntimeProfile as selectRuntimeProfile
 } from "./session-data.js";
+import { createSessionController } from "./session-controller.js";
 import { renderPreflightPanel as renderPreflightView, renderSetupWizard as renderSetupView } from "./setup-view.js";
 import {
   appendLogEntry,
@@ -85,44 +80,20 @@ function initializeApp(): void {
   const setupAdvancedEl = getElement<HTMLDetailsElement>("setup-advanced");
   const setupAdvancedJsonEl = getElement<HTMLElement>("setup-advanced-json");
 
-  const state: {
-    playerId: string;
-    playerName: string;
-    player: PlayerState | null;
-    sessionDebug: SessionDebugPayload | null;
-    lastTurnDebug: TurnDebugPayload | null;
-    setupStatus: SetupStatus | null;
-    setupError: string | null;
-    assistTimer: number | null;
-    hasEnteredFlow: boolean;
-    pending: boolean;
-    fatalError: FatalUiErrorState | null;
-  } = {
+  const state = createInitialAppState({
     playerId: localStorage.getItem("playerId") || "",
     playerName: getStoredPlayerName(localStorage),
-    player: null,
-    sessionDebug: null,
-    lastTurnDebug: null,
-    setupStatus: null,
-    setupError: null,
-    assistTimer: null,
-    hasEnteredFlow: false,
-    pending: false,
     fatalError: activeFatalUiError
-  };
+  });
 
   nameEl.value = state.playerName;
-  setAssist([], []);
-  renderDebugPanels();
-  renderLaunchPanel();
-  renderSetupWizard();
-  renderPlaySurface();
-  renderSessionSummary();
-  renderPreflightPanel();
-  setPending(false);
 
   function addEntry(label: string, text: string, tone = "neutral"): void {
     appendLogEntry(logEl, { label, text, tone });
+  }
+
+  function clearLog(): void {
+    logEl.innerHTML = "";
   }
 
   function setStatus(text: string, tone = "idle"): void {
@@ -146,14 +117,6 @@ function initializeApp(): void {
     return selectRuntimeLocalGpuSelection(state.sessionDebug, state.lastTurnDebug);
   }
 
-  function hasSavedSession(): boolean {
-    return Boolean(state.playerId);
-  }
-
-  function isSetupReady(): boolean {
-    return state.setupStatus?.status === "ready";
-  }
-
   function renderLaunchPanel(): void {
     renderLaunchView(
       {
@@ -166,7 +129,7 @@ function initializeApp(): void {
         hasEnteredFlow: state.hasEnteredFlow,
         pending: state.pending,
         fatalBlocked: Boolean(state.fatalError || activeFatalUiError),
-        hasSavedSession: hasSavedSession(),
+        hasSavedSession: hasSavedSession(state),
         setupStatus: state.setupStatus
       }
     );
@@ -208,6 +171,37 @@ function initializeApp(): void {
     optionsEl.hidden = !showPlaySurface;
   }
 
+  const sessionController = createSessionController({
+    state,
+    storage: localStorage,
+    getActiveFatalUiError: () => activeFatalUiError,
+    getPlayerNameInput: () => nameEl.value,
+    setPlayerNameInput(value) {
+      nameEl.value = value;
+    },
+    getTurnInput: () => inputEl.value,
+    setTurnInput(value) {
+      inputEl.value = value;
+    },
+    rememberPlayerName,
+    setStatus,
+    setPending,
+    addEntry,
+    setAssist,
+    setOptions,
+    clearLog,
+    render: syncView,
+    focusInput() {
+      inputEl.focus();
+    },
+    focusName() {
+      nameEl.focus();
+    },
+    getRuntimePreflight,
+    fetchJson,
+    formatErrorMessage
+  });
+
   function setOptions(options: string[] = []): void {
     renderTurnOptions(optionsEl, {
       options,
@@ -215,7 +209,7 @@ function initializeApp(): void {
       onSelect(option) {
         inputEl.value = option;
         inputEl.focus();
-        requestAssist().catch(() => {
+        sessionController.requestAssist().catch(() => {
           setAssist([], []);
         });
       }
@@ -230,16 +224,16 @@ function initializeApp(): void {
       corrections,
       completions,
       onCorrectionSelect(token, suggestion) {
-          replaceToken(token, suggestion);
-          requestAssist().catch(() => {
-            setAssist([], []);
-          });
+        replaceToken(token, suggestion);
+        sessionController.requestAssist().catch(() => {
+          setAssist([], []);
+        });
       },
       onCompletionSelect(word) {
-          applyCompletion(word);
-          requestAssist().catch(() => {
-            setAssist([], []);
-          });
+        applyCompletion(word);
+        sessionController.requestAssist().catch(() => {
+          setAssist([], []);
+        });
       }
     });
   }
@@ -320,203 +314,18 @@ function initializeApp(): void {
         diagnostics: getRuntimeConfigDiagnostics(),
         preflight: getRuntimePreflight(),
         hasEnteredFlow: state.hasEnteredFlow,
-        hasSavedSession: hasSavedSession()
+        hasSavedSession: hasSavedSession(state)
       }
     );
   }
 
-  function updateSessionData(data: StateApiResponse): void {
-    state.sessionDebug = data.debug || state.sessionDebug;
-
-    if (!data.player) {
-      state.player = null;
-      renderLaunchPanel();
-      renderPlaySurface();
-      renderSessionSummary();
-      renderPreflightPanel();
-      renderDebugPanels();
-      setPending(state.pending);
-      return;
-    }
-
-    state.player = data.player;
-    state.playerId = data.player.id;
-
-    localStorage.setItem("playerId", state.playerId);
-    if (!nameEl.value.trim()) {
-      nameEl.value = data.player.name;
-    }
-    rememberPlayerName();
-    renderLaunchPanel();
-    renderPlaySurface();
-    renderSessionSummary();
-    renderPreflightPanel();
-    renderDebugPanels();
-    setPending(state.pending);
-  }
-
-  async function loadSetupStatus({ force = false } = {}): Promise<void> {
-    const suffix = force ? "?refresh=1" : "";
-    const result = await fetchJson<SetupStatusPayload>(`/api/setup/status${suffix}`);
-    if (!result.ok || !result.data?.setup) {
-      throw new Error(formatErrorMessage(result.data, `Setup request failed (${result.status})`));
-    }
-
-    state.setupStatus = result.data.setup;
-    state.setupError = null;
+  function syncView(): void {
     renderLaunchPanel();
     renderSetupWizard();
-    renderSessionSummary();
-    renderPreflightPanel();
-    renderDebugPanels();
-  }
-
-  async function ensurePlayer({ force = false, showStatus = false } = {}): Promise<PlayerState | null> {
-    if (state.fatalError || activeFatalUiError) {
-      return null;
-    }
-
-    if (!force && state.playerId && state.player) {
-      rememberPlayerName();
-      return state.player;
-    }
-
-    if (showStatus) setStatus("Loading session", "working");
-
-    rememberPlayerName();
-    const params = new URLSearchParams();
-    if (state.playerId) params.set("playerId", state.playerId);
-    if (nameEl.value.trim()) params.set("name", nameEl.value.trim());
-
-    const result = await fetchJson<StateApiResponse>(`/api/state?${params.toString()}`);
-    if (!result.ok) {
-      const message = formatErrorMessage(result.data, `State request failed (${result.status})`);
-      throw new Error(message);
-    }
-
-    updateSessionData(result.data);
-
-    const preflight = getRuntimePreflight();
-
-    if (!state.player) {
-      if (preflight?.status === "action-required") {
-        if (showStatus) {
-          setStatus("Setup required", "error");
-        }
-        return null;
-      }
-
-      throw new Error("Player initialization failed.");
-    }
-
-    if (showStatus) {
-      if (preflight?.status === "action-required") {
-        setStatus("Setup required", "error");
-      } else if (preflight?.status === "checking") {
-        setStatus("Checking AI setup", "working");
-      } else {
-        setStatus("Session ready", "ok");
-      }
-    }
-    return state.player;
-  }
-
-  function clearSessionView({ clearSavedPlayerId }: { clearSavedPlayerId: boolean }): void {
-    if (clearSavedPlayerId) {
-      localStorage.removeItem("playerId");
-      state.playerId = "";
-    }
-
-    state.player = null;
-    state.sessionDebug = null;
-    state.lastTurnDebug = null;
-    logEl.innerHTML = "";
-    setOptions([]);
-    setAssist([], []);
-    renderLaunchPanel();
     renderPlaySurface();
     renderSessionSummary();
     renderPreflightPanel();
     renderDebugPanels();
-  }
-
-  async function startGameFlow(mode: "new" | "resume"): Promise<void> {
-    if (state.pending || state.fatalError || activeFatalUiError) {
-      return;
-    }
-
-    if (mode === "resume" && !hasSavedSession()) {
-      setStatus("No saved game to resume", "error");
-      return;
-    }
-
-    setPending(true);
-    setStatus(mode === "resume" ? "Resuming game" : "Starting new game", "working");
-
-    try {
-      if (!isSetupReady()) {
-        await loadSetupStatus({ force: true });
-      }
-
-      if (!isSetupReady()) {
-        setStatus("Setup required", "error");
-        return;
-      }
-
-      state.hasEnteredFlow = true;
-      clearSessionView({ clearSavedPlayerId: mode === "new" });
-      setPending(true);
-
-      const player = await ensurePlayer({ force: true });
-      if (!player) {
-        setStatus("Setup required", "error");
-        return;
-      }
-
-      const guideMessage =
-        mode === "resume"
-          ? `Back in ${player.location}. Continue where you left off or try "look around" to get your bearings.`
-          : `${player.name} arrives in ${player.location}. Try "look around" or any short action to begin.`;
-      addEntry("Guide", guideMessage, "system");
-      setStatus(mode === "resume" ? "Game resumed" : "New game ready", "ok");
-    } catch (error) {
-      addEntry("System", error instanceof Error ? error.message : "Session start failed.", "system");
-      setStatus(mode === "resume" ? "Resume failed" : "Start failed", "error");
-    } finally {
-      setPending(false);
-      if (state.player && !state.fatalError && !activeFatalUiError) {
-        inputEl.focus();
-      }
-    }
-  }
-
-  async function requestAssist(): Promise<void> {
-    if (state.pending || state.fatalError || activeFatalUiError || !state.hasEnteredFlow || !state.player) return;
-
-    const input = inputEl.value.trim();
-    if (!input) {
-      setAssist([], []);
-      return;
-    }
-
-    try {
-      const player = await ensurePlayer();
-      if (!player) return;
-      const result = await fetchJson<AssistApiResponse>("/api/assist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          playerId: state.playerId,
-          name: nameEl.value.trim(),
-          input
-        })
-      });
-
-      if (!result.ok) return;
-      setAssist(result.data.corrections || [], result.data.completions || []);
-    } catch {
-      setAssist([], []);
-    }
   }
 
   function setPending(pending: boolean): void {
@@ -526,9 +335,7 @@ function initializeApp(): void {
     const fatalBlocked = Boolean(state.fatalError || activeFatalUiError);
     const readyForTurns = state.hasEnteredFlow && Boolean(state.player) && !setupBlocked && !fatalBlocked && !pending;
 
-    renderLaunchPanel();
-    renderSetupWizard();
-    renderPlaySurface();
+    syncView();
 
     sendButtonEl.disabled = !readyForTurns;
     inputEl.disabled = !readyForTurns;
@@ -541,77 +348,13 @@ function initializeApp(): void {
     });
   }
 
-  function handleFatalError(stateUpdate: FatalUiErrorState): void {
-    state.fatalError = stateUpdate;
-    renderAppFatalError(stateUpdate);
-    renderDebugPanels();
-    setPending(false);
-  }
+  setAssist([], []);
+  syncView();
+  setPending(false);
 
   formEl.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (state.pending || state.fatalError || activeFatalUiError || !state.hasEnteredFlow) return;
-
-    const input = inputEl.value.trim();
-    if (!input) return;
-
-    setPending(true);
-    setStatus("Sending turn", "working");
-
-    try {
-      const player = await ensurePlayer();
-      if (!player) {
-        setStatus("Setup required", "error");
-        return;
-      }
-      addEntry("You", input, "player");
-      inputEl.value = "";
-      setAssist([], []);
-
-      const result = await fetchJson<TurnApiResponse>("/api/turn", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          playerId: state.playerId,
-          name: nameEl.value.trim(),
-          input
-        })
-      });
-
-      if (result.data?.debug) {
-        state.lastTurnDebug = result.data.debug;
-        state.sessionDebug = {
-          runtime: result.data.debug.runtime,
-          session: result.data.debug.session
-        };
-      }
-      if (result.data?.player) {
-        state.player = result.data.player;
-      }
-      renderSessionSummary();
-      renderPreflightPanel();
-      renderDebugPanels();
-
-      if (!result.ok) {
-        const message = formatErrorMessage(result.data, `Turn request failed (${result.status})`);
-        addEntry("System", message, "system");
-        setStatus("Turn failed", "error");
-        return;
-      }
-
-      addEntry("Narrator", result.data.narrative || "No narrative returned.", "narrator");
-      setOptions(result.data.player_options || []);
-      const latency = typeof result.data.debug?.turn?.latency_ms === "number" ? result.data.debug.turn.latency_ms : undefined;
-      setStatus(typeof latency === "number" ? `Turn complete in ${latency} ms` : "Turn complete", "ok");
-    } catch (error) {
-      addEntry("System", error instanceof Error ? error.message : "Request failed.", "system");
-      setStatus("Request failed", "error");
-    } finally {
-      setPending(false);
-      if (state.player && !state.fatalError && !activeFatalUiError) {
-        inputEl.focus();
-      }
-    }
+    await sessionController.submitTurn();
   });
 
   inputEl.addEventListener("input", () => {
@@ -619,7 +362,7 @@ function initializeApp(): void {
       window.clearTimeout(state.assistTimer);
     }
     state.assistTimer = window.setTimeout(() => {
-      requestAssist().catch(() => {
+      sessionController.requestAssist().catch(() => {
         setAssist([], []);
       });
     }, 250);
@@ -635,32 +378,35 @@ function initializeApp(): void {
   nameEl.addEventListener("change", rememberPlayerName);
   nameEl.addEventListener("blur", rememberPlayerName);
 
-  setupActionsEl.addEventListener("click", (event) => {
+  function handleRecoveryClick(event: Event): void {
     const target = event.target;
-    if (!(target instanceof HTMLButtonElement)) return;
+    if (!(target instanceof HTMLButtonElement)) {
+      return;
+    }
 
     const actionId = target.dataset.recoveryAction;
-    if (!actionId) return;
+    if (!actionId) {
+      return;
+    }
 
-    void runRecoveryAction(actionId);
-  });
+    void runRecoveryAction(actionId, {
+      setupStatus: state.setupStatus,
+      runSetupCheck: () => sessionController.runSetupCheck(),
+      copyText,
+      setStatus,
+      addEntry
+    });
+  }
 
-  preflightIssuesEl.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLButtonElement)) return;
-
-    const actionId = target.dataset.recoveryAction;
-    if (!actionId) return;
-
-    void runRecoveryAction(actionId);
-  });
+  setupActionsEl.addEventListener("click", handleRecoveryClick);
+  preflightIssuesEl.addEventListener("click", handleRecoveryClick);
 
   setupCheckButtonEl.addEventListener("click", async () => {
-    await runSetupCheck();
+    await sessionController.runSetupCheck();
   });
 
   launchNewGameButtonEl.addEventListener("click", () => {
-    startGameFlow("new").catch((error) => {
+    sessionController.startGameFlow("new").catch((error) => {
       addEntry("System", error instanceof Error ? error.message : "Failed to start a new game.", "system");
       setStatus("Start failed", "error");
       setPending(false);
@@ -668,7 +414,7 @@ function initializeApp(): void {
   });
 
   launchResumeButtonEl.addEventListener("click", () => {
-    startGameFlow("resume").catch((error) => {
+    sessionController.startGameFlow("resume").catch((error) => {
       addEntry("System", error instanceof Error ? error.message : "Failed to resume the saved game.", "system");
       setStatus("Resume failed", "error");
       setPending(false);
@@ -676,149 +422,41 @@ function initializeApp(): void {
   });
 
   refreshSessionButtonEl.addEventListener("click", async () => {
-    if (state.fatalError || activeFatalUiError || !state.hasEnteredFlow) return;
-
-    try {
-      setPending(true);
-      setStatus("Refreshing game", "working");
-      const player = await ensurePlayer({ force: true });
-      if (player) {
-        addEntry("System", "Game state refreshed.", "system");
-      }
-      const preflight = getRuntimePreflight();
-      if (preflight?.status === "action-required") {
-        setStatus("Setup required", "error");
-      } else if (preflight?.status === "checking") {
-        setStatus("Checking AI setup", "working");
-      } else {
-        setStatus("Session ready", "ok");
-      }
-    } catch (error) {
-      addEntry("System", error instanceof Error ? error.message : "Refresh failed.", "system");
-      setStatus("Refresh failed", "error");
-    } finally {
-      setPending(false);
-    }
+    await sessionController.refreshSession();
   });
 
   newSessionButtonEl.addEventListener("click", async () => {
-    if (state.fatalError || activeFatalUiError || !state.hasEnteredFlow) return;
+    if (state.fatalError || activeFatalUiError || !state.hasEnteredFlow) {
+      return;
+    }
 
-    await startGameFlow("new");
+    await sessionController.startGameFlow("new");
   });
 
-  async function bootstrap(): Promise<void> {
-    setPending(true);
-    setStatus("Checking supported setup", "working");
-    try {
-      await loadSetupStatus();
-      if (isSetupReady()) {
-        setStatus(hasSavedSession() ? "Resume or start new" : "Start a new game", "idle");
-      } else {
-        setStatus("Setup required", "error");
-      }
-    } catch (error) {
-      state.setupError = error instanceof Error ? error.message : "Setup check failed.";
-      renderSetupWizard();
-      setStatus("Setup check failed", "error");
-    } finally {
-      setPending(false);
-    }
-    nameEl.focus();
-  }
-
-  bootstrap().catch((error) => {
-    handleFatalError(createFatalUiErrorState(error));
+  sessionController.bootstrap().catch((error) => {
+    sessionController.handleFatalError(createFatalUiErrorState(error), renderAppFatalError);
   });
+}
 
-  async function runSetupCheck(): Promise<void> {
-    if (state.fatalError || activeFatalUiError) return;
-
-    try {
-      setPending(true);
-      setStatus("Checking AI setup", "working");
-      await loadSetupStatus({ force: true });
-      if (isSetupReady()) {
-        setStatus("Setup ready", "ok");
-      } else {
-        setStatus("Setup required", "error");
-      }
-    } catch (error) {
-      state.setupError = error instanceof Error ? error.message : "Setup check failed.";
-      renderSetupWizard();
-      setStatus("Setup check failed", "error");
-    } finally {
-      setPending(false);
-    }
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
   }
 
-  async function runRecoveryAction(actionId: string): Promise<void> {
-    switch (actionId) {
-      case "retry-setup-check": {
-        await runSetupCheck();
-        return;
-      }
-      case "copy-launcher-command": {
-        const launcher = state.setupStatus?.supported_path?.launcher;
-        if (!launcher) {
-          setStatus("Launcher command unavailable", "error");
-          return;
-        }
-        await copyRecoveryText(launcher, "Launcher command copied");
-        return;
-      }
-      case "copy-smaller-profile-guidance": {
-        const guidance = [
-          "Use the conservative supported profile for the next launcher run:",
-          "AI_PROFILE=local-gpu-small",
-          "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -Rebuild"
-        ].join("\n");
-        await copyRecoveryText(guidance, "Smaller-profile guidance copied");
-        return;
-      }
-      case "copy-gpu-repair-checklist": {
-        const checklist = [
-          "GPU-backed repair checklist:",
-          "1. Start Docker Desktop and wait for the Linux engine.",
-          "2. Confirm nvidia-smi works in PowerShell.",
-          "3. Re-run the supported launcher path.",
-          "4. Retry the setup check without clearing the saved browser session.",
-          state.setupStatus?.supported_path?.launcher || "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1"
-        ].join("\n");
-        await copyRecoveryText(checklist, "GPU repair checklist copied");
-        return;
-      }
-      default:
-        return;
-    }
-  }
+  copyTextWithFallback(text);
+}
 
-  async function copyRecoveryText(text: string, successStatus: string): Promise<void> {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        copyTextWithFallback(text);
-      }
-      addEntry("System", successStatus, "system");
-      setStatus(successStatus, "ok");
-    } catch {
-      setStatus("Copy failed", "error");
-      addEntry("System", "Copy failed. Open the advanced setup details and copy the text manually.", "system");
-    }
-  }
-
-  function copyTextWithFallback(text: string): void {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "true");
-    textarea.style.position = "absolute";
-    textarea.style.left = "-9999px";
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand("copy");
-    document.body.removeChild(textarea);
-  }
+function copyTextWithFallback(text: string): void {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "absolute";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
 }
 
 function renderAppFatalError(state: FatalUiErrorState): void {

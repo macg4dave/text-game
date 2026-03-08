@@ -41,6 +41,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - SQLite schema changes are applied by migrations only.
 - Any change that affects replay determinism requires a golden fixture update.
 - Version compatibility for saves must be tested before Phase 5 can close.
+- Replay-affecting storage must preserve committed semantic outcomes, authoritative transitions, and the ruleset or schema version needed to reproduce state without rerunning model generation.
 
 ## Test Minimums
 
@@ -50,6 +51,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Unit tests for reducers, validators, ranking, and other pure functions
 - Integration tests for the turn pipeline using fixtures
 - Golden replay tests for deterministic scripted runs
+- Replay tests must prove the final state can be reconstructed from committed event semantics even if raw model prose changes or is unavailable.
 - Fuzz tests for validator and sanitizer inputs
 - CI execution on every push by Phase 4
 - Any change to AI prompts, schemas, model defaults, or adapter request shapes must run the local AI workflow harness before and after the change when a local compatible provider is available
@@ -75,6 +77,50 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Do not let helper or utility files become catch-all buckets for unrelated logic from multiple domains.
 - Review touched files with the sentence test: if the file's responsibility cannot be described in one sentence without the word `and`, split or extract before continuing.
 
+## Authority Boundary Policy
+
+- Treat model output as advisory until the server accepts it. Proposed state changes, quest progression, director progress, and memory facts must not become authoritative solely because the model emitted them.
+- Server-side validation and adjudication must run before any authoritative mutation, memory persistence, or player-facing turn finalization.
+- Player-facing narrative and suggested options must be reconciled against committed state; if prose contradicts the accepted outcome, rewrite, trim, or reject it before returning it to the player.
+- Turn-pipeline changes must include at least one deterministic rejection case where the model invents facts, implies unearned progress, or otherwise attempts authority drift.
+
+## Agency And Pacing Policy
+
+- Preserve player agency by separating attempt interpretation, simulation resolution, and pacing decisions instead of collapsing them into one model or director step.
+- Plausibility and failure should be decided by simulation rules or server adjudication, not by beat order alone.
+- Director rules should frame and capitalize on accepted outcomes after simulation, including when the player goes off the expected path.
+- Tests for turn-pipeline or director changes should include at least one off-beat but plausible action that succeeds without forced beat advancement, and at least one implausible action that fails for simulation reasons rather than hidden pacing reasons.
+
+## Memory Authority Policy
+
+- Memory classes must be explicit and carry clear admission and retrieval rules rather than using one undifferentiated `fact` bucket.
+- Only authority-relevant memory classes may participate in state-sensitive retrieval or downstream decision support, and even those memories must not override committed state.
+- Flavor-oriented memories may support narration and continuity, but they must stay non-authoritative and be safe to drop, trim, or ignore without changing truth.
+- Memory or retrieval changes should include tests or fixtures that prove flavor memories cannot smuggle new authoritative facts into gameplay decisions.
+
+## NPC Memory Significance Policy
+
+- Do not treat raw dialogue logs as durable NPC memory. Transcript retention exists for replay and debugging; durable NPC recall must come from committed structured encounter facts and server-owned significance scoring.
+- NPC memory should use explicit tiers with sparse defaults. Cheap identity facts such as names may persist broadly, but richer summaries, relationship state, open threads, and retrieval priority require higher cumulative significance.
+- Retrieval policy must keep NPC memory, world memory, player journal memory, and short-lived scene context separate enough that one pool cannot crowd out the others by default.
+- NPC memory changes should include fixtures proving both that meaningful returning NPCs are recognized from committed facts and that irrelevant prior chat does not flood the turn context.
+
+## Memory Storage Hierarchy Policy
+
+- Treat live prompt context as a small hot layer, not as the primary storage surface. Everything not needed for the current turn should stay in durable storage.
+- Default live context should be budgeted by bucket, with explicit slices for scene state, current goal, nearby world state, recalled quest or canon facts, NPC or relationship memory, and any approved recent-event window.
+- Raw history or transcript text must stay cold by default. If a turn needs transcript recovery, the retrieval mode, reason, and budget should be explicit and inspectable.
+- Run compression passes after scenes and larger recap merges after chapters or beats so hot memory sheds verbose dialogue quickly.
+- Version summary and recap artifacts so they can be recomputed later from canonical records when extraction or summarization logic changes.
+- Memory tooling must expose token accounting, prompt diffs, retrieval traces, and replay-oriented checks that explain what entered context and why.
+
+## AI Schema Governance Policy
+
+- Keep the model-facing turn schema compact and transport-oriented. Narrative, candidate actions, structured intents, and proposed deltas are preferred over scene-shaped contracts.
+- Do not encode gameplay rules, beat policy, quest semantics, or world-simulation logic into model schema shape when those concepts can live in validators, adjudication, reducers, or content specs.
+- Treat new model-facing fields as requiring a transport justification. If the reason for a field is really game design or engine behavior, the change belongs outside the schema.
+- Schema or prompt changes should include at least one deterministic check that rejects mixed-authority or over-modeled payloads before they reach authoritative mutation.
+
 ## AI Test-First Change Policy
 
 - Treat AI-related work as test-based by default, not as prompt tinkering followed by hope.
@@ -88,6 +134,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - The preferred loop is: define or tighten the expectation, run it to observe the current failure or gap, make the smallest implementation change, then re-run the focused check plus the relevant broader suite.
 - If fully automated verification is not yet possible, add the smallest deterministic fixture or scripted harness step that proves the contract and record the limitation in [BACKLOG.md](/g:/text-game/BACKLOG.md).
 - AI-related changes are not complete unless the changed behavior is covered by a test, fixture, or scripted harness path that another agent can re-run.
+- Authority-boundary changes are not complete unless the test, fixture, or harness path proves at least one rejected model proposal does not leak into committed state, replay data, or player-facing narrative.
 
 ## Telemetry Contract
 
@@ -105,6 +152,12 @@ Each `/api/turn` should record, at minimum:
 - state schema version
 - output schema version
 
+## Replay And Event Log Policy
+
+- Treat the event log as a canonical semantic record of committed gameplay outcomes, not as a transcript-only debug stream.
+- Player text and narrator prose may be stored for UX or debugging, but deterministic replay must depend on committed event semantics and authoritative transitions.
+- Event-log design changes should decide explicitly which fields are canonical for replay, which are diagnostics only, and which version or ruleset marker is required to interpret them safely.
+
 ## Operational Runbook Checklist
 
 The runbook may live in this file or a dedicated operations document later, but the following content is mandatory before Phase 4 closes:
@@ -115,6 +168,14 @@ The runbook may live in this file or a dedicated operations document later, but 
 - incident checklist for model failures and timeouts
 - release rollback notes for packaged builds
 
+## Issue Intake And Documentation Sync Policy
+
+- User-assigned future issues should be grounded against the current roadmap, backlog, dependencies, and open decisions before task authoring.
+- Default non-trivial issue capture to one parent backlog item plus explicit child tasks. Use a single standalone task only when the issue is clearly small enough not to need decomposition.
+- Future issues that are real but not implementation-ready must still be captured with explicit dependencies, `Blocked` status, queue placement, or an open decision instead of staying as undocumented notes.
+- Each child task must name concrete validation, even when the work is planning-only or documentation-only.
+- When an issue changes sequencing, user-visible scope, runtime boundaries, or delivery policy, sync the owning planning docs in the same session rather than treating `BACKLOG.md` as sufficient by itself.
+
 ## Documentation Ownership
 
 | Document | Owner Role | Update Trigger |
@@ -122,4 +183,5 @@ The runbook may live in this file or a dedicated operations document later, but 
 | [ROADMAP.md](/g:/text-game/ROADMAP.md) | Tech lead | Phase change, scope change, or milestone resequencing |
 | [BACKLOG.md](/g:/text-game/BACKLOG.md) | Current phase owner | Any status, dependency, or priority change |
 | [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md) | Product/UI lead | User-visible behavior or scope change |
+| [ARCHITECTURE.md](/g:/text-game/ARCHITECTURE.md) | Tech lead | Runtime boundary, module ownership, packaging-direction, or provider-boundary change |
 | [README.md](/g:/text-game/README.md) | Tech lead | Setup or environment change |

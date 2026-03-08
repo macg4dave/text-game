@@ -7,48 +7,20 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { config, formatConfigErrors, getSafeConfigDiagnostics } from "../core/config.js";
 import { initDb } from "../core/db.js";
 import { createLogger } from "../core/logging.js";
-import {
-  TURN_OUTPUT_SCHEMA_VERSION,
-  type Player,
-  type QuestSpec,
-  type RuntimePreflightIssue,
-  type RuntimePreflightReport,
-  type TurnOutputPayload
-} from "../core/types.js";
-import {
-  addEvent,
-  addMemories,
-  getOrCreatePlayer,
-  getRecentText,
-  getRelevantMemories,
-  getShortHistory,
-  updateDirectorState,
-  updatePlayerState,
-  updateSummary
-} from "../state/game.js";
+import { type QuestSpec, type RuntimePreflightIssue, type RuntimePreflightReport } from "../core/types.js";
+import { getOrCreatePlayer, getRecentText } from "../state/game.js";
 import { assistText } from "../utils/assist.js";
-import { applyDirectorRules, getCurrentBeat, loadDirectorSpec, reloadDirectorSpec } from "../story/director.js";
-import {
-  parseTurnInput,
-  validateSetupStatusResponse,
-  validateDirectorSpec,
-  validateQuestSpec,
-  validateStateResponse,
-  validateStateUpdates,
-  validateTurnResponse,
-  validateTurnOutput
-} from "../rules/validator.js";
+import { loadDirectorSpec, reloadDirectorSpec } from "../story/director.js";
+import { validateDirectorSpec, validateQuestSpec } from "../rules/validator.js";
 import { loadQuestSpec, reloadQuestSpec } from "../story/quest.js";
-import { generateTurn, getEmbedding, getEmbeddings } from "../ai/service.js";
 import { buildRuntimeDebug, buildSessionDebug, buildTurnDebug, type TurnDebugParams } from "./debug.js";
 import { buildStorageStartupIssue } from "./host-preflight.js";
-import { normalizeDirectorState } from "./player-state.js";
-import { SYSTEM_PROMPT } from "./prompt.js";
 import { createRuntimePreflightService } from "./runtime-preflight.js";
-import { sanitizeTurnResult } from "./turn-result.js";
 import { createGlobalProcessHandler } from "./global-handler.js";
-import { createAuthoritativePlayerState, createStateResponsePayload, createTurnResponsePayload } from "./http-contract.js";
-import { createSetupStatusPayload } from "./setup-status.js";
+import { getErrorMessage, readRequestIdHeader } from "./request-utils.js";
+import { createSetupStatusHandler } from "./setup-route.js";
+import { createStateHandler } from "./state-route.js";
+import { createTurnHandler } from "./turn-route.js";
 
 type ServerTurnDebugParams = Omit<TurnDebugParams, "config" | "runtimePreflight">;
 
@@ -90,87 +62,29 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 app.use(express.static(path.resolve(process.cwd(), "public")));
 
-app.get("/api/setup/status", async (req: Request, res: Response) => {
-  const refreshRequested = matchesRefreshRequest(readQueryValue(req.query.refresh));
-  let preflight = await runtimePreflight.ensureReport({
-    force: refreshRequested || !runtimePreflight.getCurrentReport().checked_at
-  });
+app.get(
+  "/api/setup/status",
+  createSetupStatusHandler({
+    config,
+    runtimePreflight,
+    ensureDatabaseReady,
+    hasStorageBlocker,
+    getRequestLogger
+  })
+);
 
-  if (!hasStorageBlocker(preflight)) {
-    const dbIssue = ensureDatabaseReady();
-    if (dbIssue) {
-      preflight = await runtimePreflight.ensureReport({ force: true });
-    }
-  }
-
-  const setupStatus = createSetupStatusPayload(config, preflight);
-  const validation = validateSetupStatusResponse(setupStatus);
-  if (!validation.ok) {
-    getRequestLogger(res).error("setup status request produced invalid response payload", {
-      validationErrors: validation.errors
-    });
-    return res.status(500).json({
-      error: "Invalid setup status response",
-      detail: validation.errors
-    });
-  }
-
-  return res.json(setupStatus);
-});
-
-app.get("/api/state", async (req: Request, res: Response) => {
-  let preflight = await runtimePreflight.ensureReport();
-  if (!hasStorageBlocker(preflight)) {
-    const dbIssue = ensureDatabaseReady();
-    if (dbIssue) {
-      preflight = await runtimePreflight.ensureReport({ force: true });
-    }
-  }
-
-  if (hasStorageBlocker(preflight)) {
-    return res.json({
-      player: null,
-      debug: {
-        runtime: buildRuntimeDebug(config, preflight),
-        session: null
-      }
-    });
-  }
-
-  const playerId = readQueryValue(req.query.playerId);
-  const name = readQueryValue(req.query.name);
-  const player = getOrCreatePlayer({ playerId, name });
-  const normalized = normalizeDirectorState(player, directorSpec);
-  if (normalized.changed) {
-    updateDirectorState(player.id, normalized.director);
-    player.director_state = normalized.director;
-  }
-
-  const authoritativePlayer = createAuthoritativePlayerState(player);
-  const stateResponse = createStateResponsePayload(authoritativePlayer);
-  const stateResponseValidation = validateStateResponse(stateResponse);
-  if (!stateResponseValidation.ok) {
-    getRequestLogger(res).error("state request produced invalid response payload", {
-      validationErrors: stateResponseValidation.errors
-    });
-    return res.status(500).json({
-      error: "Invalid state response",
-      detail: stateResponseValidation.errors,
-      debug: {
-        runtime: buildRuntimeDebugPayload(),
-        session: null
-      }
-    });
-  }
-
-  res.json({
-    ...stateResponse,
-    debug: {
-      runtime: buildRuntimeDebugPayload(),
-      session: buildSessionDebug(authoritativePlayer)
-    }
-  });
-});
+app.get(
+  "/api/state",
+  createStateHandler({
+    runtimePreflight,
+    ensureDatabaseReady,
+    hasStorageBlocker,
+    buildRuntimeDebug: buildRuntimeDebugPayload,
+    buildSessionDebug,
+    getRequestLogger,
+    getDirectorSpec: () => directorSpec
+  })
+);
 
 app.post("/api/assist", async (req: Request, res: Response) => {
   const dbIssue = ensureDatabaseReady();
@@ -242,344 +156,19 @@ app.post("/api/quests/reload", (_req: Request, res: Response) => {
   }
 });
 
-app.post("/api/turn", async (req: Request, res: Response) => {
-  const requestId = crypto.randomUUID();
-  const startedAt = Date.now();
-  let player: Player | null = null;
-  let refreshedPlayer: Player | null = null;
-  let input = "";
-  let shortHistory: string[] = [];
-  let memories: string[] = [];
-  let statePack: unknown = null;
-  let inputEmbedding: number[] = [];
-  let inputEmbeddingError: string | null = null;
-  let rawResult: unknown = null;
-  let result: TurnOutputPayload | null = null;
-  let updateValidation: { ok: boolean; errors: string[] } = { ok: true, errors: [] };
-  let memoryEmbeddings: number[][] = [];
-  let memoryEmbeddingError: string | null = null;
-
-  const requestLogger = getRequestLogger(res).child({ turnRequestId: requestId });
-  res.setHeader("x-request-id", requestId);
-
-  try {
-    const turnInput = parseTurnInput(req.body);
-    if (!turnInput.ok || !turnInput.value) {
-      requestLogger.warn("turn request rejected", { reason: "missing_input" });
-      return res.status(400).json({
-        error: "Invalid turn input",
-        detail: turnInput.errors,
-        debug: buildTurnDebugPayload({
-          requestId,
-          startedAt,
-          input,
-          player,
-          refreshedPlayer,
-          shortHistory,
-          memories,
-          statePack,
-          inputEmbedding,
-          inputEmbeddingError,
-          rawResult,
-          result,
-          updateValidation,
-          memoryEmbeddings,
-          memoryEmbeddingError
-        })
-      });
-    }
-    input = turnInput.value.input;
-
-    const preflight = await runtimePreflight.ensureReport();
-    if (!preflight.ok) {
-      requestLogger.warn("turn blocked by startup preflight", {
-        blockerCount: preflight.counts.blocker,
-        warningCount: preflight.counts.warning
-      });
-      return res.status(503).json({
-        error: "Setup required",
-        detail: preflight.issues.map((issue) => `${issue.title}: ${issue.message}`),
-        debug: buildTurnDebugPayload({
-          requestId,
-          startedAt,
-          input,
-          player,
-          refreshedPlayer,
-          shortHistory,
-          memories,
-          statePack,
-          inputEmbedding,
-          inputEmbeddingError,
-          rawResult,
-          result,
-          updateValidation,
-          memoryEmbeddings,
-          memoryEmbeddingError,
-          error: preflight.summary
-        })
-      });
-    }
-
-    const dbIssue = ensureDatabaseReady();
-    if (dbIssue) {
-      const refreshedPreflight = await runtimePreflight.ensureReport({ force: true });
-      requestLogger.warn("turn blocked by storage startup preflight", {
-        blockerCount: refreshedPreflight.counts.blocker,
-        warningCount: refreshedPreflight.counts.warning
-      });
-      return res.status(503).json({
-        error: "Setup required",
-        detail: refreshedPreflight.issues.map((issue) => `${issue.title}: ${issue.message}`),
-        debug: buildTurnDebugPayload({
-          requestId,
-          startedAt,
-          input,
-          player,
-          refreshedPlayer,
-          shortHistory,
-          memories,
-          statePack,
-          inputEmbedding,
-          inputEmbeddingError,
-          rawResult,
-          result,
-          updateValidation,
-          memoryEmbeddings,
-          memoryEmbeddingError,
-          error: refreshedPreflight.summary
-        })
-      });
-    }
-
-    player = getOrCreatePlayer({ playerId: turnInput.value.player_id, name: turnInput.value.player_name });
-    const normalized = normalizeDirectorState(player, directorSpec);
-    if (normalized.changed) {
-      updateDirectorState(player.id, normalized.director);
-      player.director_state = normalized.director;
-    }
-
-    addEvent(player.id, "player", input);
-
-    shortHistory = getShortHistory(player.id, 6);
-    try {
-      inputEmbedding = await getEmbedding({ model: embeddingModel, input });
-    } catch (error) {
-      inputEmbedding = [];
-      inputEmbeddingError = getErrorMessage(error);
-    }
-
-    memories = getRelevantMemories(player.id, inputEmbedding, 6);
-    statePack = {
-      player: {
-        id: player.id,
-        name: player.name,
-        location: player.location,
-        inventory: player.inventory,
-        flags: player.flags,
-        quests: player.quests
-      },
-      summary: player.summary,
-      director: player.director_state,
-      director_spec: {
-        end_goal: directorSpec.end_goal,
-        current_beat: getCurrentBeat(directorSpec, player.director_state),
-        rules: directorSpec.rules
-      },
-      quest_spec: questSpec
-    };
-
-    rawResult = await generateTurn({
-      model,
-      systemPrompt: SYSTEM_PROMPT,
-      statePack,
-      shortHistory,
-      memories,
-      input
-    });
-
-    result = {
-      schema_version: TURN_OUTPUT_SCHEMA_VERSION,
-      ...sanitizeTurnResult(rawResult, player)
-    };
-    const turnOutputValidation = validateTurnOutput(result);
-    if (!turnOutputValidation.ok) {
-      requestLogger.warn("turn rejected after output schema validation", {
-        validationErrors: turnOutputValidation.errors
-      });
-      return res.status(400).json({
-        error: "Invalid turn output",
-        detail: turnOutputValidation.errors,
-        debug: buildTurnDebugPayload({
-          requestId,
-          startedAt,
-          input,
-          player,
-          refreshedPlayer,
-          shortHistory,
-          memories,
-          statePack,
-          inputEmbedding,
-          inputEmbeddingError,
-          rawResult,
-          result,
-          updateValidation,
-          memoryEmbeddings,
-          memoryEmbeddingError
-        })
-      });
-    }
-
-    updateValidation = validateStateUpdates(result.state_updates);
-    if (!updateValidation.ok) {
-      requestLogger.warn("turn rejected after validation", {
-        validationErrors: updateValidation.errors
-      });
-      return res.status(400).json({
-        error: "Invalid state updates",
-        detail: updateValidation.errors,
-        debug: buildTurnDebugPayload({
-          requestId,
-          startedAt,
-          input,
-          player,
-          refreshedPlayer,
-          shortHistory,
-          memories,
-          statePack,
-          inputEmbedding,
-          inputEmbeddingError,
-          rawResult,
-          result,
-          updateValidation,
-          memoryEmbeddings,
-          memoryEmbeddingError
-        })
-      });
-    }
-
-    addEvent(player.id, "narrator", result.narrative);
-
-    updatePlayerState(player.id, result.state_updates);
-    const nextFlags = mergeList(player.flags, result.state_updates.flags_add, result.state_updates.flags_remove);
-    const directorState = applyDirectorRules({
-      spec: directorSpec,
-      directorState: player.director_state,
-      stateUpdates: result.state_updates,
-      flags: nextFlags
-    });
-    directorState.end_goal_progress = result.director_updates.end_goal_progress;
-    updateDirectorState(player.id, directorState);
-
-    if (result.memory_updates.length) {
-      try {
-        memoryEmbeddings = await getEmbeddings({
-          model: embeddingModel,
-          inputs: result.memory_updates
-        });
-      } catch (error) {
-        memoryEmbeddings = [];
-        memoryEmbeddingError = getErrorMessage(error);
-      }
-
-      addMemories(
-        player.id,
-        result.memory_updates.map((content, index) => ({
-          content,
-          embedding: memoryEmbeddings[index]
-        }))
-      );
-      updateSummary(player.id, result.memory_updates);
-    }
-
-    refreshedPlayer = getOrCreatePlayer({ playerId: player.id });
-    const authoritativePlayer = createAuthoritativePlayerState(refreshedPlayer);
-    if (!result) {
-      throw new Error("Validated turn result missing.");
-    }
-
-    const turnResponse = createTurnResponsePayload(result, authoritativePlayer);
-    const turnResponseValidation = validateTurnResponse(turnResponse);
-    if (!turnResponseValidation.ok) {
-      requestLogger.error("turn produced invalid response payload", {
-        validationErrors: turnResponseValidation.errors
-      });
-      return res.status(500).json({
-        error: "Invalid turn response",
-        detail: turnResponseValidation.errors,
-        debug: buildTurnDebugPayload({
-          requestId,
-          startedAt,
-          input,
-          player,
-          refreshedPlayer,
-          shortHistory,
-          memories,
-          statePack,
-          inputEmbedding,
-          inputEmbeddingError,
-          rawResult,
-          result,
-          updateValidation,
-          memoryEmbeddings,
-          memoryEmbeddingError
-        })
-      });
-    }
-
-    requestLogger.info("turn completed", {
-      durationMs: Date.now() - startedAt,
-      inputEmbeddingFallback: Boolean(inputEmbeddingError),
-      memoryEmbeddingFallback: Boolean(memoryEmbeddingError),
-      suggestedOptionCount: result.player_options.length,
-      memoryUpdateCount: result.memory_updates.length
-    });
-
-    return res.json({
-      ...turnResponse,
-      debug: buildTurnDebugPayload({
-        requestId,
-        startedAt,
-        input,
-        player,
-        refreshedPlayer,
-        shortHistory,
-        memories,
-        statePack,
-        inputEmbedding,
-        inputEmbeddingError,
-        rawResult,
-        result,
-        updateValidation,
-        memoryEmbeddings,
-        memoryEmbeddingError
-      })
-    });
-  } catch (error) {
-    requestLogger.error("turn failed", { error, durationMs: Date.now() - startedAt });
-    return res.status(500).json({
-      error: "Turn failed",
-      detail: getErrorMessage(error),
-      debug: buildTurnDebugPayload({
-        requestId,
-        startedAt,
-        input,
-        player,
-        refreshedPlayer,
-        shortHistory,
-        memories,
-        statePack,
-        inputEmbedding,
-        inputEmbeddingError,
-        rawResult,
-        result,
-        updateValidation,
-        memoryEmbeddings,
-        memoryEmbeddingError,
-        error: getErrorMessage(error)
-      })
-    });
-  }
-});
+app.post(
+  "/api/turn",
+  createTurnHandler({
+    runtimePreflight,
+    ensureDatabaseReady,
+    getRequestLogger,
+    buildTurnDebugPayload,
+    model,
+    embeddingModel,
+    getDirectorSpec: () => directorSpec,
+    getQuestSpec: () => questSpec
+  })
+);
 
 const server = http.createServer(app);
 createGlobalProcessHandler({
@@ -601,8 +190,8 @@ void runtimePreflight.ensureReport({ force: true }).catch((error) => {
   logger.warn("initial runtime preflight failed", { error });
 });
 
-function buildRuntimeDebugPayload() {
-  return buildRuntimeDebug(config, runtimePreflight.getCurrentReport());
+function buildRuntimeDebugPayload(preflight = runtimePreflight.getCurrentReport()) {
+  return buildRuntimeDebug(config, preflight);
 }
 
 function buildTurnDebugPayload(params: ServerTurnDebugParams) {
@@ -611,41 +200,6 @@ function buildTurnDebugPayload(params: ServerTurnDebugParams) {
     config,
     runtimePreflight: runtimePreflight.getCurrentReport()
   });
-}
-
-function mergeList(existing: string[], addList: string[] = [], removeList: string[] = []): string[] {
-  const set = new Set(existing);
-  addList.forEach((item) => set.add(item));
-  removeList.forEach((item) => set.delete(item));
-  return Array.from(set);
-}
-
-function readQueryValue(value: unknown): string | undefined {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return typeof value[0] === "string" ? value[0] : undefined;
-  }
-
-  return undefined;
-}
-
-function matchesRefreshRequest(value: string | undefined): boolean {
-  if (!value) {
-    return false;
-  }
-
-  return value === "1" || value.toLowerCase() === "true";
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
 }
 
 function logStartupConfigState() {
@@ -679,18 +233,6 @@ function logStartupConfigState() {
 
 function getRequestLogger(res: Response) {
   return (res.locals.requestLogger as ReturnType<typeof createLogger> | undefined) ?? logger;
-}
-
-function readRequestIdHeader(value: string | string[] | undefined): string | null {
-  if (typeof value === "string" && value.trim()) {
-    return value.trim();
-  }
-
-  if (Array.isArray(value) && typeof value[0] === "string" && value[0].trim()) {
-    return value[0].trim();
-  }
-
-  return null;
 }
 
 function ensureDatabaseReady(): RuntimePreflightIssue | null {

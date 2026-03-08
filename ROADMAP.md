@@ -29,6 +29,7 @@ The roadmap is successful if the project reaches all of the following:
 - The app performs startup checks for missing config, missing AI connectivity, and incompatible saves, then shows clear recovery steps.
 - A player can start a game, play multiple turns, save, load, and finish a guided story arc without using a terminal.
 - The game state can be replayed from the event log with deterministic results.
+- Deterministic replay means reconstructing final state from committed semantic events, not by re-querying models from historical prompts or prose.
 - AI output is validated before it affects authoritative state.
 - Content authors can change quests and director rules without code edits.
 - The same gameplay stack powers both the browser-based development loop and the packaged player build.
@@ -121,9 +122,12 @@ Entry gate:
 Exit gate:
 - The launcher or packaged shell reaches the first playable turn on the supported Windows target.
 - Turn input, turn output, and authoritative state schemas are versioned.
+- The model-facing turn schema stays compact and transport-oriented instead of becoming the game's hidden design language.
 - A new game can be created and played for at least 10 scripted turns in a row.
 - Every turn writes an event that can be replayed deterministically.
+- Every turn writes a committed semantic event record that is sufficient to reconstruct authoritative state without depending on exact narrator prose.
 - Invalid or unsafe model output is rejected before state mutation.
+- Model-authored consequences remain proposals until the server accepts them, and rejected proposals cannot appear as committed story truth in the player-facing turn result.
 - Basic onboarding, tutorial guidance, and first-run troubleshooting are present in the player flow.
 - Save and load are available from the main UI.
 - The default turn path uses LiteLLM without direct provider SDK usage outside the adapter boundary.
@@ -144,8 +148,13 @@ Entry gate:
 
 Exit gate:
 - Retrieval returns ranked memory summaries for each turn.
+- Memory classes and retrieval policy distinguish authority-relevant facts from flavor-only recollections before longer-session continuity is treated as stable.
+- NPC continuity uses significance-scored structured encounter facts and tiered long-lived memory instead of replaying raw dialogue history.
+- Live model context is assembled from budgeted memory buckets rather than from one expanding prompt, and raw history remains cold unless explicitly retrieved.
+- Scene- and chapter-level summary artifacts are versioned so recap logic can be recomputed from canonical records when needed.
 - Director rules are loaded from versioned specs and can be reloaded without app reinstall.
 - Director enforcement runs server-side before authoritative state is committed.
+- Director enforcement frames accepted outcomes after simulation resolution instead of acting as the primary plausibility gate for player actions.
 - The embedding route, chat route, and fallback behavior are covered by integration tests.
 - Delivery budgets are loaded from one server-side config source and exposed through an advanced runtime surface without file edits.
 - Token use for the baseline replay fixture stays within the documented budget.
@@ -214,12 +223,23 @@ Exit gate:
 - Save and load cannot be treated as stable until schema compatibility rules are documented and tested.
 - Packaging work must not force provider-specific gameplay logic into the app runtime.
 - Authoring tools cannot outrank core player launch friction while clean-machine playtesting is still failing.
+- Turn, replay, and save work must not treat raw model prose as authoritative world truth; the authority boundary must be locked before those later contracts solidify.
+- Replay, save, and fixture work must not rely on rerunning model generation from raw prompts or responses; semantic event design must be locked before the event log becomes a long-term contract.
+
+## Planning Intake Rules
+
+- When a future issue changes phase sequencing, exit gates, near-term priorities, risks, or open decisions, update this roadmap in the same session as the matching [BACKLOG.md](/g:/text-game/BACKLOG.md) parent issue and child tasks.
+- Capture implementation detail in the backlog, not here. This roadmap should record phase placement, rationale, risks, and milestone effects only.
+- Future-looking issues that are not yet startable should still be reflected through roadmap sequencing or risk notes when they materially affect delivery order.
 
 ## Now / Next / Later
 
 ### Now
 
 - Ship the versioned turn pipeline through the supported launched app.
+- Lock the proposal-only authority boundary before more turn, replay, and save work deepens the Phase 1 contract.
+- Lock a compact model schema boundary before turn validation and pipeline work harden a smart-scene contract into the engine surface.
+- Define the event log around committed semantic outcomes before `T09` and later save or replay fixtures harden transcript-only storage.
 - Make the first-run player path understandable without README reading by landing onboarding, setup, retry, and recovery flow work.
 - Add save and load to the main player flow so session continuity is part of the supported slice, not a later add-on.
 - Keep the supported Windows launcher and browser path aligned while Phase 1 replaces developer-facing gaps with player-facing guidance.
@@ -227,6 +247,11 @@ Exit gate:
 ### Next
 
 - Add memory retrieval and director control without increasing player-facing setup friction.
+- Separate freeform intent interpretation, simulation resolution, and pacing before later director-spec and quest-progression work hardens the wrong gameplay boundary.
+- Keep the turn-output schema compact so later validator, memory, and director work extends server-owned logic instead of growing model contract complexity.
+- Define memory classes and class-aware retrieval before Phase 2 memory work hardens one undifferentiated memory bucket.
+- Define NPC significance scoring, tier promotion, and partitioned recall before retrieval or summarization work hardens raw dialogue history into the memory design.
+- Define the memory storage hierarchy, per-bucket context budgets, and summary versioning before budget or telemetry work measures the wrong prompt shape.
 - Move delivery budgets from doc-only values into a shared server-side config contract and expose them through an advanced UI surface.
 - Add automatic local-model profile selection and setup guidance for common VRAM tiers.
 - Produce the first packaged Windows playtest build.
@@ -246,6 +271,13 @@ Exit gate:
 | The Docker-managed LiteLLM default may conflict with packaging assumptions or fail on machines without working Docker or NVIDIA passthrough support. | Release lead | Keep the MVP packaged contract explicit: Docker Desktop plus NVIDIA support are required for AI startup, and GPU prerequisite failures must fall back to plain-language guidance instead of silent startup hangs. | First clean-machine launcher or packaged test fails before LiteLLM becomes ready |
 | The GPU-backed launcher path may choose models that exceed VRAM or perform badly on common cards. | AI systems lead | Define a VRAM-tier profile matrix, add conservative defaults, and let users override the detected profile when needed. | First out-of-memory or unusably slow local-GPU smoke test on a supported tier |
 | Preflight may become either too strict for developers or too vague for end users. | Tech lead | Separate blocker versus warning policy from advanced diagnostics, keep the default surface plain-language, and validate manual overrides through the same contract. | First common setup issue requires support to explain hidden diagnostics or bypass checks manually |
+| Authority drift turns the model into a hidden game engine that invents world truth through prose or overreaching updates. | Gameplay systems lead | Lock a proposal-only model contract, adjudicate consequences server-side, and require drift fixtures where rejected proposals cannot leak into player-facing narrative or replay. | First turn where narrative, quest progress, or saved facts disagree with committed state |
+| The model schema grows into a hidden design language that encodes scene logic or pacing policy instead of staying a compact transport boundary. | AI systems lead | Keep the schema compact, require transport justification for new fields, and move richer game semantics into validators, adjudication, reducers, or content specs. | First schema change that adds scene-ontology fields or uses schema shape to represent gameplay rules |
+| Beat logic becomes a hidden railway that decides plausibility instead of pacing, making freeform play feel arbitrary. | Gameplay systems lead | Separate intent interpretation, simulation resolution, and pacing so beats frame accepted outcomes instead of blocking plausible actions. | First playtest where an off-path but sensible action is rejected or flattened because it does not match the current beat |
+| Event logging hardens around transcript text instead of committed semantics, making replay unstable across model or prompt changes. | Tech lead | Define canonical semantic event fields now, store committed transitions with version markers, and keep raw prose as supplementary debug data only. | First replay attempt depends on rerunning a model or differs after prompt or model changes |
+| Memory stays one undifferentiated fact bucket, causing flavor recollections to compete with canon or quest truth in retrieval. | AI systems lead | Add explicit memory classes, class-aware retrieval policy, and authority rules so narration support does not become a parallel truth system. | First turn where flavor memory changes or crowds out canon-sensitive behavior |
+| NPC continuity hardens around raw dialogue retention, causing storage bloat, weak canon, and poor recognition quality for returning characters. | AI systems lead | Use structured encounter facts, significance thresholds, importance tiers, and separate NPC versus world versus journal recall before scaling retrieval or summarization. | First memory design or fixture that relies on replaying old dialogue to make an NPC feel remembered |
+| Memory turns into one expanding prompt with no per-bucket accounting, causing context drift, weak explainability, and avoidable token growth. | AI systems lead | Define hot-versus-cold storage, per-bucket retrieval budgets, summary compression, and inspectable context tooling before budget and telemetry work harden the wrong prompt shape. | First turn where the team cannot explain what entered context or why a prompt grew sharply |
 | Packaged runtime and local server coordination cause fragile startup or antivirus friction. | Release lead | Decide the wrapper early, prototype startup behavior, log launch phases, and smoke-test on clean Windows machines. | First packaged build requires manual recovery beyond the documented flow |
 | Save locations and schema migration rules confuse players in packaged builds. | Tech lead | Lock save-path conventions early, expose save slots in the UI, and require migration coverage before broader playtests. | First unreadable save or misplaced save report |
 | Structured output through LiteLLM is less reliable than expected for the chosen upstream models. | AI systems lead | Maintain strict validation, fixture-based replay tests, and a fallback response path before state mutation. | First failed replay caused by model variance |
@@ -261,6 +293,13 @@ Exit gate:
 | LiteLLM-managed gateway runs as a repo-managed Docker sidecar by default, with the GPU-backed Ollama path as the normal launcher contract and manual larger-model overrides still available behind the same boundary | Locked | AI systems lead | Keeps the player-facing setup centered on one provider-neutral gateway, removes manual proxy startup from the default path, and still allows hosted and local upstreams behind the same boundary. | End of Phase 2 |
 | MVP packaged AI startup still depends on Docker Desktop and the repo-managed LiteLLM sidecar rather than bundling the gateway into Electron | Locked | Release lead | Avoids splitting AI-runtime ownership across two packaging strategies during Phase 0 and lets the launcher, setup flow, and packaged shell share one gateway contract and recovery language. | Start of T36 |
 | Provider-neutral internal adapter boundary | Locked | Tech lead | Prevents provider-specific logic from leaking across the app. | End of Phase 1 |
+| Model is a narrator plus proposal engine only; the server adjudicates which consequences become truth and player-facing narrative must align to committed state | Locked | Gameplay systems lead | Prevents authority drift, keeps replay and save contracts deterministic, and stops prose from becoming an unreviewed state-mutation path. | End of Phase 1 |
+| Model-facing turn schema stays compact and transport-oriented rather than becoming the game's design language | Locked | AI systems lead | Keeps validation and schema evolution manageable while preserving server ownership of simulation, pacing, and quest semantics. | Start of T10 |
+| Turn handling separates freeform intent interpretation, world simulation resolution, and story pacing or framing | Locked | Gameplay systems lead | Preserves player agency while keeping authored beats useful as pacing tools instead of hidden refusal logic. | Start of T16 |
+| Event log canon is committed semantic outcome data, while prompts and prose are supplemental diagnostics or presentation artifacts | Locked | Tech lead | Keeps replay stable across model or prompt changes and makes state transitions, not transcript text, the durable record. | Start of T09 |
+| Memory is classed and narration-supporting, with authority-sensitive retrieval rules and no independent truth power | Locked | AI systems lead | Prevents flavor recall from becoming a hidden authority channel and keeps canon, quest, and relationship memory usable without flattening all recall into one bucket. | Start of T13 |
+| NPC memory is significance-scored, tiered, and fact-based, while transcript retention remains replay or debug data only | Locked | AI systems lead | Keeps long-session continuity sparse, deterministic, and believable without turning chat history into the canonical memory store. | Start of T14 |
+| Memory is a storage hierarchy with budgeted hot context, versioned summaries, and cold history outside the default prompt | Locked | AI systems lead | Keeps token usage, retrieval quality, and context explainability under control while preserving recomputation from canonical records. | Start of T43 |
 | Server-side director enforcement is authoritative | Locked | Gameplay systems lead | Keeps story control and state integrity outside the client. | After first external playtest |
 | Windows is the primary supported end-user platform for MVP | Locked | Release lead | Reduces packaging surface area so launch quality can be solved properly before expanding platform support. | After first external playtest |
 
