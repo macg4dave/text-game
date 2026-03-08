@@ -18,6 +18,7 @@ export const TURN_INPUT_SCHEMA_VERSION = "turn-input/v1";
 export const TURN_OUTPUT_SCHEMA_VERSION = "turn-output/v1";
 export const AUTHORITATIVE_STATE_SCHEMA_VERSION = "authoritative-state/v1";
 export const COMMITTED_EVENT_SCHEMA_VERSION = "committed-event/v1";
+export const DEFAULT_RULESET_VERSION = "story-rules/v1";
 
 export interface TurnInputPayload {
   schema_version: typeof TURN_INPUT_SCHEMA_VERSION;
@@ -368,6 +369,15 @@ export interface PlayerRow {
 export interface EventRow {
   role: string;
   content: string;
+}
+
+export interface CommittedEventRow {
+  id: string;
+  player_id: string;
+  schema_version: string;
+  event_kind: string;
+  payload: string;
+  created_at: string;
 }
 
 export interface MemoryRow {

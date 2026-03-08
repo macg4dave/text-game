@@ -68,6 +68,7 @@ What each command does:
 - `npm run dev` rebuilds the browser asset once, then starts the TypeScript server directly through `tsx`
 - `npm start` runs the compiled server from `dist/server.js`
 - `npm test` runs type-checking first, then executes the TypeScript tests directly
+- `npx tsx scripts/replay-fixture.ts` runs the canonical committed-event replay fixture and prints the reconstructed final player state
 
 Current limitation of the browser asset path:
 
@@ -642,6 +643,12 @@ Use a test-first loop as the default workflow for prompt, schema, adapter, retri
 6. Only move on to broader app testing after the type-check, focused check, and harness all pass.
 
 If `npm` is available on your machine, the same check is exposed as `npm run test:local-ai`.
+
+For canonical replay-contract checks, run:
+
+```powershell
+docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts
+```
 
 ## Assist Endpoint
 

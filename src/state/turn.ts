@@ -1,7 +1,9 @@
 import { SYSTEM_PROMPT } from "../ai/prompt.js";
 import { generateTurn, getEmbedding, getEmbeddings } from "../ai/service.js";
 import {
+  DEFAULT_RULESET_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
+  type CanonicalTurnEventPayload,
   type DirectorSpec,
   type Player,
   type QuestSpec,
@@ -9,6 +11,7 @@ import {
   type ValidationResult
 } from "../core/types.js";
 import {
+  addCommittedTurnEvent,
   addEvent,
   addMemories,
   getOrCreatePlayer,
@@ -18,6 +21,11 @@ import {
   updatePlayerState,
   updateSummary
 } from "./game.js";
+import {
+  createCommittedTurnEventPayload,
+  summarizeAcceptedTurnOutcome,
+  summarizeRejectedTurnOutcome
+} from "./committed-event.js";
 import { sanitizeTurnResult } from "./turn-result.js";
 import { applyDirectorRules, getCurrentBeat } from "../story/director.js";
 import { validateStateUpdates, validateTurnOutput } from "../rules/validator.js";
@@ -26,6 +34,7 @@ export interface TurnExecutionTrace {
   input: string;
   player: Player | null;
   refreshedPlayer: Player | null;
+  committedEvent: CanonicalTurnEventPayload | null;
   shortHistory: string[];
   memories: string[];
   statePack: unknown;
@@ -72,6 +81,7 @@ export interface TurnService {
 }
 
 export interface TurnServiceDependencies {
+  addCommittedTurnEvent: typeof addCommittedTurnEvent;
   addEvent: typeof addEvent;
   addMemories: typeof addMemories;
   applyDirectorRules: typeof applyDirectorRules;
@@ -94,6 +104,7 @@ export function createTurnExecutionTrace(input = ""): TurnExecutionTrace {
     input,
     player: null,
     refreshedPlayer: null,
+    committedEvent: null,
     shortHistory: [],
     memories: [],
     statePack: null,
@@ -109,6 +120,7 @@ export function createTurnExecutionTrace(input = ""): TurnExecutionTrace {
 
 export function createTurnService(overrides: Partial<TurnServiceDependencies> = {}): TurnService {
   const deps: TurnServiceDependencies = {
+    addCommittedTurnEvent,
     addEvent,
     addMemories,
     applyDirectorRules,
@@ -170,6 +182,35 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
 
         const turnOutputValidation = deps.validateTurnOutput(trace.result);
         if (!turnOutputValidation.ok) {
+          trace.committedEvent = createCommittedTurnEventPayload({
+            playerId: player.id,
+            input,
+            outcome: {
+              status: "rejected",
+              summary: summarizeRejectedTurnOutcome("turn_output_validation"),
+              rejection_reason: "turn_output_validation"
+            },
+            committed: {
+              state_updates: null,
+              director_updates: null,
+              memory_updates: []
+            },
+            rulesetVersion: DEFAULT_RULESET_VERSION,
+            supplemental: {
+              transcript: {
+                player_text: input,
+                narrator_text: null
+              },
+              presentation: {
+                narrative: null,
+                player_options: []
+              },
+              prompt: {
+                model
+              }
+            }
+          });
+          deps.addCommittedTurnEvent(trace.committedEvent);
           return {
             ok: false,
             statusCode: 400,
@@ -182,6 +223,35 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
 
         trace.updateValidation = deps.validateStateUpdates(trace.result.state_updates);
         if (!trace.updateValidation.ok) {
+          trace.committedEvent = createCommittedTurnEventPayload({
+            playerId: player.id,
+            input,
+            outcome: {
+              status: "rejected",
+              summary: summarizeRejectedTurnOutcome("state_update_validation"),
+              rejection_reason: "state_update_validation"
+            },
+            committed: {
+              state_updates: null,
+              director_updates: null,
+              memory_updates: []
+            },
+            rulesetVersion: DEFAULT_RULESET_VERSION,
+            supplemental: {
+              transcript: {
+                player_text: input,
+                narrator_text: null
+              },
+              presentation: {
+                narrative: trace.result.narrative,
+                player_options: trace.result.player_options
+              },
+              prompt: {
+                model
+              }
+            }
+          });
+          deps.addCommittedTurnEvent(trace.committedEvent);
           return {
             ok: false,
             statusCode: 400,
@@ -225,6 +295,36 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           );
           deps.updateSummary(player.id, trace.result.memory_updates);
         }
+
+        trace.committedEvent = createCommittedTurnEventPayload({
+          playerId: player.id,
+          input,
+          outcome: {
+            status: "accepted",
+            summary: summarizeAcceptedTurnOutcome(trace.result),
+            rejection_reason: null
+          },
+          committed: {
+            state_updates: trace.result.state_updates,
+            director_updates: trace.result.director_updates,
+            memory_updates: trace.result.memory_updates
+          },
+          rulesetVersion: DEFAULT_RULESET_VERSION,
+          supplemental: {
+            transcript: {
+              player_text: input,
+              narrator_text: trace.result.narrative
+            },
+            presentation: {
+              narrative: trace.result.narrative,
+              player_options: trace.result.player_options
+            },
+            prompt: {
+              model
+            }
+          }
+        });
+        deps.addCommittedTurnEvent(trace.committedEvent);
 
         trace.refreshedPlayer = deps.getOrCreatePlayer({ playerId: player.id });
 

@@ -65,6 +65,25 @@ const MIGRATIONS: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_memories_player_id ON memories(player_id);
       `);
     }
+  },
+  {
+    id: "003_committed_event_log",
+    description: "add committed event log table for canonical replay records",
+    apply(database) {
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS committed_events (
+          id TEXT PRIMARY KEY,
+          player_id TEXT NOT NULL,
+          schema_version TEXT NOT NULL,
+          event_kind TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY(player_id) REFERENCES players(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_committed_events_player_id ON committed_events(player_id, created_at);
+      `);
+    }
   }
 ];
 

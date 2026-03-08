@@ -54,6 +54,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Unit tests for reducers, validators, ranking, and other pure functions
 - Integration tests for the turn pipeline using fixtures
 - Golden replay tests for deterministic scripted runs
+- Replay-affecting persistence work should include a rerunnable local fixture path such as `npx tsx scripts/replay-fixture.ts`, not only ad hoc inspection.
 - Replay tests must prove the final state can be reconstructed from committed event semantics even if raw model prose changes or is unavailable.
 - Fuzz tests for validator and sanitizer inputs
 - CI execution on every push by Phase 4

@@ -197,7 +197,7 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Ready | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
 | T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Ready | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Ready | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Ready | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
+| T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Done | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T58b | Later | P2 | P1 | Simulation-first consequence resolution | Ready | T58a, T57b, T07, T08 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T58c | Later | P2 | P1 | Director framing and beat pacing policy | Ready | T16, T58b | Schema validation check + integration test + replay fixture execution |
 | T51 | Next | P1 | P1 | Database storage and migration boundary split | Ready | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
@@ -960,7 +960,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T59b - Committed Outcome Event Persistence And Replay Fixture
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -1001,6 +1001,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - this task is where the repo should stop treating `events(role, content)` as enough for deterministic replay
   - if a compatibility bridge is needed for older transcript-only rows, document it clearly rather than implying those rows are already replay-safe
   - keep replay fixture output centered on final authoritative state and committed transitions, not on exact text matching
+  - completed on 2026-03-08 by adding migration `003_committed_event_log` in `src/core/db.ts`, dedicated committed-event persistence helpers in `src/state/game.ts`, and replay reconstruction helpers in `src/state/replay.ts`
+  - accepted and rejected canonical `committed-event/v1` records are now written from `src/state/turn.ts`, while transcript history stays in the legacy `events` table for short-history and UI use
+  - deterministic replay coverage now includes `src/state/replay.test.ts`, and the local replay fixture path is `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts`
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts`, and `docker compose run --rm --no-deps app npm test`
+  - current replay reconstruction starts from an initial player snapshot and applies committed event deltas; if later save or migration work needs replay-from-empty-state, add an explicit player-creation canonical event rather than overloading transcript rows
 
 ### T60 - Memory Classes And Authority Policy
 

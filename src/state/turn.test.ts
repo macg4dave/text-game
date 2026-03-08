@@ -87,6 +87,7 @@ test("system prompt frames model-emitted consequences as proposals instead of co
 
 test("turn service executes the gameplay pipeline outside the server layer", async () => {
   const events: Array<{ playerId: string; role: string; content: string }> = [];
+  const committedEvents: string[] = [];
   const memoriesAdded: Array<{ playerId: string; content: string; embedding?: number[] }> = [];
   const updatedDirectorStates: string[] = [];
   const summaryUpdates: string[][] = [];
@@ -102,6 +103,9 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
   };
 
   const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      committedEvents.push(event.outcome.status);
+    },
     addEvent(playerId, role, content) {
       events.push({ playerId, role, content });
     },
@@ -209,6 +213,7 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
   );
   assert.deepEqual(summaryUpdates, [["The signal lantern hummed when touched."]]);
   assert.equal(updatedDirectorStates.length, 1);
+  assert.deepEqual(committedEvents, ["accepted"]);
   assert.deepEqual(memoriesAdded, [
     {
       playerId: player.id,
@@ -220,7 +225,11 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
 
 test("turn service returns a 400 outcome when turn output validation fails", async () => {
   const player = createPlayer();
+  const committedEvents: string[] = [];
   const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      committedEvents.push(event.outcome.status);
+    },
     addEvent() {},
     addMemories() {},
     applyDirectorRules({ directorState }) {
@@ -303,6 +312,7 @@ test("turn service returns a 400 outcome when turn output validation fails", asy
   assert.deepEqual(outcome.trace.memories, []);
   assert.deepEqual(outcome.trace.inputEmbedding, []);
   assert.deepEqual(outcome.trace.updateValidation, { ok: true, errors: [] });
+  assert.deepEqual(committedEvents, ["rejected"]);
   assert.equal(
     (outcome.trace.result as { schema_version?: string } | null)?.schema_version,
     TURN_OUTPUT_SCHEMA_VERSION
@@ -320,8 +330,13 @@ test("turn service commits only server-accepted state changes before storing nar
   };
   const callOrder: string[] = [];
   let committedUpdates: StateUpdates | null = null;
+  const committedEventStatuses: string[] = [];
 
   const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      callOrder.push("committedEvent");
+      committedEventStatuses.push(event.outcome.status);
+    },
     addEvent(_playerId, role) {
       callOrder.push(`event:${role}`);
     },
@@ -420,12 +435,14 @@ test("turn service commits only server-accepted state changes before storing nar
     ]
   });
   assert.deepEqual(outcome.turnOutput.state_updates, committedUpdates);
-  assert.deepEqual(callOrder, ["event:player", "event:narrator", "updatePlayerState", "updateDirectorState"]);
+  assert.deepEqual(callOrder, ["event:player", "event:narrator", "updatePlayerState", "updateDirectorState", "committedEvent"]);
+  assert.deepEqual(committedEventStatuses, ["accepted"]);
 });
 
 test("turn output can be translated into a canonical replay event without treating narrative as canonical state", async () => {
   const player = createPlayer();
   const service = createTurnService({
+    addCommittedTurnEvent() {},
     addEvent() {},
     addMemories() {},
     applyDirectorRules({ directorState }) {

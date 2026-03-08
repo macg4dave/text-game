@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import { getDb } from "../core/db.js";
 import { getInitialDirectorState, loadDirectorSpec } from "../story/director.js";
 import type {
+  CanonicalTurnEventPayload,
+  CommittedEventRow,
   DirectorState,
   EventRow,
   MemoryInsert,
@@ -83,6 +85,31 @@ export function addEvent(playerId: string, role: string, content: string): void 
     content,
     new Date().toISOString()
   );
+}
+
+export function addCommittedTurnEvent(payload: CanonicalTurnEventPayload): void {
+  const db = getDb();
+  db.prepare(
+    "INSERT INTO committed_events (id, player_id, schema_version, event_kind, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(
+    payload.event_id,
+    payload.player_id,
+    payload.schema_version,
+    payload.event_kind,
+    JSON.stringify(payload),
+    payload.occurred_at
+  );
+}
+
+export function getCommittedTurnEvents(playerId: string): CanonicalTurnEventPayload[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT id, player_id, schema_version, event_kind, payload, created_at FROM committed_events WHERE player_id = ? ORDER BY created_at ASC")
+    .all(playerId) as CommittedEventRow[];
+
+  return rows
+    .map((row) => safeJsonParse<CanonicalTurnEventPayload | null>(row.payload, null))
+    .filter((row): row is CanonicalTurnEventPayload => row !== null);
 }
 
 export function addMemories(playerId: string, memoryList: MemoryInsert[]): void {
