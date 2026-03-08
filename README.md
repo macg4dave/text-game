@@ -307,6 +307,7 @@ Script organization is now split between small entry scripts and shared helpers:
 
 - `scripts/start-dev.ps1` - launcher orchestration
 - `scripts/test-local-ai-workflow.ps1` - local AI contract harness
+- `scripts/test-setup-browser-smoke.ps1` - targeted launch-screen setup smoke harness for blocked and recovered browser states
 - `scripts/start-desktop-prototype.ps1` - Electron prototype wrapper
 - `scripts/lib/shared.ps1` - shared PowerShell helpers for dotenv parsing, config lookup, URI handling, and HTTP readiness checks
 - `scripts/lib/shared.ps1` now also owns the shared AI config-resolution logic used by both the launcher and the local AI harness
@@ -465,6 +466,7 @@ The browser UI includes:
 - a first-screen onboarding panel with `Start New Game` and `Resume Last Game` actions instead of auto-starting a session on page load
 - one short turn-loop explainer on the launch screen so players can begin without opening project docs
 - a first-run setup wizard on the launch screen with a retryable connection test for the supported Docker Desktop plus LiteLLM plus GPU-backed Ollama path
+- guided setup recovery cards that can retry checks, copy the supported launcher command, and expose smaller-profile or GPU repair checklists without clearing saves
 - a text log for player and narrator turns
 - player naming plus a multiline turn input with local assist chips
 - a startup setup panel that uses one shared preflight contract with `blocker`, `warning`, and `info` issues before the first turn
@@ -476,7 +478,32 @@ For a Windows-only local model setup, use [setup_local_a.i.md](/g:/text-game/set
 
 For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`.
 
+For the launch-screen setup smoke harness, run `powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1`.
+
 For local GPU matrix consistency checks, run `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1`.
+
+## Setup Browser Smoke Harness
+
+The launch-screen setup wizard now has one lightweight, repeatable smoke path for blocked and recovered browser states.
+
+Run it with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1
+```
+
+What it verifies:
+
+- `Start New Game` and `Resume Last Game` stay disabled while setup is blocked
+- the same launch surface re-enables both actions after a successful retry result
+- a saved browser session id remains available across the blocked-to-ready retry path
+- the setup wizard can keep richer recovery cards and advanced diagnostics in the same flow without breaking the blocked-to-ready path
+- the browser bundle still compiles after the targeted smoke tests pass
+
+Current approach:
+
+- the smoke path stays intentionally lightweight by exercising the browser launch-panel and setup-view helpers through focused TypeScript tests rather than a full end-to-end browser framework
+- the wrapper script runs inside the normal Docker-backed validation path so later agents can repeat the same check before changing setup UX
 
 ## Key Files
 

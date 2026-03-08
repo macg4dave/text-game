@@ -1,3 +1,4 @@
+import { getSafeConfigDiagnostics } from "../core/config.js";
 import type { AppConfig, RuntimePreflightReport, SetupStatusPayload } from "../core/types.js";
 
 const SUPPORTED_MVP_PATH = {
@@ -29,6 +30,8 @@ export function createSetupStatusPayload(config: AppConfig, preflight: RuntimePr
         launcher: SUPPORTED_MVP_PATH.launcher,
         services: [...SUPPORTED_MVP_PATH.services]
       },
+      config_diagnostics: getSafeConfigDiagnostics(config),
+      local_gpu: config.runtime.local_gpu,
       preflight
     }
   };

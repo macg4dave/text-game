@@ -162,6 +162,8 @@ export interface SetupStatus {
   can_retry: boolean;
   current_profile: SetupCurrentProfile;
   supported_path: SetupSupportedPath;
+  config_diagnostics?: unknown;
+  local_gpu?: PublicRuntimeLocalGpuSelection | null;
   preflight: RuntimePreflightReport;
 }
 

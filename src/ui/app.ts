@@ -16,15 +16,21 @@ import {
 import { getElement } from "./dom.js";
 import { renderDebugPanels as renderDebugView } from "./debug-view.js";
 import { fetchJson, formatErrorMessage } from "./http-client.js";
+import { renderLaunchPanel as renderLaunchView } from "./launch-view.js";
 import { getStoredPlayerName, rememberPlayerName as persistPlayerName } from "./player-name.js";
 import {
-  formatLocalGpuSummary,
   getRuntimeConfigDiagnostics as selectRuntimeConfigDiagnostics,
   getRuntimeLocalGpuSelection as selectRuntimeLocalGpuSelection,
   getRuntimePreflight as selectRuntimePreflight,
   getRuntimeProfile as selectRuntimeProfile
 } from "./session-data.js";
 import { renderPreflightPanel as renderPreflightView, renderSetupWizard as renderSetupView } from "./setup-view.js";
+import {
+  appendLogEntry,
+  renderAssistChips,
+  renderSessionSummary as renderTurnSurfaceSummary,
+  renderTurnOptions
+} from "./turn-surface.js";
 
 let activeFatalUiError: FatalUiErrorState | null = null;
 
@@ -75,6 +81,9 @@ function initializeApp(): void {
   const setupLauncherEl = getElement<HTMLElement>("setup-launcher");
   const setupServicesEl = getElement<HTMLElement>("setup-services");
   const setupGuidanceEl = getElement<HTMLElement>("setup-guidance");
+  const setupActionsEl = getElement<HTMLElement>("setup-actions");
+  const setupAdvancedEl = getElement<HTMLDetailsElement>("setup-advanced");
+  const setupAdvancedJsonEl = getElement<HTMLElement>("setup-advanced-json");
 
   const state: {
     playerId: string;
@@ -113,19 +122,7 @@ function initializeApp(): void {
   setPending(false);
 
   function addEntry(label: string, text: string, tone = "neutral"): void {
-    const entry = document.createElement("article");
-    entry.className = `entry ${tone}`;
-
-    const title = document.createElement("strong");
-    title.textContent = label;
-
-    const body = document.createElement("div");
-    body.textContent = text;
-
-    entry.appendChild(title);
-    entry.appendChild(body);
-    logEl.appendChild(entry);
-    logEl.scrollTop = logEl.scrollHeight;
+    appendLogEntry(logEl, { label, text, tone });
   }
 
   function setStatus(text: string, tone = "idle"): void {
@@ -158,21 +155,21 @@ function initializeApp(): void {
   }
 
   function renderLaunchPanel(): void {
-    const fatalBlocked = Boolean(state.fatalError || activeFatalUiError);
-    const resumeAvailable = hasSavedSession();
-    const setupReady = isSetupReady();
-    const setupKnown = Boolean(state.setupStatus);
-
-    launchPanelEl.hidden = state.hasEnteredFlow || fatalBlocked;
-    launchNewGameButtonEl.disabled = state.pending || fatalBlocked || !setupKnown || !setupReady;
-    launchResumeButtonEl.disabled = state.pending || fatalBlocked || !setupKnown || !setupReady || !resumeAvailable;
-    launchResumeNoteEl.textContent = !setupKnown
-      ? "Finish the setup check before starting."
-      : !setupReady
-        ? "Fix the setup items below, then run the connection test again."
-        : resumeAvailable
-          ? "Resume uses the last game saved in this browser."
-          : "No saved game is stored in this browser yet. Start a new game to begin.";
+    renderLaunchView(
+      {
+        launchPanelEl,
+        launchNewGameButtonEl,
+        launchResumeButtonEl,
+        launchResumeNoteEl
+      },
+      {
+        hasEnteredFlow: state.hasEnteredFlow,
+        pending: state.pending,
+        fatalBlocked: Boolean(state.fatalError || activeFatalUiError),
+        hasSavedSession: hasSavedSession(),
+        setupStatus: state.setupStatus
+      }
+    );
   }
 
   function renderSetupWizard(): void {
@@ -186,7 +183,10 @@ function initializeApp(): void {
         setupSupportedSummaryEl,
         setupLauncherEl,
         setupServicesEl,
-        setupGuidanceEl
+        setupGuidanceEl,
+        setupActionsEl,
+        setupAdvancedEl,
+        setupAdvancedJsonEl
       },
       {
         setupStatus: state.setupStatus,
@@ -209,21 +209,16 @@ function initializeApp(): void {
   }
 
   function setOptions(options: string[] = []): void {
-    optionsEl.innerHTML = "";
-
-    options.forEach((option) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = option;
-      button.disabled = state.pending || Boolean(state.fatalError || activeFatalUiError);
-      button.addEventListener("click", () => {
+    renderTurnOptions(optionsEl, {
+      options,
+      disabled: state.pending || Boolean(state.fatalError || activeFatalUiError),
+      onSelect(option) {
         inputEl.value = option;
         inputEl.focus();
         requestAssist().catch(() => {
           setAssist([], []);
         });
-      });
-      optionsEl.appendChild(button);
+      }
     });
   }
 
@@ -231,60 +226,22 @@ function initializeApp(): void {
     corrections: Array<{ token: string; suggestions: string[] }> = [],
     completions: string[] = []
   ): void {
-    assistEl.innerHTML = "";
-
-    if (!corrections.length && !completions.length) {
-      const placeholder = document.createElement("span");
-      placeholder.className = "assist-placeholder";
-      placeholder.textContent = "Local assist suggestions appear here.";
-      assistEl.appendChild(placeholder);
-      return;
-    }
-
-    if (corrections.length) {
-      const label = document.createElement("span");
-      label.className = "label";
-      label.textContent = "Spelling";
-      assistEl.appendChild(label);
-
-      corrections.forEach((item) => {
-        const suggestion = item.suggestions[0];
-        if (!suggestion) return;
-
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "chip";
-        chip.textContent = `${item.token} -> ${suggestion}`;
-        chip.addEventListener("click", () => {
-          replaceToken(item.token, suggestion);
+    renderAssistChips(assistEl, {
+      corrections,
+      completions,
+      onCorrectionSelect(token, suggestion) {
+          replaceToken(token, suggestion);
           requestAssist().catch(() => {
             setAssist([], []);
           });
-        });
-        assistEl.appendChild(chip);
-      });
-    }
-
-    if (completions.length) {
-      const label = document.createElement("span");
-      label.className = "label";
-      label.textContent = "Complete";
-      assistEl.appendChild(label);
-
-      completions.forEach((word) => {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "chip";
-        chip.textContent = word;
-        chip.addEventListener("click", () => {
+      },
+      onCompletionSelect(word) {
           applyCompletion(word);
           requestAssist().catch(() => {
             setAssist([], []);
           });
-        });
-        assistEl.appendChild(chip);
-      });
-    }
+      }
+    });
   }
 
   function rememberPlayerName(): void {
@@ -347,49 +304,25 @@ function initializeApp(): void {
   }
 
   function renderSessionSummary(): void {
-    const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
-    const session = state.sessionDebug?.session || state.lastTurnDebug?.session;
-    const preflight = getRuntimePreflight();
-    const profile = getRuntimeProfile();
-    const localGpu = getRuntimeLocalGpuSelection();
-    const diagnostics = getRuntimeConfigDiagnostics();
-    const setupProfile = state.setupStatus?.current_profile;
-    const beat = state.player?.director_state?.current_beat_label;
-
-    const runtimeParts: string[] = [];
-    if (runtime && typeof runtime.provider === "string") runtimeParts.push(runtime.provider);
-    if (runtime && typeof runtime.chat_model === "string") runtimeParts.push(runtime.chat_model);
-    if (!runtime && setupProfile?.provider) runtimeParts.push(setupProfile.provider);
-    if (!runtime && setupProfile?.chat_model) runtimeParts.push(setupProfile.chat_model);
-    if (localGpu?.profile_label) runtimeParts.push(localGpu.profile_label);
-    if (preflight?.status === "action-required") runtimeParts.push("setup required");
-    if (preflight?.status === "checking") runtimeParts.push("checking AI");
-    if (session && typeof session.player_id === "string") runtimeParts.push(`player ${session.player_id.slice(0, 8)}`);
-    runtimeSummaryEl.textContent = runtimeParts.length
-      ? runtimeParts.join(" / ")
-      : hasSavedSession()
-        ? "Saved game ready to resume"
-        : "Choose a start option";
-    const overrideCount = diagnostics?.profile_overrides?.length || 0;
-    const localGpuSummary = formatLocalGpuSummary(localGpu);
-    profileSummaryEl.textContent = profile
-      ? `${profile.label || profile.id || "Setup profile"}${overrideCount ? ` | ${overrideCount} override${overrideCount === 1 ? "" : "s"}` : ""}${localGpuSummary ? ` | ${localGpuSummary}` : ""}`
-      : setupProfile
-        ? `${setupProfile.label || setupProfile.id || "Setup profile"}${localGpuSummary ? ` | ${localGpuSummary}` : ""}`
-        : localGpuSummary || (state.hasEnteredFlow ? "Setup profile loading..." : "No session loaded yet.");
-
-    if (!state.player) {
-      sessionSummaryEl.textContent = state.hasEnteredFlow
-        ? "Waiting for the opening scene."
-        : hasSavedSession()
-          ? "Resume the last game saved in this browser or start over with a new run."
-          : "Choose a name and start when you're ready.";
-      return;
-    }
-
-    const details = [`${state.player.name} in ${state.player.location}`];
-    if (beat) details.push(`beat: ${beat}`);
-    sessionSummaryEl.textContent = details.join(" | ");
+    renderTurnSurfaceSummary(
+      {
+        runtimeSummaryEl,
+        sessionSummaryEl,
+        profileSummaryEl
+      },
+      {
+        player: state.player,
+        sessionDebug: state.sessionDebug,
+        lastTurnDebug: state.lastTurnDebug,
+        setupStatus: state.setupStatus,
+        profile: getRuntimeProfile(),
+        localGpu: getRuntimeLocalGpuSelection(),
+        diagnostics: getRuntimeConfigDiagnostics(),
+        preflight: getRuntimePreflight(),
+        hasEnteredFlow: state.hasEnteredFlow,
+        hasSavedSession: hasSavedSession()
+      }
+    );
   }
 
   function updateSessionData(data: StateApiResponse): void {
@@ -702,25 +635,28 @@ function initializeApp(): void {
   nameEl.addEventListener("change", rememberPlayerName);
   nameEl.addEventListener("blur", rememberPlayerName);
 
-  setupCheckButtonEl.addEventListener("click", async () => {
-    if (state.fatalError || activeFatalUiError) return;
+  setupActionsEl.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLButtonElement)) return;
 
-    try {
-      setPending(true);
-      setStatus("Checking AI setup", "working");
-      await loadSetupStatus({ force: true });
-      if (isSetupReady()) {
-        setStatus("Setup ready", "ok");
-      } else {
-        setStatus("Setup required", "error");
-      }
-    } catch (error) {
-      state.setupError = error instanceof Error ? error.message : "Setup check failed.";
-      renderSetupWizard();
-      setStatus("Setup check failed", "error");
-    } finally {
-      setPending(false);
-    }
+    const actionId = target.dataset.recoveryAction;
+    if (!actionId) return;
+
+    void runRecoveryAction(actionId);
+  });
+
+  preflightIssuesEl.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLButtonElement)) return;
+
+    const actionId = target.dataset.recoveryAction;
+    if (!actionId) return;
+
+    void runRecoveryAction(actionId);
+  });
+
+  setupCheckButtonEl.addEventListener("click", async () => {
+    await runSetupCheck();
   });
 
   launchNewGameButtonEl.addEventListener("click", () => {
@@ -794,6 +730,95 @@ function initializeApp(): void {
   bootstrap().catch((error) => {
     handleFatalError(createFatalUiErrorState(error));
   });
+
+  async function runSetupCheck(): Promise<void> {
+    if (state.fatalError || activeFatalUiError) return;
+
+    try {
+      setPending(true);
+      setStatus("Checking AI setup", "working");
+      await loadSetupStatus({ force: true });
+      if (isSetupReady()) {
+        setStatus("Setup ready", "ok");
+      } else {
+        setStatus("Setup required", "error");
+      }
+    } catch (error) {
+      state.setupError = error instanceof Error ? error.message : "Setup check failed.";
+      renderSetupWizard();
+      setStatus("Setup check failed", "error");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function runRecoveryAction(actionId: string): Promise<void> {
+    switch (actionId) {
+      case "retry-setup-check": {
+        await runSetupCheck();
+        return;
+      }
+      case "copy-launcher-command": {
+        const launcher = state.setupStatus?.supported_path?.launcher;
+        if (!launcher) {
+          setStatus("Launcher command unavailable", "error");
+          return;
+        }
+        await copyRecoveryText(launcher, "Launcher command copied");
+        return;
+      }
+      case "copy-smaller-profile-guidance": {
+        const guidance = [
+          "Use the conservative supported profile for the next launcher run:",
+          "AI_PROFILE=local-gpu-small",
+          "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -Rebuild"
+        ].join("\n");
+        await copyRecoveryText(guidance, "Smaller-profile guidance copied");
+        return;
+      }
+      case "copy-gpu-repair-checklist": {
+        const checklist = [
+          "GPU-backed repair checklist:",
+          "1. Start Docker Desktop and wait for the Linux engine.",
+          "2. Confirm nvidia-smi works in PowerShell.",
+          "3. Re-run the supported launcher path.",
+          "4. Retry the setup check without clearing the saved browser session.",
+          state.setupStatus?.supported_path?.launcher || "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1"
+        ].join("\n");
+        await copyRecoveryText(checklist, "GPU repair checklist copied");
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  async function copyRecoveryText(text: string, successStatus: string): Promise<void> {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        copyTextWithFallback(text);
+      }
+      addEntry("System", successStatus, "system");
+      setStatus(successStatus, "ok");
+    } catch {
+      setStatus("Copy failed", "error");
+      addEntry("System", "Copy failed. Open the advanced setup details and copy the text manually.", "system");
+    }
+  }
+
+  function copyTextWithFallback(text: string): void {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "true");
+    textarea.style.position = "absolute";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  }
 }
 
 function renderAppFatalError(state: FatalUiErrorState): void {

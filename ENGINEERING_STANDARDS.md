@@ -60,6 +60,20 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Entry scripts should orchestrate shared helpers rather than redefine them.
 - Cross-script concerns such as dotenv loading, config precedence, Docker invocation, readiness polling, and common error formatting should have one shared implementation whenever practical.
 - Script output should stay easy to debug: prefer consistent step logging, clear failure messages, and one canonical place to change shared behavior.
+- Treat mixed orchestration and implementation as a design defect. If an entry script starts owning reusable retry policy, environment resolution, port probing, readiness logic, or other shared behavior, move that logic into `scripts/lib/`.
+
+## Responsibility Boundary Policy
+
+- Design around responsibilities, not file length. Split when a file begins owning multiple layers or subordinate concerns, not only after it becomes large.
+- Keep one layer per file: orchestration, domain logic, UI rendering, and transport or setup logic should not accumulate in the same module.
+- Treat a new subordinate responsibility as an extraction trigger. If a file starts handling a distinct sub-problem with its own inputs, outputs, branching, or tests, give that behavior its own module.
+- Treat reusable decision-making as an extraction trigger. If logic would be useful to another route, screen, script, or test, it should not stay inline in the current file by default.
+- Composition roots must stay thin. `src/server/`, `src/ui/app.ts`, and entry scripts may assemble modules, but they should not become the home for feature behavior.
+- UI modules should not own both page flow and distinct subview behavior. Extract panels, dialogs, setup steps, and turn surfaces once they become separate concerns.
+- Server modules should not own gameplay, AI, validation, or state decisions that can live outside request parsing and HTTP shaping.
+- Keep data shaping separate from presentation, and keep validation separate from authoritative mutation when both concerns appear in the same file.
+- Do not let helper or utility files become catch-all buckets for unrelated logic from multiple domains.
+- Review touched files with the sentence test: if the file's responsibility cannot be described in one sentence without the word `and`, split or extract before continuing.
 
 ## AI Test-First Change Policy
 

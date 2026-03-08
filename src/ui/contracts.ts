@@ -1,4 +1,9 @@
-import type { SetupStatus as SharedSetupStatus, SetupStatusPayload as SharedSetupStatusPayload } from "../core/types.js";
+import type {
+  RuntimePreflightIssue as SharedRuntimePreflightIssue,
+  RuntimePreflightReport as SharedRuntimePreflightPayload,
+  SetupStatus as SharedSetupStatus,
+  SetupStatusPayload as SharedSetupStatusPayload
+} from "../core/types.js";
 
 export interface PlayerState {
   id: string;
@@ -15,28 +20,9 @@ export interface SessionDebugPayload {
   session?: Record<string, unknown> | null;
 }
 
-export interface RuntimePreflightIssue {
-  severity?: string;
-  title?: string;
-  message?: string;
-  recovery?: string[];
-  recommended_fix?: string | null;
-  env_vars?: string[];
-  details?: Record<string, unknown> | null;
-}
+export type RuntimePreflightIssue = SharedRuntimePreflightIssue;
 
-export interface RuntimePreflightPayload {
-  ok?: boolean;
-  status?: string;
-  summary?: string;
-  issues?: RuntimePreflightIssue[];
-  checked_at?: string | null;
-  counts?: {
-    blocker?: number;
-    warning?: number;
-    info?: number;
-  };
-}
+export type RuntimePreflightPayload = SharedRuntimePreflightPayload;
 
 export interface RuntimeConfigProfile {
   id?: string;

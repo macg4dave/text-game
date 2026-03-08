@@ -27,6 +27,8 @@ test("createSetupStatusPayload returns a validated supported-path setup envelope
   assert.equal(payload.setup.current_profile.id, "local-gpu-small");
   assert.equal(payload.setup.current_profile.provider, "litellm");
   assert.equal(payload.setup.supported_path.provider, "LiteLLM");
+  assert.equal((payload.setup.config_diagnostics as { profile?: { value?: string } } | undefined)?.profile?.value, "local-gpu-small");
+  assert.equal(payload.setup.local_gpu, null);
   assert.match(payload.setup.supported_path.summary, /docker/i);
   assert.deepEqual(validateSetupStatusResponse(payload), { ok: true, errors: [] });
 });

@@ -35,6 +35,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - The first-run setup flow must provide a safe connection test for the supported Docker-backed LiteLLM path before the first turn.
 - The default launcher path must use the GPU-backed Docker Ollama service and support VRAM-tier-based model recommendations or manual tier selection when detection is unavailable.
 - Recovery actions should let users retry setup and switch supported profiles without deleting saves or reopening a terminal for normal fixes.
+- The setup wizard must surface copyable recovery actions for the supported launcher path, smaller-profile guidance, and GPU repair checklists when those actions are relevant.
 - Local assist endpoint for spellcheck + autocomplete, with small helper tasks intended to prefer hosted providers through the default gateway path.
 - Delivery budgets for latency, token usage, cost, and storage must come from a config file with sane defaults and be adjustable through the web UI.
 

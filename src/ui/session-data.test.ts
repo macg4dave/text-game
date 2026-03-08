@@ -8,10 +8,21 @@ import {
   getRuntimeProfile
 } from "./session-data.js";
 
+function createPreflight(status: "ready" | "action-required" | "checking", summary: string) {
+  return {
+    ok: status === "ready",
+    status,
+    summary,
+    issues: [],
+    counts: { blocker: status === "action-required" ? 1 : 0, warning: 0, info: 0 },
+    checked_at: "2026-03-08T00:00:00.000Z"
+  };
+}
+
 test("getRuntimePreflight prefers newer runtime debug data over the bootstrap setup snapshot", () => {
   const preflight = getRuntimePreflight(
-    { preflight: { status: "action-required", summary: "Blocked" } },
-    { runtime: { preflight: { status: "ready" } } },
+    { preflight: createPreflight("action-required", "Blocked") } as never,
+    { runtime: { preflight: createPreflight("ready", "Ready") } },
     null
   );
 
@@ -19,7 +30,7 @@ test("getRuntimePreflight prefers newer runtime debug data over the bootstrap se
 });
 
 test("getRuntimePreflight falls back to setup preflight when runtime debug data is absent", () => {
-  const preflight = getRuntimePreflight({ preflight: { status: "action-required", summary: "Blocked" } }, null, null);
+  const preflight = getRuntimePreflight({ preflight: createPreflight("action-required", "Blocked") } as never, null, null);
 
   assert.equal(preflight?.status, "action-required");
   assert.equal(preflight?.summary, "Blocked");
@@ -28,7 +39,7 @@ test("getRuntimePreflight falls back to setup preflight when runtime debug data 
 test("runtime selectors read values from session debug when setup data is absent", () => {
   const sessionDebug = {
     runtime: {
-      preflight: { status: "checking" },
+      preflight: createPreflight("checking", "Checking AI"),
       config_diagnostics: { profile_overrides: [{ field: "chat_model" }] },
       profile: { label: "Local GPU Small" },
       local_gpu: { requested: true, profile_label: "8 GB tier", detected_vram_gb: 8 }

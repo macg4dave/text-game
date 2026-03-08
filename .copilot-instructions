@@ -61,13 +61,22 @@ Before making substantial changes, read:
 ## Module Boundary Rules
 
 - Organize new code by ownership domain first, not by convenience. Prefer adding to `src/core`, `src/state`, `src/story`, `src/rules`, `src/ai`, `src/utils`, `src/server`, or `src/ui` based on who owns the behavior.
+- Keep one layer per file. A file may orchestrate, implement domain logic, render UI, or perform transport or setup work, but it should not own multiple layers at once.
 - Keep `src/core/` limited to shared primitives and infrastructure such as config, DB access, shared types, and cross-cutting contracts. Do not move gameplay, HTTP, or provider-specific branching into `core` just because many files can import it.
 - Treat `src/server/` as the composition root. It should wire routes, translate HTTP payloads, and coordinate modules. If logic can run without Express, it likely does not belong in `src/server/`.
 - Keep `src/state/`, `src/story/`, `src/rules/`, `src/ai/`, and `src/utils/` independent from `src/server/` and `src/ui/`. These modules should not import from the server or browser layer.
 - Keep `src/ui/` limited to browser behavior and API consumption. Do not import server, DB, or gameplay implementation modules into the UI layer.
 - Prefer one-way dependency flow: `core` -> feature modules -> `server` or `ui`. Avoid circular dependencies and avoid peer modules reaching upward into entrypoint code.
 - Add a new module when work introduces a new responsibility, a different dependency set, or would otherwise enlarge an existing file that is already hard to scan. Do not keep extending `index.ts` or another large file as a default.
-- Treat very large files as refactor targets before adding more behavior. As a rule of thumb, once a file is already a few hundred lines and mixes unrelated concerns, split it first or in the same change.
+- Treat subordinate responsibilities as split triggers. If a file starts handling a distinct sub-problem with its own inputs, outputs, branching, or tests, extract it into its own module.
+- Treat reusable decision-making as a split trigger. If logic could be reused by another route, screen, script, or test, it does not belong inline in the current file.
+- Do not let wiring code own domain rules. If `src/server/` starts deciding gameplay, AI, validation, or state behavior, move that logic into the owning non-server module.
+- Keep data shaping separate from presentation. If a file both derives or maps data and renders or presents it, move one of those responsibilities into a focused module.
+- Do not let helper files become buckets. If a helper starts collecting unrelated logic from multiple domains, move the logic into feature-owned modules instead of growing the helper.
+- Keep composition roots thin. `src/server/`, `src/ui/app.ts`, and entry scripts may assemble modules, but they should not become the place where feature behavior lives.
+- Prefer feature-local modules over generic ones. If a new behavior clearly belongs to one feature, place it next to that feature rather than in a central file that already has broad access.
+- Review responsibility boundaries, not file length. Extraction decisions should be based on mixed concerns, reuse potential, and layer violations rather than line-count thresholds.
+- Use the sentence test during review: if a file's responsibility cannot be described in one sentence without the word `and`, split it.
 - Keep feature-local types near the owning module. Only move a type into `src/core/types.ts` when it is shared across multiple modules or defines a cross-boundary contract.
 - Put new tests beside the owning module when practical, using `*.test.ts` in the same feature folder.
 - Edit browser source in `src/ui/app.ts`; do not add logic to `public/app.js`, and do not treat `public/app.ts` as an active authoring surface.
@@ -80,6 +89,17 @@ Before making substantial changes, read:
 - Prefer one canonical helper function for each cross-script concern so debugging happens in one place.
 - When changing shared script behavior, update the helper first and then keep the entry script focused on intent, sequencing, and user-facing messages.
 - Favor structured, plain-language failure output that helps both end users and developers isolate the failing layer quickly.
+- Treat mixed orchestration and implementation as a split trigger. If a script does more than parse inputs, call shared helpers, wait for readiness, and report status, move the reusable logic into `scripts/lib/`.
+- If a script owns retry policy, environment resolution, port probing, or readiness behavior that another script could reuse, move that behavior into `scripts/lib/` instead of keeping it inline.
+
+## Responsibility Heuristics
+
+- If a UI module controls page flow and also renders a distinct panel, dialog, setup step, or turn surface, extract that subview into its own module.
+- If a UI module both handles DOM events and contains non-trivial formatting, mapping, or state-derivation rules, move those rules into a focused feature-local helper or view module.
+- If a server route both parses requests and decides gameplay or AI behavior, move the behavior into a non-server module.
+- If a module both validates external input and mutates authoritative state, keep validation separate from mutation.
+- If a file starts accumulating sections such as `setup`, `render`, `helpers`, `state`, and `transport` together, treat that as a sign that it owns too many responsibilities.
+- If a change feels easiest only because one file already has access to everything, treat that as a signal to extract rather than a reason to keep adding code there.
 
 ## File Responsibilities
 

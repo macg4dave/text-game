@@ -114,10 +114,10 @@ Use this exact shape when adding new work:
 | T11 | Next | P1 | P1 | Minimal player UI loop | Done | T06 | `docker compose run --rm --no-deps app npm test` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + manual browser smoke test |
 | T11a | Now | P1 | P2 | Browser UI module decomposition groundwork | Done | T11, T12b | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/global-error.test.ts src/ui/http-client.test.ts src/ui/player-name.test.ts src/ui/session-data.test.ts src/ui/setup-view.test.ts src/ui/debug-view.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
 | T12 | Next | P1 | P1 | New game onboarding | Review | T06 | Manual new-game flow check |
-| T12b | Next | P1 | P1 | First-run setup wizard and connection test | Review | T02f, T11, T12 | Manual first-run flow check |
-| T11b | Next | P1 | P2 | Turn surface renderer extraction | Ready | T11a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
-| T12d | Next | P1 | P2 | First-run setup browser smoke harness | Ready | T12b | Browser setup smoke path |
-| T12c | Next | P1 | P1 | Guided recovery actions and advanced setup details | Ready | T12b, T01c, T02i, T04a, T02j | Manual recovery flow check |
+| T12b | Next | P1 | P1 | First-run setup wizard and connection test | Done | T02f, T11, T12 | Manual first-run flow check |
+| T11b | Next | P1 | P2 | Turn surface renderer extraction | Done | T11a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
+| T12d | Next | P1 | P2 | First-run setup browser smoke harness | Done | T12b | Browser setup smoke path |
+| T12c | Next | P1 | P1 | Guided recovery actions and advanced setup details | Done | T12b, T01c, T02i, T04a, T02j | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/setup-status.test.ts src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
 | T29 | Next | P1 | P1 | Save slots UI | Ready | T08, T09 | Manual save/load check |
 | T34 | Next | P1 | P1 | Tutorial and first-run guidance | Ready | T11, T12 | Manual onboarding smoke test |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
@@ -464,7 +464,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T11b - Turn Surface Renderer Extraction
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -498,6 +498,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - this task is intentionally the next narrow slice after `T11a`; do not mix it with setup-flow or save-slot behavior work
   - prefer pure renderer helpers or view-model builders over stateful mini-controllers in this phase
+  - completed on 2026-03-08 by adding `src/ui/turn-surface.ts` and `src/ui/turn-surface.test.ts`, extracting log entry rendering, suggestion option rendering, assist chip rendering, and session-summary text generation out of `src/ui/app.ts` while leaving async flow control in the composition root
+  - `src/ui/app.ts` now delegates turn-surface DOM work to the new helper module, and the UI-side setup or preflight contract types were realigned to the shared `src/core/types.ts` definitions to remove duplicate drift in `src/ui/contracts.ts`
+  - focused test coverage now includes the new turn-surface helper plus updated shared-type fixtures in `src/ui/debug-view.test.ts`, `src/ui/session-data.test.ts`, and `src/ui/setup-view.test.ts`
+  - validation on 2026-03-08 passed with `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts`, and `docker compose run --rm --no-deps app npm run build:client`
 
 ### T12 - New Game Onboarding
 
@@ -539,7 +543,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T12b - First-Run Setup Wizard And Connection Test
 
-- Status: Review
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -591,15 +595,15 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - validation on 2026-03-08 passed with `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/setup-status.test.ts src/server/runtime-preflight.test.ts`, `docker compose run --rm --no-deps app npm run build:client`, and `docker compose run --rm --no-deps app npm test`
   - manual reachable-path smoke on 2026-03-08 used `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` plus `GET /api/setup/status` and confirmed a `ready` setup payload for the supported Docker Desktop plus LiteLLM plus GPU-backed Ollama path
   - manual unreachable-path smoke on 2026-03-08 used a detached `docker compose run --service-ports --no-deps` app container with `AI_PROFILE=custom` and `LITELLM_PROXY_URL=http://host.docker.internal:59999`; querying `/api/setup/status` inside that container returned `action-required` with the expected `ai_endpoint_unreachable` blocker
-  - leave this task in `Review` until a quick interactive browser smoke confirms the rendered launch screen shows the setup wizard, disables start while blocked, and allows retry to recover without clearing the saved browser session
-  - a follow-up harness task is tracked as `T12d` so this review item can close against a repeatable browser check instead of relying on memory
+  - closed on 2026-03-08 after `T12d` added the repeatable launch-screen setup smoke harness in `scripts/test-setup-browser-smoke.ps1`, which verifies the blocked-state launch gating, retry recovery, and saved browser session preservation path without relying on an ad hoc manual read-through
+  - fresh closeout validation on 2026-03-08 passed with `docker compose build app`, `docker compose run --rm --no-deps app npm test`, and `powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1`
   - the user confirmed on 2026-03-08 that setup and diagnostics should stay UI-first for now
   - the user confirmed on 2026-03-08 that LiteLLM is the default AI control plane the setup flow should steer toward
   - treat the repo-managed Docker LiteLLM sidecar as the default recovery path, with GPU-backed local inference explained as an explicit opt-in
 
 ### T12d - First-Run Setup Browser Smoke Harness
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -631,10 +635,15 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - keep this as a smoke path, not a full end-to-end framework migration
   - prefer reusing the existing Docker or launcher setup contracts rather than inventing a UI-only fake backend unless deterministic blocking states require one
+  - completed on 2026-03-08 by adding `src/ui/launch-view.ts`, `src/ui/launch-view.test.ts`, and `src/ui/setup-browser-smoke.test.ts`, giving the launch-screen setup gating logic a shared helper plus a focused blocked-to-ready smoke path
+  - `src/ui/app.ts` now delegates launch-panel gating to `src/ui/launch-view.ts`, so later setup UX changes can reuse the same view-model logic instead of duplicating it in tests
+  - added `scripts/test-setup-browser-smoke.ps1` as the repeatable wrapper command; it rebuilds the app image, runs `npm run type-check`, executes the targeted setup smoke tests, and rebuilds the browser bundle to confirm the current UI still compiles
+  - `README.md` now documents the smoke harness command and what it verifies: blocked launch gating, retry recovery, saved browser session preservation, and bundle rebuild safety
+  - validation on 2026-03-08 passed with `powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1`
 
 ### T12c - Guided Recovery Actions And Advanced Setup Details
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -650,10 +659,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - REQUIREMENTS.md
   - README.md
   - public/index.html
-  - public/app.ts
   - public/styles.css
-  - src/server.ts
-  - src/config.ts
+  - src/ui/app.ts
+  - src/ui/setup-view.ts
+  - src/ui/setup-view.test.ts
+  - src/core/types.ts
+  - src/server/setup-status.ts
 - Do Not Touch:
   - data/spec/
 - Dependencies:
@@ -673,6 +684,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - avoid turning the first-run screen into a wall of diagnostics
   - auto-fix actions should stay reversible and conservative
+  - completed on 2026-03-08 by extending `/api/setup/status` with advanced config and local-GPU details, then teaching `src/ui/setup-view.ts` to render richer issue cards plus copyable recovery actions for retry, launcher restart guidance, smaller-profile guidance, and GPU repair checklists
+  - `public/index.html` and `public/styles.css` now include a dedicated setup-actions area plus an expandable advanced-setup details surface so end-user recovery copy and developer diagnostics stay separated
+  - `src/ui/app.ts` now handles setup recovery buttons through shared browser-side copy helpers, keeping the saved browser session intact while retrying setup checks
+  - validation on 2026-03-08 passed with `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/server/setup-status.test.ts src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts`, `docker compose run --rm --no-deps app npm run build:client`, and `docker compose run --rm --no-deps app npm test`
 
 ### T29 - Save Slots UI
 

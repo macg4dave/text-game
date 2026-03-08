@@ -18,6 +18,9 @@ export interface SetupWizardElements {
   setupLauncherEl: HTMLElement;
   setupServicesEl: HTMLElement;
   setupGuidanceEl: HTMLElement;
+  setupActionsEl: HTMLElement;
+  setupAdvancedEl: HTMLDetailsElement;
+  setupAdvancedJsonEl: HTMLElement;
 }
 
 export interface PreflightPanelElements {
@@ -47,6 +50,20 @@ export interface SetupWizardViewModel {
   launcher: string;
   services: string[];
   guidance: string[];
+  actions: SetupRecoveryActionViewModel[];
+  advancedJson: string | null;
+}
+
+export type SetupRecoveryActionId =
+  | "retry-setup-check"
+  | "copy-launcher-command"
+  | "copy-smaller-profile-guidance"
+  | "copy-gpu-repair-checklist";
+
+export interface SetupRecoveryActionViewModel {
+  id: SetupRecoveryActionId;
+  label: string;
+  description: string;
 }
 
 export interface PreflightPanelRenderState {
@@ -60,6 +77,12 @@ export interface PreflightPanelRenderState {
 export interface PreflightIssueViewModel {
   text: string;
   advancedIssue: Record<string, unknown> | null;
+  severity: string | null;
+  title: string;
+  message: string;
+  recommendedFix: string | null;
+  advancedJson: string | null;
+  actions: SetupRecoveryActionViewModel[];
 }
 
 export interface PreflightPanelViewModel {
@@ -77,6 +100,14 @@ const DEFAULT_SUPPORTED_SUMMARY =
 const DEFAULT_LAUNCHER = "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1";
 const DEFAULT_SERVICES = ["Docker Desktop", "LiteLLM sidecar", "GPU-backed Ollama service"];
 
+interface RecoveryActionContext {
+  canRetry: boolean;
+  launcher: string | null;
+  currentProfileId: string | null;
+  localGpuRequested: boolean;
+  hasProfileOverrides: boolean;
+}
+
 export function createSetupWizardViewModel(state: SetupWizardRenderState): SetupWizardViewModel {
   const setup = state.setupStatus;
   const preflight = setup?.preflight;
@@ -84,6 +115,7 @@ export function createSetupWizardViewModel(state: SetupWizardRenderState): Setup
   const supportedPath = setup?.supported_path;
   const issues = preflight?.issues || [];
   const guidance: string[] = [];
+  const recoveryContext = createRecoveryActionContext(setup);
 
   if (state.setupError) {
     guidance.push(
@@ -99,7 +131,9 @@ export function createSetupWizardViewModel(state: SetupWizardRenderState): Setup
       supportedSummary: supportedPath?.summary || DEFAULT_SUPPORTED_SUMMARY,
       launcher: supportedPath?.launcher || DEFAULT_LAUNCHER,
       services: supportedPath?.services || DEFAULT_SERVICES,
-      guidance
+      guidance,
+      actions: buildRecoveryActions([], recoveryContext),
+      advancedJson: null
     };
   }
 
@@ -115,7 +149,15 @@ export function createSetupWizardViewModel(state: SetupWizardRenderState): Setup
       supportedSummary: DEFAULT_SUPPORTED_SUMMARY,
       launcher: DEFAULT_LAUNCHER,
       services: DEFAULT_SERVICES,
-      guidance
+      guidance,
+      actions: buildRecoveryActions([], {
+        canRetry: true,
+        launcher: DEFAULT_LAUNCHER,
+        currentProfileId: null,
+        localGpuRequested: false,
+        hasProfileOverrides: false
+      }),
+      advancedJson: null
     };
   }
 
@@ -148,7 +190,30 @@ export function createSetupWizardViewModel(state: SetupWizardRenderState): Setup
     supportedSummary: supportedPath?.summary || DEFAULT_SUPPORTED_SUMMARY,
     launcher: supportedPath?.launcher || DEFAULT_LAUNCHER,
     services: supportedPath?.services || DEFAULT_SERVICES,
-    guidance
+    guidance,
+    actions: buildRecoveryActions(issues, recoveryContext),
+    advancedJson: JSON.stringify(
+      {
+        status: setup.status,
+        summary: setup.summary,
+        checked_at: setup.checked_at,
+        current_profile: setup.current_profile,
+        supported_path: setup.supported_path,
+        config_diagnostics: setup.config_diagnostics || null,
+        local_gpu: setup.local_gpu || null,
+        issues: issues.map((issue) => ({
+          code: issue.code,
+          severity: issue.severity,
+          area: issue.area,
+          title: issue.title,
+          message: issue.message,
+          env_vars: issue.env_vars,
+          details: issue.details || null
+        }))
+      },
+      null,
+      2
+    )
   };
 }
 
@@ -176,6 +241,34 @@ export function renderSetupWizard(elements: SetupWizardElements, state: SetupWiz
     item.textContent = guidance;
     elements.setupGuidanceEl.appendChild(item);
   });
+
+  elements.setupActionsEl.innerHTML = "";
+  elements.setupActionsEl.hidden = viewModel.actions.length === 0;
+  viewModel.actions.forEach((action) => {
+    const card = document.createElement("div");
+    card.className = "setup-action";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary";
+    button.dataset.recoveryAction = action.id;
+    button.textContent = action.label;
+
+    const description = document.createElement("p");
+    description.textContent = action.description;
+
+    card.appendChild(button);
+    card.appendChild(description);
+    elements.setupActionsEl.appendChild(card);
+  });
+
+  elements.setupAdvancedEl.hidden = !viewModel.advancedJson;
+  if (!viewModel.advancedJson) {
+    elements.setupAdvancedEl.open = false;
+    elements.setupAdvancedJsonEl.textContent = "";
+  } else {
+    elements.setupAdvancedJsonEl.textContent = viewModel.advancedJson;
+  }
 }
 
 export function createPreflightPanelViewModel(state: PreflightPanelRenderState): PreflightPanelViewModel {
@@ -196,9 +289,15 @@ export function createPreflightPanelViewModel(state: PreflightPanelRenderState):
   const overrideCount = state.diagnostics?.profile_overrides?.length || 0;
   const localGpuSummary = formatLocalGpuSummary(state.localGpu);
   const issueItems = (preflight.issues || []).map(createPreflightIssueViewModel);
-  const advancedIssues = issueItems
-    .map((item) => item.advancedIssue)
-    .filter((issue): issue is Record<string, unknown> => Boolean(issue));
+  const advancedIssues = (preflight.issues || []).map((issue) => ({
+    code: issue.code,
+    severity: issue.severity,
+    area: issue.area,
+    title: issue.title,
+    message: issue.message,
+    env_vars: issue.env_vars,
+    details: issue.details || null
+  }));
 
   return {
     hidden: false,
@@ -213,6 +312,12 @@ export function createPreflightPanelViewModel(state: PreflightPanelRenderState):
           {
             status: preflight.status || null,
             summary: preflight.summary || null,
+            profile: {
+              label: profileLabel,
+              overrides: state.diagnostics?.profile_overrides || [],
+              local_gpu: state.localGpu || null
+            },
+            diagnostics: state.diagnostics || null,
             issues: advancedIssues
           },
           null,
@@ -243,7 +348,71 @@ export function renderPreflightPanel(elements: PreflightPanelElements, state: Pr
   elements.preflightIssuesEl.innerHTML = "";
   viewModel.issueItems.forEach((issue) => {
     const item = document.createElement("li");
-    item.textContent = issue.text;
+    item.className = "preflight-issue";
+
+    const header = document.createElement("div");
+    header.className = "preflight-issue-header";
+
+    const badge = document.createElement("span");
+    badge.className = "preflight-badge";
+    if (issue.severity) {
+      badge.dataset.severity = issue.severity;
+      badge.textContent = issue.severity;
+    }
+
+    const title = document.createElement("strong");
+    title.textContent = issue.title;
+
+    header.appendChild(badge);
+    header.appendChild(title);
+    item.appendChild(header);
+
+    const copy = document.createElement("p");
+    copy.className = "preflight-issue-copy";
+    copy.textContent = issue.message;
+    item.appendChild(copy);
+
+    if (issue.recommendedFix) {
+      const fix = document.createElement("p");
+      fix.className = "preflight-issue-fix";
+      fix.textContent = `Recommended next step: ${issue.recommendedFix}`;
+      item.appendChild(fix);
+    }
+
+    if (issue.actions.length) {
+      const actions = document.createElement("div");
+      actions.className = "preflight-issue-actions";
+      issue.actions.forEach((action) => {
+        const card = document.createElement("div");
+        card.className = "setup-action";
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary";
+        button.dataset.recoveryAction = action.id;
+        button.textContent = action.label;
+
+        const description = document.createElement("p");
+        description.textContent = action.description;
+
+        card.appendChild(button);
+        card.appendChild(description);
+        actions.appendChild(card);
+      });
+      item.appendChild(actions);
+    }
+
+    if (issue.advancedJson) {
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = "Advanced issue details";
+      const pre = document.createElement("pre");
+      pre.textContent = issue.advancedJson;
+      details.appendChild(summary);
+      details.appendChild(pre);
+      item.appendChild(details);
+    }
+
     elements.preflightIssuesEl.appendChild(item);
   });
 
@@ -263,19 +432,105 @@ export function createPreflightIssueViewModel(issue: RuntimePreflightIssue): Pre
   const parts = [issue.title, issue.message].filter((value): value is string => Boolean(value));
   const recovery = Array.isArray(issue.recovery) ? issue.recovery.filter(Boolean) : [];
   const recommendedFix = issue.recommended_fix || recovery[0] || "";
+  const advancedIssue =
+    issue.details || (issue.env_vars && issue.env_vars.length)
+      ? {
+          code: issue.code || null,
+          area: issue.area || null,
+          title: issue.title || null,
+          severity: issue.severity || null,
+          env_vars: issue.env_vars || [],
+          details: issue.details ? { ...issue.details } : null
+        }
+      : null;
 
   return {
     text: recommendedFix
       ? `${severity}${parts.join(": ")} Recommended next step: ${recommendedFix}`
       : `${severity}${parts.join(": ")}`,
-    advancedIssue:
-      issue.details || (issue.env_vars && issue.env_vars.length)
-        ? {
-            title: issue.title || null,
-            severity: issue.severity || null,
-            env_vars: issue.env_vars || [],
-            details: issue.details || null
-          }
-        : null
+    advancedIssue,
+    severity: issue.severity || null,
+    title: issue.title || "Setup issue",
+    message: issue.message || "Review the setup details and retry.",
+    recommendedFix: recommendedFix || null,
+    advancedJson: advancedIssue ? JSON.stringify(advancedIssue, null, 2) : null,
+    actions: buildRecoveryActions([issue], {
+      canRetry: true,
+      launcher: DEFAULT_LAUNCHER,
+      currentProfileId: null,
+      localGpuRequested: false,
+      hasProfileOverrides: false
+    })
   };
+}
+
+function createRecoveryActionContext(setup: SetupStatus | null): RecoveryActionContext {
+  const diagnostics = setup?.config_diagnostics as { profile_overrides?: unknown[] } | null | undefined;
+  return {
+    canRetry: setup?.can_retry ?? true,
+    launcher: setup?.supported_path?.launcher || DEFAULT_LAUNCHER,
+    currentProfileId: setup?.current_profile?.id || null,
+    localGpuRequested: Boolean((setup?.local_gpu as { requested?: boolean } | null | undefined)?.requested),
+    hasProfileOverrides: Array.isArray(diagnostics?.profile_overrides) && diagnostics.profile_overrides.length > 0
+  };
+}
+
+function buildRecoveryActions(
+  issues: RuntimePreflightIssue[],
+  context: RecoveryActionContext
+): SetupRecoveryActionViewModel[] {
+  const actions = new Map<SetupRecoveryActionId, SetupRecoveryActionViewModel>();
+  const issueCodes = issues.map((issue) => issue.code);
+
+  if (context.canRetry) {
+    actions.set("retry-setup-check", {
+      id: "retry-setup-check",
+      label: "Retry setup check",
+      description: "Run the connection test again without clearing the saved browser session."
+    });
+  }
+
+  if (context.launcher && issues.length) {
+    actions.set("copy-launcher-command", {
+      id: "copy-launcher-command",
+      label: "Copy launcher command",
+      description: "Copy the supported launcher command so you can restart Docker Desktop, LiteLLM, and the GPU-backed Ollama path together."
+    });
+  }
+
+  if (
+    context.currentProfileId === "custom" ||
+    context.currentProfileId === "local-gpu-large" ||
+    context.hasProfileOverrides ||
+    issueCodes.some((code) =>
+      ["local_model_missing", "local_model_backend_unreachable", "ai_upstream_unhealthy", "profile_overrides_active"].includes(code)
+    )
+  ) {
+    actions.set("copy-smaller-profile-guidance", {
+      id: "copy-smaller-profile-guidance",
+      label: "Copy smaller-profile guidance",
+      description: "Copy the conservative local profile instructions for the next launcher run."
+    });
+  }
+
+  if (
+    context.localGpuRequested ||
+    issueCodes.some((code) =>
+      [
+        "docker_not_running",
+        "local_model_missing",
+        "local_model_backend_unreachable",
+        "gpu_tooling_not_detected",
+        "docker_nvidia_runtime_missing"
+      ].includes(code)
+    )
+  ) {
+    actions.set("copy-gpu-repair-checklist", {
+      id: "copy-gpu-repair-checklist",
+      label: "Copy GPU repair checklist",
+      description: "Copy the supported GPU-backed recovery checklist for Docker Desktop, NVIDIA, and local model availability."
+    });
+  }
+
+  return Array.from(actions.values());
 }
