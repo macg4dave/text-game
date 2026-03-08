@@ -12,6 +12,7 @@ import { validateCanonicalTurnEvent, validateStateResponse, validateTurnResponse
 import {
   createAuthoritativePlayerState,
   createCommittedTurnEventPayload,
+  createPlayerCreatedEventPayload,
   createStateResponsePayload,
   createTurnResponsePayload
 } from "./http-contract.js";
@@ -144,5 +145,20 @@ test("createCommittedTurnEventPayload separates replay-critical semantics from s
   assert.equal(payload.contract_versions.authoritative_state, AUTHORITATIVE_STATE_SCHEMA_VERSION);
   assert.deepEqual(payload.committed.state_updates, turnOutput.state_updates);
   assert.deepEqual(payload.supplemental?.presentation?.player_options, turnOutput.player_options);
+  assert.deepEqual(validateCanonicalTurnEvent(payload), { ok: true, errors: [] });
+});
+
+test("createPlayerCreatedEventPayload stamps a canonical bootstrap event for replay", () => {
+  const authoritativePlayer = createAuthoritativePlayerState(createPlayer());
+  const payload = createPlayerCreatedEventPayload({
+    eventId: "event-created",
+    occurredAt: "2026-03-08T00:00:00.000Z",
+    player: authoritativePlayer,
+    rulesetVersion: "story-rules/v1"
+  });
+
+  assert.equal(payload.event_kind, "player-created");
+  assert.equal(payload.player_id, authoritativePlayer.id);
+  assert.equal(payload.created_player.schema_version, AUTHORITATIVE_STATE_SCHEMA_VERSION);
   assert.deepEqual(validateCanonicalTurnEvent(payload), { ok: true, errors: [] });
 });

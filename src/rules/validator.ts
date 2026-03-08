@@ -3,7 +3,9 @@ import {
   COMMITTED_EVENT_SCHEMA_VERSION,
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
+  type CanonicalEventPayload,
   type CanonicalEventCommittedChanges,
+  type CanonicalPlayerCreatedEventPayload,
   type CanonicalTurnEventPayload,
   type AuthoritativePlayerState,
   type DirectorSpec,
@@ -247,18 +249,19 @@ export function validateCanonicalTurnEvent(payload: unknown): ValidationResult<s
     return { ok: false, errors: ["canonical event must be an object."] };
   }
 
-  const candidate = payload as Partial<CanonicalTurnEventPayload> & Record<string, unknown>;
+  const candidate = payload as Partial<CanonicalEventPayload> & Record<string, unknown>;
   const allowedTopLevelKeys = new Set([
     "schema_version",
     "event_kind",
     "event_id",
     "player_id",
     "occurred_at",
+    "contract_versions",
+    "supplemental",
     "attempt",
     "outcome",
     "committed",
-    "contract_versions",
-    "supplemental"
+    "created_player"
   ]);
   for (const key of Object.keys(candidate)) {
     if (!allowedTopLevelKeys.has(key)) {
@@ -270,8 +273,8 @@ export function validateCanonicalTurnEvent(payload: unknown): ValidationResult<s
     errors.push(`schema_version must be ${COMMITTED_EVENT_SCHEMA_VERSION}.`);
   }
 
-  if (candidate.event_kind !== "turn-resolution") {
-    errors.push("event_kind must be turn-resolution.");
+  if (!(candidate.event_kind === "turn-resolution" || candidate.event_kind === "player-created")) {
+    errors.push("event_kind must be turn-resolution or player-created.");
   }
 
   if (typeof candidate.event_id !== "string") {
@@ -286,11 +289,18 @@ export function validateCanonicalTurnEvent(payload: unknown): ValidationResult<s
     errors.push("occurred_at must be a string.");
   }
 
-  errors.push(...validateCanonicalEventAttempt(candidate.attempt));
-  errors.push(...validateCanonicalEventOutcome(candidate.outcome));
-  errors.push(...validateCanonicalEventCommittedChanges(candidate.committed));
   errors.push(...validateCanonicalEventContractVersions(candidate.contract_versions));
   errors.push(...validateCanonicalEventSupplemental(candidate.supplemental));
+
+  if (candidate.event_kind === "turn-resolution") {
+    errors.push(...validateCanonicalEventAttempt(candidate.attempt));
+    errors.push(...validateCanonicalEventOutcome(candidate.outcome));
+    errors.push(...validateCanonicalEventCommittedChanges(candidate.committed));
+  }
+
+  if (candidate.event_kind === "player-created") {
+    errors.push(...validateCanonicalPlayerCreatedEvent(candidate));
+  }
 
   return { ok: errors.length === 0, errors };
 }
@@ -671,6 +681,38 @@ function validateCanonicalEventAttempt(attempt: unknown): string[] {
 
   if (typeof candidate.input !== "string" || !candidate.input.trim()) {
     errors.push("attempt.input must be a non-empty string.");
+  }
+
+  return errors;
+}
+
+function validateCanonicalPlayerCreatedEvent(event: Partial<CanonicalPlayerCreatedEventPayload> & Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  const allowedKeys = new Set([
+    "schema_version",
+    "event_kind",
+    "event_id",
+    "player_id",
+    "occurred_at",
+    "contract_versions",
+    "supplemental",
+    "created_player"
+  ]);
+
+  for (const key of Object.keys(event)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`${key} is not allowed in the canonical event schema.`);
+    }
+  }
+
+  if (!("created_player" in event)) {
+    errors.push("created_player must be present for player-created events.");
+    return errors;
+  }
+
+  errors.push(...prefixValidationErrors(validateAuthoritativePlayerState(event.created_player), "created_player.").errors);
+  if (event.created_player && typeof event.created_player === "object" && "id" in event.created_player && event.created_player.id !== event.player_id) {
+    errors.push("created_player.id must match player_id.");
   }
 
   return errors;

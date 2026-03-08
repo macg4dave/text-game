@@ -4,8 +4,10 @@ import {
   COMMITTED_EVENT_SCHEMA_VERSION,
   DEFAULT_RULESET_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
+  type AuthoritativePlayerState,
   type CanonicalEventCommittedChanges,
   type CanonicalEventOutcome,
+  type CanonicalPlayerCreatedEventPayload,
   type CanonicalEventSupplemental,
   type CanonicalTurnEventPayload,
   type TurnOutputPayload
@@ -43,6 +45,37 @@ export function createCommittedTurnEventPayload({
     },
     outcome,
     committed,
+    contract_versions: {
+      turn_output: TURN_OUTPUT_SCHEMA_VERSION,
+      authoritative_state: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      ruleset: rulesetVersion
+    },
+    ...(supplemental ? { supplemental } : {})
+  };
+}
+
+export interface CreatePlayerCreatedEventPayloadParams {
+  eventId?: string;
+  occurredAt?: string;
+  player: AuthoritativePlayerState;
+  rulesetVersion?: string;
+  supplemental?: CanonicalEventSupplemental;
+}
+
+export function createPlayerCreatedEventPayload({
+  eventId = crypto.randomUUID(),
+  occurredAt = new Date().toISOString(),
+  player,
+  rulesetVersion = DEFAULT_RULESET_VERSION,
+  supplemental
+}: CreatePlayerCreatedEventPayloadParams): CanonicalPlayerCreatedEventPayload {
+  return {
+    schema_version: COMMITTED_EVENT_SCHEMA_VERSION,
+    event_kind: "player-created",
+    event_id: eventId,
+    player_id: player.id,
+    occurred_at: occurredAt,
+    created_player: player,
     contract_versions: {
       turn_output: TURN_OUTPUT_SCHEMA_VERSION,
       authoritative_state: AUTHORITATIVE_STATE_SCHEMA_VERSION,

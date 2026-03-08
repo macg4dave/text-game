@@ -300,7 +300,7 @@ export interface TurnResponsePayload extends TurnOutputPayload {
   player: AuthoritativePlayerState;
 }
 
-export type CanonicalEventKind = "turn-resolution";
+export type CanonicalEventKind = "turn-resolution" | "player-created";
 export type CanonicalOutcomeStatus = "accepted" | "rejected";
 
 export interface CanonicalEventAttempt {
@@ -341,18 +341,28 @@ export interface CanonicalEventSupplemental {
   prompt?: unknown;
 }
 
-export interface CanonicalTurnEventPayload {
+export interface CanonicalEventBase {
   schema_version: typeof COMMITTED_EVENT_SCHEMA_VERSION;
-  event_kind: CanonicalEventKind;
   event_id: string;
   player_id: string;
   occurred_at: string;
-  attempt: CanonicalEventAttempt;
-  outcome: CanonicalEventOutcome;
-  committed: CanonicalEventCommittedChanges;
   contract_versions: CanonicalEventContractVersions;
   supplemental?: CanonicalEventSupplemental;
 }
+
+export interface CanonicalTurnEventPayload extends CanonicalEventBase {
+  event_kind: "turn-resolution";
+  attempt: CanonicalEventAttempt;
+  outcome: CanonicalEventOutcome;
+  committed: CanonicalEventCommittedChanges;
+}
+
+export interface CanonicalPlayerCreatedEventPayload extends CanonicalEventBase {
+  event_kind: "player-created";
+  created_player: AuthoritativePlayerState;
+}
+
+export type CanonicalEventPayload = CanonicalTurnEventPayload | CanonicalPlayerCreatedEventPayload;
 
 export interface PlayerRow {
   id: string;

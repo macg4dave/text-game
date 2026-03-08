@@ -45,7 +45,7 @@ async function main(): Promise<void> {
   try {
     dbModule.resetDb();
     const player = createPlayer();
-    const hydratedPlayer = gameModule.getOrCreatePlayer({ playerId: player.id, name: player.name });
+    gameModule.getOrCreatePlayer({ playerId: player.id, name: player.name });
 
     gameModule.addEvent(player.id, "player", "touch the lantern");
     gameModule.addEvent(player.id, "narrator", "The signal lantern hummed when touched.");
@@ -99,12 +99,11 @@ async function main(): Promise<void> {
     );
 
     const committedEvents = gameModule.getCommittedTurnEvents(player.id);
-    const replayedPlayer = replayModule.replayCommittedTurnEvents({
-      initialPlayer: hydratedPlayer,
-      events: committedEvents
-    });
+    const replayedPlayer = replayModule.replayCommittedTurnEvents({ events: committedEvents });
+    const playerCreatedEvent = committedEvents.find((event) => event.event_kind === "player-created");
 
-    assert.equal(committedEvents.length, 1);
+    assert.equal(committedEvents.length, 2);
+    assert.equal(playerCreatedEvent?.event_kind, "player-created");
     assert.equal(replayedPlayer.location, "Sky Bridge");
     assert.deepEqual(replayedPlayer.inventory, ["bridge pass"]);
     assert.deepEqual(replayedPlayer.flags, ["signal_seen"]);

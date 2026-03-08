@@ -650,6 +650,8 @@ For canonical replay-contract checks, run:
 docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts
 ```
 
+The replay fixture now expects the committed event log itself to contain the canonical `player-created` bootstrap event before later `turn-resolution` records are applied.
+
 ## Assist Endpoint
 
 `POST /api/assist` returns lightweight, local spellcheck and autocomplete suggestions so you can reduce token use in the main model.

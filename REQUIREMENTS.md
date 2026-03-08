@@ -34,6 +34,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Director and beat controls such as `required_flags`, `unlock_flags`, and `max_beats_per_turn` must shape pacing and framing after accepted outcomes, not replace simulation or plausibility checks.
 - Replayable event logging must record committed semantic outcomes and authoritative transitions, not only raw prompts, raw responses, or presentation prose.
 - The canonical replay-event contract must explicitly separate replay-critical fields such as player attempt, accepted or rejected outcome, committed transitions, and contract-version markers from optional transcript, prompt, or presentation data.
+- Canonical replay must bootstrap authoritative state from an explicit `player-created` event in the committed event log rather than relying on an external initial player snapshot.
 - The default AI setup uses a LiteLLM-managed gateway that can route to local AI or hosted providers behind the same app-facing contract.
 - Startup preflight must validate host prerequisites, AI readiness, writable paths, and save or migration safety before the first turn.
 - Preflight issues must be classified as blocker, warning, or info; blockers must stop the first turn and present plain-language recovery steps.
@@ -83,6 +84,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - SQLite as the source of truth for game state.
 - Only server-committed state, accepted quest progression, and accepted memory facts are authoritative; prose alone cannot establish world truth.
 - The canonical event log must preserve what the player attempted, what the server accepted or rejected, and which authoritative transitions were committed under the active ruleset or schema version.
+- The canonical event log must also preserve the authoritative player-creation snapshot as a versioned bootstrap record so deterministic replay can start from canonical data alone.
 - Transcript or prompt artifacts may still be retained for debugging or UX, but they must remain supplementary to the canonical replay-event contract rather than serving as replay input.
 - Summaries capped in size to control tokens.
 - Embeddings stored for memory retrieval.

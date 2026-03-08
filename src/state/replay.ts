@@ -1,11 +1,18 @@
-import type { CanonicalTurnEventPayload, Player, QuestUpdate, StateUpdateProposal } from "../core/types.js";
+import type {
+  CanonicalEventPayload,
+  CanonicalPlayerCreatedEventPayload,
+  CanonicalTurnEventPayload,
+  Player,
+  QuestUpdate,
+  StateUpdateProposal
+} from "../core/types.js";
 
 export interface ReplayCommittedTurnEventsParams {
-  initialPlayer: Player;
-  events: CanonicalTurnEventPayload[];
+  events: CanonicalEventPayload[];
 }
 
-export function replayCommittedTurnEvents({ initialPlayer, events }: ReplayCommittedTurnEventsParams): Player {
+export function replayCommittedTurnEvents({ events }: ReplayCommittedTurnEventsParams): Player {
+  const initialPlayer = getInitialPlayerFromEvents(events);
   let player = clonePlayer(initialPlayer);
 
   for (const event of events) {
@@ -36,6 +43,16 @@ export function replayCommittedTurnEvents({ initialPlayer, events }: ReplayCommi
     }
   }
 
+  return player;
+}
+
+function getInitialPlayerFromEvents(events: CanonicalEventPayload[]): Player {
+  const playerCreatedEvent = events.find((event): event is CanonicalPlayerCreatedEventPayload => event.event_kind === "player-created");
+  if (!playerCreatedEvent) {
+    throw new Error("Replay requires a canonical player-created event before turn-resolution events.");
+  }
+
+  const { schema_version: _schemaVersion, ...player } = playerCreatedEvent.created_player;
   return player;
 }
 

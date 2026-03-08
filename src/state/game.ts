@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
 import { getDb } from "../core/db.js";
 import { getInitialDirectorState, loadDirectorSpec } from "../story/director.js";
+import { AUTHORITATIVE_STATE_SCHEMA_VERSION } from "../core/types.js";
 import type {
-  CanonicalTurnEventPayload,
+  CanonicalEventPayload,
   CommittedEventRow,
   DirectorState,
   EventRow,
@@ -12,6 +13,7 @@ import type {
   PlayerRow,
   QuestUpdate
 } from "../core/types.js";
+import { createPlayerCreatedEventPayload } from "./committed-event.js";
 
 interface ContentRow {
   content: string;
@@ -43,7 +45,24 @@ export function getOrCreatePlayer({ playerId, name }: { playerId?: string; name?
      VALUES (@id, @name, @created_at, @location, @summary, @director_state, @inventory, @flags, @quests)`
   ).run(newPlayer);
 
-  return hydratePlayer(newPlayer);
+  const hydrated = hydratePlayer(newPlayer);
+  addCommittedTurnEvent(
+    createPlayerCreatedEventPayload({
+      occurredAt: now,
+      player: {
+        schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+        ...hydrated
+      },
+      supplemental: {
+        presentation: {
+          narrative: null,
+          player_options: []
+        }
+      }
+    })
+  );
+
+  return hydrated;
 }
 
 export function getShortHistory(playerId: string, limit = 6): string[] {
@@ -87,7 +106,7 @@ export function addEvent(playerId: string, role: string, content: string): void 
   );
 }
 
-export function addCommittedTurnEvent(payload: CanonicalTurnEventPayload): void {
+export function addCommittedTurnEvent(payload: CanonicalEventPayload): void {
   const db = getDb();
   db.prepare(
     "INSERT INTO committed_events (id, player_id, schema_version, event_kind, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)"
@@ -101,15 +120,15 @@ export function addCommittedTurnEvent(payload: CanonicalTurnEventPayload): void 
   );
 }
 
-export function getCommittedTurnEvents(playerId: string): CanonicalTurnEventPayload[] {
+export function getCommittedTurnEvents(playerId: string): CanonicalEventPayload[] {
   const db = getDb();
   const rows = db
     .prepare("SELECT id, player_id, schema_version, event_kind, payload, created_at FROM committed_events WHERE player_id = ? ORDER BY created_at ASC")
     .all(playerId) as CommittedEventRow[];
 
   return rows
-    .map((row) => safeJsonParse<CanonicalTurnEventPayload | null>(row.payload, null))
-    .filter((row): row is CanonicalTurnEventPayload => row !== null);
+    .map((row) => safeJsonParse<CanonicalEventPayload | null>(row.payload, null))
+    .filter((row): row is CanonicalEventPayload => row !== null);
 }
 
 export function addMemories(playerId: string, memoryList: MemoryInsert[]): void {

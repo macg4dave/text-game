@@ -50,7 +50,7 @@ test("canonical committed events persist separately from transcript rows and rep
   dbModule.resetDb();
 
   const player = createPlayer();
-  const hydratedPlayer = gameModule.getOrCreatePlayer({ playerId: player.id, name: player.name });
+  gameModule.getOrCreatePlayer({ playerId: player.id, name: player.name });
 
   gameModule.addEvent(player.id, "player", "touch the lantern");
   gameModule.addEvent(player.id, "narrator", "The signal lantern hummed when touched.");
@@ -134,21 +134,56 @@ test("canonical committed events persist separately from transcript rows and rep
 
   const transcript = gameModule.getShortHistory(player.id, 6);
   const committedEvents = gameModule.getCommittedTurnEvents(player.id);
-  const replayedPlayer = replayModule.replayCommittedTurnEvents({
-    initialPlayer: hydratedPlayer,
-    events: committedEvents
-  });
+  const replayedPlayer = replayModule.replayCommittedTurnEvents({ events: committedEvents });
+  const playerCreatedEvent = committedEvents.find((event) => event.event_kind === "player-created");
+  const acceptedTurnEvent = committedEvents.find(
+    (event) => event.event_kind === "turn-resolution" && event.outcome.status === "accepted"
+  );
 
   assert.deepEqual(transcript, ["PLAYER: touch the lantern", "NARRATOR: The signal lantern hummed when touched."]);
-  assert.equal(committedEvents.length, 2);
-  assert.equal(committedEvents[0]?.schema_version, "committed-event/v1");
-  assert.equal(committedEvents[0]?.contract_versions.turn_output, TURN_OUTPUT_SCHEMA_VERSION);
-  assert.equal(committedEvents[0]?.contract_versions.authoritative_state, AUTHORITATIVE_STATE_SCHEMA_VERSION);
+  assert.equal(committedEvents.length, 3);
+  assert.equal(playerCreatedEvent?.schema_version, "committed-event/v1");
+  assert.equal(playerCreatedEvent?.event_kind, "player-created");
+  assert.equal(acceptedTurnEvent?.contract_versions.turn_output, TURN_OUTPUT_SCHEMA_VERSION);
+  assert.equal(acceptedTurnEvent?.contract_versions.authoritative_state, AUTHORITATIVE_STATE_SCHEMA_VERSION);
   assert.equal(replayedPlayer.location, "Sky Bridge");
   assert.deepEqual(replayedPlayer.inventory, ["bridge pass"]);
   assert.deepEqual(replayedPlayer.flags, ["signal_seen"]);
   assert.equal(replayedPlayer.quests[0]?.status, "complete");
   assert.equal(replayedPlayer.director_state.end_goal_progress, "You now have a clear route toward the tower.");
+});
+
+test("replay requires a canonical player-created event before applying committed turn deltas", () => {
+  const turnOnlyEvents = [
+    createCommittedTurnEventPayload({
+      eventId: "event-accepted",
+      playerId: "player-123",
+      occurredAt: "2026-03-08T00:00:00.000Z",
+      input: "touch the lantern",
+      outcome: {
+        status: "accepted",
+        summary: "Accepted committed turn outcome.",
+        rejection_reason: null
+      },
+      committed: {
+        state_updates: {
+          location: "Sky Bridge",
+          inventory_add: ["bridge pass"],
+          inventory_remove: [],
+          flags_add: [],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: null,
+        memory_updates: []
+      }
+    })
+  ];
+
+  assert.throws(
+    () => replayModule.replayCommittedTurnEvents({ events: turnOnlyEvents }),
+    /Replay requires a canonical player-created event/
+  );
 });
 
 test.after(() => {

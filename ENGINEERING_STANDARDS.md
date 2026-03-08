@@ -168,6 +168,7 @@ Each `/api/turn` should record, at minimum:
 - Player text and narrator prose may be stored for UX or debugging, but deterministic replay must depend on committed event semantics and authoritative transitions.
 - Event-log design changes should decide explicitly which fields are canonical for replay, which are diagnostics only, and which version or ruleset marker is required to interpret them safely.
 - The minimum canonical replay-event fields are: player attempt, accepted or rejected outcome, committed transitions, and the relevant event, turn-output, authoritative-state, and ruleset version markers.
+- Deterministic replay must start from a canonical `player-created` event in the committed event log rather than from an external bootstrap snapshot.
 
 ## Operational Runbook Checklist
 

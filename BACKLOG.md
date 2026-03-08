@@ -198,6 +198,7 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Ready | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Ready | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Done | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
+| T59c | Next | P1 | P1 | Canonical player-creation replay bootstrap | Done | T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T58b | Later | P2 | P1 | Simulation-first consequence resolution | Ready | T58a, T57b, T07, T08 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T58c | Later | P2 | P1 | Director framing and beat pacing policy | Ready | T16, T58b | Schema validation check + integration test + replay fixture execution |
 | T51 | Next | P1 | P1 | Database storage and migration boundary split | Ready | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
@@ -898,6 +899,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Child Tasks:
   - T59a
   - T59b
+  - T59c
 - Validation:
   - manual planning-doc consistency review
   - child task validation listed on each child card
@@ -908,7 +910,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - user assigned this issue on 2026-03-08 after identifying replay drift risk from transcript-only event storage
   - parent issue closeout on 2026-03-08 confirmed the planning docs align on committed semantic events as replay canon: `ROADMAP.md` now gates Phase 1 and replay work on committed semantic records, `REQUIREMENTS.md` requires authoritative transitions and accepted or rejected outcomes in the canonical event log, `ARCHITECTURE.md` treats raw prompt or prose retention as supplementary, and `ENGINEERING_STANDARDS.md` locks replay-affecting storage to committed semantics plus version markers
-  - the remaining implementation surface is explicit: `T59a` defines the concrete event contract in types and HTTP surfaces, and `T59b` owns DB persistence plus the golden replay fixture
+  - the implementation surface was executed in three slices: `T59a` defined the concrete event contract in types and HTTP surfaces, `T59b` added DB persistence plus the golden replay fixture, and `T59c` added the canonical `player-created` bootstrap event so replay no longer depends on an external initial snapshot
   - use the child tasks, not this parent card, as the execution gate for later event-log, replay, and save work
 
 ### T59a - Canonical Event Schema And Replay Contract
@@ -1005,7 +1007,53 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - accepted and rejected canonical `committed-event/v1` records are now written from `src/state/turn.ts`, while transcript history stays in the legacy `events` table for short-history and UI use
   - deterministic replay coverage now includes `src/state/replay.test.ts`, and the local replay fixture path is `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts`
   - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts`, and `docker compose run --rm --no-deps app npm test`
-  - current replay reconstruction starts from an initial player snapshot and applies committed event deltas; if later save or migration work needs replay-from-empty-state, add an explicit player-creation canonical event rather than overloading transcript rows
+  - the initial implementation still relied on an external player snapshot; `T59c` closes that gap by moving replay bootstrap into the canonical committed event log
+
+### T59c - Canonical Player-Creation Replay Bootstrap
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: Backend lead
+- Goal: Bootstrap deterministic replay from canonical committed events alone by recording player creation as an explicit semantic event.
+- Scope:
+  - extend the canonical committed-event contract with a versioned player-creation record
+  - write the player-creation bootstrap event when a new authoritative player is created
+  - update replay helpers and fixtures to reconstruct final state from the canonical event log without an external initial snapshot
+  - keep transcript history supplementary and avoid overloading legacy transcript rows as bootstrap truth
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - REQUIREMENTS.md
+  - ARCHITECTURE.md
+  - ENGINEERING_STANDARDS.md
+  - src/core/types.ts
+  - src/rules/
+  - src/server/
+  - src/state/
+  - scripts/
+- Do Not Touch:
+  - public/
+  - data/spec/
+  - packaging/
+- Dependencies:
+  - T59b
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - replay fixture execution
+  - `docker compose run --rm --no-deps app npm test`
+- Definition of Done:
+  - canonical replay can reconstruct authoritative state from committed events without an out-of-band initial player snapshot
+  - new-player creation records are persisted as versioned semantic events in the committed event log
+  - replay tests and fixture coverage fail clearly if the bootstrap event is missing
+  - planning and contract docs describe player creation as part of the canonical replay source of truth
+- Handoff Notes:
+  - completed on 2026-03-08 by adding a canonical `player-created` event variant in `src/core/types.ts`, validator support in `src/rules/validator.ts`, and the `createPlayerCreatedEventPayload` helper used from `src/state/game.ts`
+  - replay reconstruction in `src/state/replay.ts` now derives the initial authoritative player snapshot from the committed event log and throws if the bootstrap event is missing
+  - fixture and test coverage now include the player-created bootstrap path in `src/state/replay.test.ts`, `src/server/http-contract.test.ts`, `src/rules/validator.test.ts`, and `scripts/replay-fixture.ts`
+  - no automatic backfill was added for pre-`T59c` committed logs that already contain turn-resolution events without a bootstrap record, because the original creation snapshot is not safely derivable from committed deltas alone
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts`, and `docker compose run --rm --no-deps app npm test`
 
 ### T60 - Memory Classes And Authority Policy
 

@@ -4,6 +4,8 @@ import {
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
   COMMITTED_EVENT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
+  type CanonicalEventPayload,
+  type CanonicalTurnEventPayload,
   type DirectorSpec,
   type Player,
   type QuestSpec,
@@ -14,6 +16,10 @@ import { SYSTEM_PROMPT } from "../ai/prompt.js";
 import { validateCanonicalTurnEvent } from "../rules/validator.js";
 import { createCommittedTurnEventPayload } from "../server/http-contract.js";
 import { createTurnService } from "./turn.js";
+
+function getTurnResolutionEvent(event: CanonicalEventPayload): CanonicalTurnEventPayload | null {
+  return event.event_kind === "turn-resolution" ? event : null;
+}
 
 function createPlayer(): Player {
   return {
@@ -104,7 +110,10 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
 
   const service = createTurnService({
     addCommittedTurnEvent(event) {
-      committedEvents.push(event.outcome.status);
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent.outcome.status);
+      }
     },
     addEvent(playerId, role, content) {
       events.push({ playerId, role, content });
@@ -228,7 +237,10 @@ test("turn service returns a 400 outcome when turn output validation fails", asy
   const committedEvents: string[] = [];
   const service = createTurnService({
     addCommittedTurnEvent(event) {
-      committedEvents.push(event.outcome.status);
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent.outcome.status);
+      }
     },
     addEvent() {},
     addMemories() {},
@@ -335,7 +347,10 @@ test("turn service commits only server-accepted state changes before storing nar
   const service = createTurnService({
     addCommittedTurnEvent(event) {
       callOrder.push("committedEvent");
-      committedEventStatuses.push(event.outcome.status);
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEventStatuses.push(turnEvent.outcome.status);
+      }
     },
     addEvent(_playerId, role) {
       callOrder.push(`event:${role}`);

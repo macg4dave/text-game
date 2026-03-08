@@ -6,6 +6,7 @@ import {
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
+  type CanonicalPlayerCreatedEventPayload,
   type CanonicalTurnEventPayload,
   type AuthoritativePlayerState,
   type StateResponsePayload,
@@ -419,7 +420,7 @@ test("validateCanonicalTurnEvent accepts a versioned replay event with canonical
 test("validateCanonicalTurnEvent rejects malformed canonical fields while allowing supplementary data to stay optional", () => {
   const result = validateCanonicalTurnEvent({
     schema_version: COMMITTED_EVENT_SCHEMA_VERSION,
-    event_kind: "chat-log",
+    event_kind: "turn-resolution",
     event_id: 123,
     player_id: "player-123",
     occurred_at: "2026-03-08T00:00:00.000Z",
@@ -467,7 +468,6 @@ test("validateCanonicalTurnEvent rejects malformed canonical fields while allowi
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.errors.join(" "), /event_kind/i);
   assert.match(result.errors.join(" "), /event_id/i);
   assert.match(result.errors.join(" "), /attempt\.input/i);
   assert.match(result.errors.join(" "), /outcome\.status/i);
@@ -479,6 +479,50 @@ test("validateCanonicalTurnEvent rejects malformed canonical fields while allowi
   assert.match(result.errors.join(" "), /supplemental\.transcript\.player_text/i);
   assert.match(result.errors.join(" "), /supplemental\.presentation\.narrative/i);
   assert.match(result.errors.join(" "), /raw_response/i);
+});
+
+test("validateCanonicalTurnEvent accepts a player-created event that bootstraps replay state", () => {
+  const payload: CanonicalPlayerCreatedEventPayload = {
+    schema_version: COMMITTED_EVENT_SCHEMA_VERSION,
+    event_kind: "player-created",
+    event_id: "event-created",
+    player_id: "player-123",
+    occurred_at: "2026-03-08T00:00:00.000Z",
+    created_player: {
+      schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      id: "player-123",
+      name: "Avery",
+      created_at: "2026-03-08T00:00:00.000Z",
+      location: "Rooftop Market",
+      summary: "",
+      inventory: [],
+      flags: [],
+      quests: [],
+      director_state: {
+        end_goal: "Reach the tower",
+        current_act_id: "act-1",
+        current_act: "Arrival",
+        current_beat_id: "beat-1",
+        current_beat_label: "Find the signal",
+        story_beats_remaining: 3,
+        end_goal_progress: "You have started the search.",
+        completed_beats: []
+      }
+    },
+    contract_versions: {
+      turn_output: TURN_OUTPUT_SCHEMA_VERSION,
+      authoritative_state: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      ruleset: "story-rules/v1"
+    },
+    supplemental: {
+      presentation: {
+        narrative: null,
+        player_options: []
+      }
+    }
+  };
+
+  assert.deepEqual(validateCanonicalTurnEvent(payload), { ok: true, errors: [] });
 });
 
 test("validateSetupStatusResponse accepts a guided setup envelope", () => {

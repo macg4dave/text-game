@@ -6,7 +6,7 @@ import {
   type TurnOutputPayload,
   type TurnResponsePayload
 } from "../core/types.js";
-export { createCommittedTurnEventPayload } from "../state/committed-event.js";
+export { createCommittedTurnEventPayload, createPlayerCreatedEventPayload } from "../state/committed-event.js";
 
 export function createAuthoritativePlayerState(player: Player): AuthoritativePlayerState {
   return {
