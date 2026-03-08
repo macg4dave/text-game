@@ -1,6 +1,8 @@
-import type { AiConfig, AppConfig, ConfigError } from "../types.js";
+import type { AiConfig, AppConfig, ConfigError, LogLevel } from "../types.js";
 import { buildConfigError, DEFAULT_PORT, isSupportedAiProvider, SUPPORTED_AI_PROVIDERS } from "./shared.js";
 import { getAiEnvVarNames } from "./env.js";
+
+const SUPPORTED_LOG_LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
 
 export function parsePort(value: string | undefined): { value: number; errors: ConfigError[] } {
   if (value === undefined) {
@@ -28,6 +30,33 @@ export function parsePort(value: string | undefined): { value: number; errors: C
   }
 
   return { value: port, errors: [] };
+}
+
+export function parseLogLevel(value: string | undefined): { value: LogLevel; errors: ConfigError[] } {
+  if (value === undefined) {
+    return { value: "info", errors: [] };
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) {
+    return { value: "info", errors: [] };
+  }
+
+  if (SUPPORTED_LOG_LEVELS.includes(normalized as LogLevel)) {
+    return { value: normalized as LogLevel, errors: [] };
+  }
+
+  return {
+    value: "info",
+    errors: [
+      buildConfigError({
+        path: "logging.level",
+        message: `LOG_LEVEL must be one of: ${SUPPORTED_LOG_LEVELS.join(", ")}.`,
+        envVars: ["LOG_LEVEL"],
+        code: "invalid_log_level"
+      })
+    ]
+  };
 }
 
 export function validateHttpUrl(

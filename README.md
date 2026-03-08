@@ -51,6 +51,8 @@ Useful commands:
 npm run type-check
 npm run test:config
 npm run build
+npm run db:migrate
+npm run db:reset
 npm run dev
 npm start
 npm test
@@ -61,6 +63,8 @@ What each command does:
 - `npm run type-check` validates all TypeScript source in `src/`
 - `npm run test:config` runs the focused config-module checks after type-checking
 - `npm run build` compiles the server to `dist/` and rebuilds the browser asset at `public/app.js`
+- `npm run db:migrate` compiles the server and applies any pending SQLite migrations to `data/game.db`
+- `npm run db:reset` compiles the server, removes the current SQLite DB files, and reapplies the baseline migrations
 - `npm run dev` rebuilds the browser asset once, then starts the TypeScript server directly through `tsx`
 - `npm start` runs the compiled server from `dist/server.js`
 - `npm test` runs type-checking first, then executes the TypeScript tests directly
@@ -101,6 +105,7 @@ What this gives you:
 - the Docker image builds the browser asset and compiled server output up front, then runs `dist/server.js`
 - the app source is baked into the image so startup works even when Docker bind mounts from a Windows secondary drive are flaky
 - the SQLite database lives in a Docker volume so app state can survive container restarts without hiding the built-in spec files
+- the same compiled DB migration and reset commands can be run inside the app container when you need deterministic local recovery
 
 Current limitation of the Docker runtime path:
 
@@ -119,6 +124,34 @@ On Windows, the launcher wraps the same compiled Docker path and opens the brows
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
+
+## Database Reset And Recovery
+
+The app now uses explicit SQLite migrations through [db.ts](/g:/text-game/src/core/db.ts) instead of relying only on incidental table creation during server startup.
+
+For a normal local reset on a host Node.js workflow:
+
+```bash
+npm run db:reset
+```
+
+For the supported Docker runtime path:
+
+```bash
+docker compose run --rm --no-deps app npm run db:migrate
+docker compose run --rm --no-deps app npm run db:reset
+```
+
+What those do:
+
+- `db:migrate` applies any pending migrations and leaves existing data in place
+- `db:reset` removes `game.db` plus SQLite sidecar files such as `-wal` and `-shm`, then reapplies the baseline migrations
+
+After a reset, restart the app with your normal path:
+
+- `docker compose up --build`
+- `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`
+- `npm run dev`
 
 ## Install Node.js And npm
 
@@ -406,6 +439,7 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 ## Key Files
 
 - `src/server/index.ts` - API server entrypoint and routing
+- `src/core/logging.ts` - structured server logging with levels and secret redaction
 - `src/server/runtime-preflight.ts` - cached startup probe and AI readiness checks
 - `src/server/host-preflight.ts` - runtime host and storage prerequisite checks for writable paths and disk headroom
 - `src/server/debug.ts` - runtime, session, and turn debug payload shaping
@@ -441,6 +475,7 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 - `OLLAMA_API_KEY` - optional Ollama key placeholder; defaults to `ollama`
 - `OLLAMA_CHAT_MODEL` - Ollama chat model; defaults to `gemma3:4b`
 - `OLLAMA_EMBEDDING_MODEL` - Ollama embedding model; defaults to `embeddinggemma`
+- `LOG_LEVEL` - server log threshold; use `debug`, `info`, `warn`, or `error`; defaults to `info`
 - Legacy `OPENAI_*` env vars still work during migration, but new setup should prefer LiteLLM or an explicit `AI_PROVIDER`
 
 ### Docker note for local AI
@@ -544,6 +579,14 @@ The browser client is intentionally useful for local AI debugging:
 - API keys are not returned by the debug payload; only non-secret runtime metadata is exposed
 
 At startup, the server now prints a safe config summary plus a source summary so invalid env state is visible immediately without leaking credentials.
+
+Server logs now emit structured JSON lines with:
+
+- `time`, `level`, and `message`
+- request context such as `requestId`, `method`, and `route`
+- automatic redaction for common secret fields such as `authorization`, `apiKey`, `token`, `password`, `cookie`, and `secret`
+
+Set `LOG_LEVEL=debug` when you need request-start events and lower-signal debugging detail during local troubleshooting.
 
 ## Startup Recovery
 

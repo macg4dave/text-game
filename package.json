@@ -18,6 +18,8 @@
     "test:config": "npm run type-check && tsx --test src/core/config.test.ts",
     "test:local-ai": "npm run type-check && powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1",
     "test": "npm run type-check && tsx --test src/**/*.test.ts",
+    "db:migrate": "npm run build:server && node dist/core/db.js migrate",
+    "db:reset": "npm run build:server && node dist/core/db.js reset",
     "dev": "npm run build:client && tsx src/server/index.ts",
     "start": "node dist/server/index.js",
     "desktop:prototype:dev": "npm run build && electron .",

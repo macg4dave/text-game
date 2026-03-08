@@ -1,4 +1,4 @@
-import type { AiConfig, EnvSource, PublicRuntimeConfig } from "../types.js";
+import type { AiConfig, EnvSource, LoggingConfig, PublicRuntimeConfig } from "../types.js";
 import type { SafeConfigDiagnostics, ConfigEnvSource, ConfigLike, ConfigValueSource, AiConfigField } from "./shared.js";
 import {
   AI_ENV_VAR_CANDIDATES,
@@ -9,7 +9,7 @@ import {
   normalizeProvider,
   readFirstEnvValue
 } from "./shared.js";
-import { parsePort, validateAiConfig } from "./validation.js";
+import { parseLogLevel, parsePort, validateAiConfig } from "./validation.js";
 
 export function getAiEnvVarNames(provider: string, field: AiConfigField): string[] {
   const candidates = AI_ENV_VAR_CANDIDATES[field];
@@ -110,6 +110,17 @@ export function resolvePort(env: EnvSource): { value: number; source: ConfigEnvS
   };
 }
 
+export function resolveLogLevel(env: EnvSource): { value: LoggingConfig["level"]; source: ConfigEnvSource; envVar: string | null } {
+  const raw = readFirstEnvValue(env, ["LOG_LEVEL"]);
+  const parsed = parseLogLevel(raw.value);
+
+  return {
+    value: parsed.value,
+    source: raw.envVar ? (parsed.errors.length ? "invalid-env" : "env") : "default",
+    envVar: raw.envVar
+  };
+}
+
 export function resolveAiConfig(env: EnvSource): AiConfig {
   const provider = resolveProvider(env).value;
   const defaults = getProviderDefaults(provider);
@@ -133,6 +144,7 @@ export function getSafeConfigDiagnostics(
 ): SafeConfigDiagnostics {
   const provider = resolveProvider(env);
   const port = resolvePort(env);
+  const logLevel = resolveLogLevel(env);
   const defaults = getProviderDefaults(configToSummarize.ai.provider);
   const apiKey = resolveAiSetting(env, configToSummarize.ai.provider, "apiKey", defaults.apiKey);
   const baseUrl = resolveAiSetting(env, configToSummarize.ai.provider, "baseUrl", defaults.baseUrl);
@@ -154,6 +166,13 @@ export function getSafeConfigDiagnostics(
       value: configToSummarize.port,
       source: port.source,
       env_var: port.envVar
+    },
+    logging: {
+      level: {
+        value: configToSummarize.logging.level,
+        source: logLevel.source,
+        env_var: logLevel.envVar
+      }
     },
     ai: {
       api_key: {
@@ -192,6 +211,7 @@ export function getPublicRuntimeConfig(configToSummarize: ConfigLike): PublicRun
     embedding_model: configToSummarize.ai.embeddingModel,
     base_url: configToSummarize.ai.baseUrl || null,
     api_key_configured: Boolean(configToSummarize.ai.apiKey),
+    log_level: configToSummarize.logging.level,
     validation: {
       ok: Boolean(configToSummarize.validation?.ok),
       errors: (configToSummarize.validation?.errors || []).map((error) => ({
@@ -206,6 +226,7 @@ export function getPublicRuntimeConfig(configToSummarize: ConfigLike): PublicRun
 export function loadConfig(env: EnvSource): {
   port: number;
   ai: AiConfig;
+  logging: LoggingConfig;
   validation: {
     ok: boolean;
     errors: ReturnType<typeof validateAiConfig>;
@@ -213,13 +234,17 @@ export function loadConfig(env: EnvSource): {
   runtime: PublicRuntimeConfig;
 } {
   const portResult = parsePort(readFirstEnvValue(env, ["PORT"]).value);
+  const logLevelResult = parseLogLevel(readFirstEnvValue(env, ["LOG_LEVEL"]).value);
   const ai = resolveAiConfig(env);
   const loadedConfig = {
     port: portResult.value,
     ai,
+    logging: {
+      level: logLevelResult.value
+    },
     validation: {
       ok: false,
-      errors: [...portResult.errors, ...validateAiConfig(ai)]
+      errors: [...portResult.errors, ...logLevelResult.errors, ...validateAiConfig(ai)]
     }
   };
 

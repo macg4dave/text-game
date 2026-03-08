@@ -77,6 +77,16 @@ test("loadConfig applies LiteLLM defaults without extra env edits", () => {
   assert.equal(loaded.ai.embeddingModel, "game-embedding");
 });
 
+test("loadConfig defaults logging to info and validates supported LOG_LEVEL values", () => {
+  const loaded = loadConfig({ AI_API_KEY: "sk-test" });
+  const invalid = loadConfig({ AI_API_KEY: "sk-test", LOG_LEVEL: "loud" });
+
+  assert.equal(loaded.logging.level, "info");
+  assert.equal(invalid.logging.level, "info");
+  assert.equal(invalid.validation.ok, false);
+  assert.equal(invalid.validation.errors.some((error) => error.code === "invalid_log_level"), true);
+});
+
 test("loadConfig prefers provider-specific env vars over generic and legacy fallbacks", () => {
   const loaded = loadConfig({
     AI_PROVIDER: "litellm",

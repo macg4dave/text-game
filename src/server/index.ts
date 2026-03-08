@@ -5,6 +5,7 @@ import process from "node:process";
 import express, { type Request, type Response } from "express";
 import { config, formatConfigErrors, getSafeConfigDiagnostics } from "../core/config.js";
 import { initDb } from "../core/db.js";
+import { createLogger } from "../core/logging.js";
 import type { Player, QuestSpec } from "../core/types.js";
 import {
   addEvent,
@@ -34,6 +35,7 @@ const app = express();
 const port = config.port;
 const model = config.ai.chatModel;
 const embeddingModel = config.ai.embeddingModel;
+const logger = createLogger({ level: config.logging.level }).child({ component: "server" });
 let directorSpec = loadDirectorSpec();
 let questSpec: QuestSpec = loadQuestSpec();
 const runtimePreflight = createRuntimePreflightService(config);
@@ -41,6 +43,30 @@ const runtimePreflight = createRuntimePreflightService(config);
 initDb();
 
 app.use(express.json());
+app.use((req: Request, res: Response, next) => {
+  const requestId = readRequestIdHeader(req.headers["x-request-id"]) || crypto.randomUUID();
+  const startedAt = Date.now();
+  const requestLogger = logger.child({
+    requestId,
+    method: req.method,
+    route: req.path
+  });
+
+  res.setHeader("x-request-id", requestId);
+  res.locals.requestId = requestId;
+  res.locals.requestLogger = requestLogger;
+
+  requestLogger.debug("request started");
+  res.on("finish", () => {
+    const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+    requestLogger[level]("request finished", {
+      statusCode: res.statusCode,
+      durationMs: Date.now() - startedAt
+    });
+  });
+
+  next();
+});
 app.use(express.static(path.resolve(process.cwd(), "public")));
 
 app.get("/api/state", async (req: Request, res: Response) => {
@@ -67,6 +93,7 @@ app.post("/api/assist", (req: Request, res: Response) => {
   const body = req.body as Partial<{ playerId: string; name: string; input: string }> | undefined;
   const input = typeof body?.input === "string" ? body.input : "";
   if (!input) {
+    getRequestLogger(res).warn("assist request rejected", { reason: "missing_input" });
     return res.status(400).json({ error: "Missing input" });
   }
 
@@ -90,11 +117,14 @@ app.post("/api/director/reload", (_req: Request, res: Response) => {
     directorSpec = reloadDirectorSpec();
     const validation = validateDirectorSpec(directorSpec);
     if (!validation.ok) {
+      getRequestLogger(res).warn("director reload rejected", { reason: "invalid_spec", errorCount: validation.errors.length });
       return res.status(400).json({ error: "Invalid director spec", detail: validation.errors });
     }
 
+    getRequestLogger(res).info("director spec reloaded");
     return res.json({ ok: true, spec: directorSpec });
   } catch (error) {
+    getRequestLogger(res).error("director reload failed", { error });
     return res.status(500).json({ error: "Failed to reload spec", detail: getErrorMessage(error) });
   }
 });
@@ -104,11 +134,14 @@ app.post("/api/quests/reload", (_req: Request, res: Response) => {
     questSpec = reloadQuestSpec();
     const validation = validateQuestSpec(questSpec);
     if (!validation.ok) {
+      getRequestLogger(res).warn("quest reload rejected", { reason: "invalid_spec", errorCount: validation.errors.length });
       return res.status(400).json({ error: "Invalid quest spec", detail: validation.errors });
     }
 
+    getRequestLogger(res).info("quest spec reloaded");
     return res.json({ ok: true, spec: questSpec });
   } catch (error) {
+    getRequestLogger(res).error("quest reload failed", { error });
     return res.status(500).json({ error: "Failed to reload quest spec", detail: getErrorMessage(error) });
   }
 });
@@ -130,12 +163,14 @@ app.post("/api/turn", async (req: Request, res: Response) => {
   let memoryEmbeddings: number[][] = [];
   let memoryEmbeddingError: string | null = null;
 
+  const requestLogger = getRequestLogger(res).child({ turnRequestId: requestId });
   res.setHeader("x-request-id", requestId);
 
   try {
     const body = req.body as Partial<{ playerId: string; name: string; input: string }> | undefined;
     input = typeof body?.input === "string" ? body.input : "";
     if (!input) {
+      requestLogger.warn("turn request rejected", { reason: "missing_input" });
       return res.status(400).json({
         error: "Missing input",
         debug: buildTurnDebugPayload({
@@ -160,6 +195,10 @@ app.post("/api/turn", async (req: Request, res: Response) => {
 
     const preflight = await runtimePreflight.ensureReport();
     if (!preflight.ok) {
+      requestLogger.warn("turn blocked by startup preflight", {
+        blockerCount: preflight.counts.blocker,
+        warningCount: preflight.counts.warning
+      });
       return res.status(503).json({
         error: "Setup required",
         detail: preflight.issues.map((issue) => `${issue.title}: ${issue.message}`),
@@ -233,6 +272,9 @@ app.post("/api/turn", async (req: Request, res: Response) => {
     result = sanitizeTurnResult(rawResult, player);
     updateValidation = validateStateUpdates(result.state_updates);
     if (!updateValidation.ok) {
+      requestLogger.warn("turn rejected after validation", {
+        validationErrors: updateValidation.errors
+      });
       return res.status(400).json({
         error: "Invalid state updates",
         detail: updateValidation.errors,
@@ -291,6 +333,13 @@ app.post("/api/turn", async (req: Request, res: Response) => {
     }
 
     refreshedPlayer = getOrCreatePlayer({ playerId: player.id });
+    requestLogger.info("turn completed", {
+      durationMs: Date.now() - startedAt,
+      inputEmbeddingFallback: Boolean(inputEmbeddingError),
+      memoryEmbeddingFallback: Boolean(memoryEmbeddingError),
+      suggestedOptionCount: result.player_options.length,
+      memoryUpdateCount: result.memory_updates.length
+    });
 
     return res.json({
       narrative: result.narrative,
@@ -317,6 +366,7 @@ app.post("/api/turn", async (req: Request, res: Response) => {
       })
     });
   } catch (error) {
+    requestLogger.error("turn failed", { error, durationMs: Date.now() - startedAt });
     return res.status(500).json({
       error: "Turn failed",
       detail: getErrorMessage(error),
@@ -344,11 +394,11 @@ app.post("/api/turn", async (req: Request, res: Response) => {
 
 app.listen(port, () => {
   logStartupConfigState();
-  console.log(`Server listening on http://localhost:${port}`);
+  logger.info("server listening", { url: `http://localhost:${port}` });
 });
 
-void runtimePreflight.ensureReport({ force: true }).catch(() => {
-  // The latest failure is reflected through the runtime preflight payload.
+void runtimePreflight.ensureReport({ force: true }).catch((error) => {
+  logger.warn("initial runtime preflight failed", { error });
 });
 
 function buildRuntimeDebugPayload() {
@@ -395,15 +445,42 @@ function logStartupConfigState() {
   const baseUrl = config.ai.baseUrl || "(provider default)";
 
   if (!config.validation.ok) {
-    console.warn("[startup] Configuration needs attention; the app will stay in setup-required mode.");
-    console.warn(formatConfigErrors(config.validation.errors));
+    logger.warn("configuration needs attention; app will stay in setup-required mode", {
+      validationErrors: formatConfigErrors(config.validation.errors)
+    });
   } else {
-    console.log(
-      `[startup] Configuration ready: provider=${config.ai.provider}, chat=${config.ai.chatModel}, embedding=${config.ai.embeddingModel}, baseUrl=${baseUrl}`
-    );
+    logger.info("configuration ready", {
+      provider: config.ai.provider,
+      chatModel: config.ai.chatModel,
+      embeddingModel: config.ai.embeddingModel,
+      baseUrl
+    });
   }
 
-  console.log(
-    `[startup] Config sources: provider=${diagnostics.provider.source}, port=${diagnostics.port.source}, apiKey=${diagnostics.ai.api_key.source}, baseUrl=${diagnostics.ai.base_url.source}, chatModel=${diagnostics.ai.chat_model.source}, embeddingModel=${diagnostics.ai.embedding_model.source}`
-  );
+  logger.info("config sources resolved", {
+    providerSource: diagnostics.provider.source,
+    portSource: diagnostics.port.source,
+    logLevelSource: diagnostics.logging.level.source,
+    apiKeySource: diagnostics.ai.api_key.source,
+    baseUrlSource: diagnostics.ai.base_url.source,
+    chatModelSource: diagnostics.ai.chat_model.source,
+    embeddingModelSource: diagnostics.ai.embedding_model.source,
+    logLevel: config.logging.level
+  });
+}
+
+function getRequestLogger(res: Response) {
+  return (res.locals.requestLogger as ReturnType<typeof createLogger> | undefined) ?? logger;
+}
+
+function readRequestIdHeader(value: string | string[] | undefined): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (Array.isArray(value) && typeof value[0] === "string" && value[0].trim()) {
+    return value[0].trim();
+  }
+
+  return null;
 }

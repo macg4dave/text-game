@@ -20,6 +20,12 @@ export interface AiConfig {
   embeddingModel: string;
 }
 
+export type LogLevel = "debug" | "info" | "warn" | "error";
+
+export interface LoggingConfig {
+  level: LogLevel;
+}
+
 export interface PublicRuntimeValidationError {
   path: string;
   message: string;
@@ -76,6 +82,7 @@ export interface PublicRuntimeConfig {
   embedding_model: string;
   base_url: string | null;
   api_key_configured: boolean;
+  log_level: LogLevel;
   validation: {
     ok: boolean;
     errors: PublicRuntimeValidationError[];
@@ -85,6 +92,7 @@ export interface PublicRuntimeConfig {
 export interface AppConfig {
   port: number;
   ai: AiConfig;
+  logging: LoggingConfig;
   validation: ValidationResult<ConfigError>;
   runtime: PublicRuntimeConfig;
 }

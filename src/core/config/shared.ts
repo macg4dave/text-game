@@ -14,7 +14,7 @@ export const SUPPORTED_AI_PROVIDERS = ["openai-compatible", "litellm", "ollama"]
 export type SupportedAiProvider = (typeof SUPPORTED_AI_PROVIDERS)[number];
 export type AiConfigField = "apiKey" | "baseUrl" | "chatModel" | "embeddingModel";
 export type ProviderDefaults = Omit<AiConfig, "provider">;
-export type ConfigLike = Pick<AppConfig, "port" | "ai" | "validation">;
+export type ConfigLike = Pick<AppConfig, "port" | "ai" | "logging" | "validation">;
 export type ConfigValueSource = "provider-specific" | "generic" | "legacy" | "default";
 export type ConfigEnvSource = "env" | "default" | "invalid-env" | "inferred";
 
@@ -28,6 +28,13 @@ export interface SafeConfigDiagnostics {
     value: number;
     source: ConfigEnvSource;
     env_var: string | null;
+  };
+  logging: {
+    level: {
+      value: string;
+      source: ConfigEnvSource;
+      env_var: string | null;
+    };
   };
   ai: {
     api_key: {

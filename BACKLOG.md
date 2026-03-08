@@ -107,8 +107,8 @@ Use this exact shape when adding new work:
 | T01b | Now | P0 | P1 | Preflight blocker contract and advanced diagnostics | Done | T01a, T02 | `npm test`; manual blocked and warning preflight check |
 | T01c | Now | P0 | P1 | Host runtime and path prerequisite checks | Done | T01, T01b | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T02i | Now | P0 | P1 | AI readiness, network, and model-availability probes | Done | T01b, T02f | Manual LiteLLM readiness probe |
-| T03 | Now | P0 | P1 | Logging with levels and redaction | Ready | None | `npm test` |
-| T04 | Now | P0 | P1 | DB migrations and seed flow | Ready | None | Manual DB reset verification |
+| T03 | Now | P0 | P1 | Logging with levels and redaction | Done | None | `npm test` |
+| T04 | Now | P0 | P1 | DB migrations and seed flow | Done | None | Manual DB reset verification |
 | T04a | Now | P0 | P1 | Storage, save, and migration preflight | Ready | T04, T01b | Manual DB and save preflight smoke test |
 | T02j | Now | P0 | P1 | End-user config profiles and validated developer overrides | Ready | T01b, T02a, T02g | `npm test`; manual profile resolution check |
 | T05 | Next | P0 | P2 | Error boundary and global handler | Ready | None | `npm test` |
@@ -918,7 +918,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T03 - Logging With Levels And Redaction
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -930,8 +930,15 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - make log usage consistent in the server path
   - keep startup and recovery logs understandable during launcher troubleshooting
 - Files to Touch:
-  - src/server.ts
-  - src/config.ts
+  - src/server/index.ts
+  - src/core/config.ts
+  - src/core/config.test.ts
+  - src/core/config/env.ts
+  - src/core/config/validation.ts
+  - src/core/types.ts
+  - src/core/logging.ts
+  - src/core/logging.test.ts
+  - docker-compose.yml
   - README.md
 - Do Not Touch:
   - public/
@@ -946,10 +953,18 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - logging behavior is documented enough for local debugging and startup failure triage
 - Handoff Notes:
   - note any remaining unstructured logs for later cleanup
+  - added `src/core/logging.ts` plus `src/core/logging.test.ts` so the server now has one shared structured logger with four levels (`debug`, `info`, `warn`, `error`), child request context, and recursive redaction for common secret fields such as `authorization`, `apiKey`, `token`, `password`, `cookie`, and `secret`
+  - added `LOG_LEVEL` parsing and validation in config so log verbosity can be changed without code edits; unsupported values now fall back to `info` and surface `invalid_log_level` in config validation
+  - `src/server/index.ts` now emits consistent JSON log lines for startup state, config-source resolution, request start and finish, reload failures, turn validation failures, and turn exceptions without logging request bodies or prompt text
+  - `docker-compose.yml` now passes `LOG_LEVEL` through to the app container so the supported Docker path can actually enable debug logging
+  - updated `README.md` to document `LOG_LEVEL`, the structured JSON log shape, and the redaction contract
+  - validated on 2026-03-08 with `docker compose run --rm --no-deps app npx tsx --test src/core/logging.test.ts src/core/config.test.ts` and `docker compose run --rm --no-deps app npm test`
+  - manual request smoke on 2026-03-08 used `$env:PORT='3301'; $env:LOG_LEVEL='debug'; docker compose up -d --build app`, `Invoke-WebRequest http://127.0.0.1:3301/api/state?name=LoggerSmoke` with `x-request-id=manual-log-smoke`, and `docker logs --tail 20 text-game-app-1`; the app emitted structured JSON lines for startup plus `request started` and `request finished` with request id, method, route, status code, and duration
+  - remaining unstructured or external output to clean up later: Node deprecation warnings from dependencies and logs emitted by the separate LiteLLM container are still outside the app logger
 
 ### T04 - DB Migrations And Seed Flow
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -960,8 +975,9 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - define a seed or reset workflow
   - document the workflow for local development and launched app recovery
 - Files to Touch:
-  - src/db.ts
+  - src/core/db.ts
   - package.json
+  - docker-compose.yml
   - README.md
 - Do Not Touch:
   - public/
@@ -975,6 +991,13 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - local docs describe the reset path
 - Handoff Notes:
   - note any schema assumptions that later migrations must preserve
+  - refactored `src/core/db.ts` into an explicit migration runner with a `schema_migrations` table, two baseline migrations (`001_initial_schema`, `002_memory_embeddings_and_indexes`), lazy DB open, and CLI commands for `migrate` and `reset`
+  - `npm run db:migrate` and `npm run db:reset` now compile the server and invoke the DB CLI through `dist/core/db.js` so the same flow works in Docker and on host builds
+  - added `GAME_DATA_DIR` and `GAME_DB_PATH` support in `src/core/db.ts`; the supported Docker path now sets `GAME_DATA_DIR=/data` in `docker-compose.yml` so resets and restarts operate on the persisted runtime volume instead of the image workspace
+  - updated `README.md` with explicit local and Docker commands for migrate versus reset, plus restart guidance after a reset
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npm test`, and a manual DB reset-and-restart smoke
+  - manual DB reset-and-restart smoke on 2026-03-08 used `$env:PORT='3304'; docker compose run --rm --no-deps app npm run db:reset`, `docker compose up -d --build app`, `Invoke-WebRequest http://127.0.0.1:3304/api/state?name=ResetSmoke`, and a `docker exec text-game-app-1` SQLite check that confirmed `schema_migrations` contained `001_initial_schema` and `002_memory_embeddings_and_indexes`
+  - current baseline assumption for future migrations: keep migration functions idempotent so older worktrees or partially-initialized local DBs can be baselined safely before stricter versioned migrations arrive
 
 ### T04a - Storage, Save, And Migration Preflight
 
