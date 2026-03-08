@@ -169,6 +169,59 @@ button {
   margin-bottom: 16px;
 }
 
+.launch-panel {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 18px;
+  border-color: rgba(143, 61, 18, 0.22);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 244, 231, 0.96) 100%);
+  animation: rise-in 220ms ease;
+}
+
+.launch-copy h3 {
+  margin: 2px 0 0;
+  font-size: 1.45rem;
+}
+
+.launch-copy p:last-child {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.launch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.launch-actions button {
+  min-width: 180px;
+  padding: 12px 18px;
+  border-radius: 999px;
+}
+
+#launch-new-game {
+  border: none;
+  background: linear-gradient(135deg, var(--accent) 0%, #e29d57 100%);
+  color: #231104;
+  font-weight: 800;
+  box-shadow: 0 16px 28px rgba(201, 109, 50, 0.24);
+}
+
+.launch-resume-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.launch-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -477,6 +530,18 @@ button {
   line-height: 1.45;
 }
 
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 1120px) {
   .workspace {
     grid-template-columns: 1fr;
@@ -514,6 +579,10 @@ button {
   }
 
   .input-form button {
+    width: 100%;
+  }
+
+  .launch-actions button {
     width: 100%;
   }
 

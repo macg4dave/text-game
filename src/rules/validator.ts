@@ -7,8 +7,10 @@ import {
   type DirectorState,
   type QuestSpec,
   type QuestUpdate,
+  type StateResponsePayload,
   type StateUpdates,
   type TurnInputPayload,
+  type TurnResponsePayload,
   type TurnOutputPayload,
   type ValidationResult
 } from "../core/types.js";
@@ -252,6 +254,39 @@ export function validateAuthoritativePlayerState(payload: unknown): ValidationRe
   return { ok: errors.length === 0, errors };
 }
 
+export function validateStateResponse(payload: unknown): ValidationResult<string> {
+  if (!payload || typeof payload !== "object") {
+    return { ok: false, errors: ["state response must be an object."] };
+  }
+
+  const candidate = payload as Partial<StateResponsePayload> & Record<string, unknown>;
+  if (!candidate.player || typeof candidate.player !== "object") {
+    return { ok: false, errors: ["player must be an object."] };
+  }
+
+  return prefixValidationErrors(validateAuthoritativePlayerState(candidate.player), "player.");
+}
+
+export function validateTurnResponse(payload: unknown): ValidationResult<string> {
+  if (!payload || typeof payload !== "object") {
+    return { ok: false, errors: ["turn response must be an object."] };
+  }
+
+  const turnErrors = validateTurnOutput(payload).errors;
+  const candidate = payload as Partial<TurnResponsePayload> & Record<string, unknown>;
+
+  if (!candidate.player || typeof candidate.player !== "object") {
+    return {
+      ok: false,
+      errors: [...turnErrors, "player must be an object."]
+    };
+  }
+
+  const playerValidation = prefixValidationErrors(validateAuthoritativePlayerState(candidate.player), "player.");
+  const errors = [...turnErrors, ...playerValidation.errors];
+  return { ok: errors.length === 0, errors };
+}
+
 export function validateQuestSpec(spec: unknown): ValidationResult<string> {
   const errors: string[] = [];
   if (!spec || typeof spec !== "object") {
@@ -372,4 +407,11 @@ function validateDirectorState(state: unknown): string[] {
   }
 
   return errors;
+}
+
+function prefixValidationErrors(result: ValidationResult<string>, prefix: string): ValidationResult<string> {
+  return {
+    ok: result.ok,
+    errors: result.errors.map((error) => `${prefix}${error}`)
+  };
 }

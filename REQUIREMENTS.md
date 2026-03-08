@@ -55,8 +55,8 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 ## API Requirements
 
 - `/api/state` returns or creates a player.
-- `/api/state` returns a versioned authoritative player-state payload.
-- `/api/turn` accepts a versioned turn-input payload, runs a story turn, and returns a versioned turn-output payload plus the versioned authoritative player state.
+- `/api/state` returns a `player` envelope containing the versioned authoritative player-state payload when setup is ready.
+- `/api/turn` accepts a versioned turn-input payload, runs a story turn, and returns the full versioned turn-output payload, including `memory_updates`, plus the versioned authoritative player state.
 - `/api/assist` provides local text assistance.
 
 ## Configuration

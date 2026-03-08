@@ -246,6 +246,14 @@ export interface AuthoritativePlayerState extends Player {
   schema_version: typeof AUTHORITATIVE_STATE_SCHEMA_VERSION;
 }
 
+export interface StateResponsePayload {
+  player: AuthoritativePlayerState;
+}
+
+export interface TurnResponsePayload extends TurnOutputPayload {
+  player: AuthoritativePlayerState;
+}
+
 export interface PlayerRow {
   id: string;
   name: string;

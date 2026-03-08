@@ -10,9 +10,9 @@
     <main class="app-shell">
       <header class="hero">
         <div>
-          <p class="eyebrow">Local Story Loop</p>
+          <p class="eyebrow">First Turn</p>
           <h1>Eclipse Signal</h1>
-          <p class="lede">Minimal browser UI for text I/O with server-side debug visibility for the local AI path.</p>
+          <p class="lede">Start a new run or resume the last one saved in this browser, then type what your character tries next.</p>
         </div>
         <section class="hero-card">
           <span class="stack-label">Runtime</span>
@@ -34,17 +34,35 @@
           <div class="panel-header">
             <div>
               <h2>Play</h2>
-              <p class="panel-copy">Send turns, inspect responses, and keep the current session in view.</p>
+              <p class="panel-copy">Pick a start option, then type what you want to try. The story answers and updates your situation.</p>
             </div>
-            <div class="toolbar">
-              <button type="button" class="secondary" id="refresh-session">Refresh State</button>
-              <button type="button" class="secondary" id="new-session">New Session</button>
+            <div class="toolbar" id="session-toolbar" hidden>
+              <button type="button" class="secondary" id="refresh-session">Refresh</button>
+              <button type="button" class="secondary" id="new-session">New Game</button>
             </div>
           </div>
 
           <div class="status-row">
             <span class="status-pill" id="status-pill" data-tone="idle">Connecting</span>
           </div>
+
+          <section class="panel-slab launch-panel" id="launch-panel" aria-live="polite">
+            <div class="launch-copy">
+              <p class="stack-label">Start Here</p>
+              <h3>Start new or jump back in.</h3>
+              <p>Choose a character name if you want one, then start a new game or resume the last game saved in this browser.</p>
+            </div>
+            <div class="launch-actions">
+              <button type="button" id="launch-new-game">Start New Game</button>
+              <button type="button" class="secondary" id="launch-resume">Resume Last Game</button>
+            </div>
+            <p class="launch-resume-note" id="launch-resume-note"></p>
+            <ol class="launch-steps">
+              <li>Type what your character tries.</li>
+              <li>The narrator answers and changes the world.</li>
+              <li>Use the suggested options or write your own move.</li>
+            </ol>
+          </section>
 
           <section class="panel-slab" id="preflight-panel" hidden aria-live="polite">
             <strong id="preflight-title">Setup check</strong>
@@ -61,26 +79,26 @@
 
           <form class="input-form" id="input-form">
             <label class="field">
-              <span>Player name</span>
+              <span>Character name</span>
               <input id="player-name" placeholder="Wanderer" />
             </label>
 
-            <label class="field field-wide">
-              <span>Action</span>
+            <label class="field field-wide" id="action-field" hidden>
+              <span>What do you do?</span>
               <textarea
                 id="player-input"
                 rows="3"
-                placeholder="Type an action. Ctrl+Enter sends."
+                placeholder="Try &quot;look around&quot; or &quot;check the radio&quot;. Ctrl+Enter sends."
                 autocomplete="off"
                 required
               ></textarea>
             </label>
 
-            <button type="submit" id="send-button">Send Turn</button>
+            <button type="submit" id="send-button" hidden>Send Action</button>
           </form>
 
-          <section class="assist panel-slab" id="assist"></section>
-          <section class="options" id="options"></section>
+          <section class="assist panel-slab" id="assist" hidden></section>
+          <section class="options" id="options" hidden></section>
         </section>
 
         <aside class="panel debug-panel">

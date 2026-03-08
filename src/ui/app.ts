@@ -136,6 +136,12 @@ function initializeApp(): void {
   const turnDebugEl = getElement<HTMLElement>("turn-debug");
   const refreshSessionButtonEl = getElement<HTMLButtonElement>("refresh-session");
   const newSessionButtonEl = getElement<HTMLButtonElement>("new-session");
+  const sessionToolbarEl = getElement<HTMLElement>("session-toolbar");
+  const launchPanelEl = getElement<HTMLElement>("launch-panel");
+  const launchNewGameButtonEl = getElement<HTMLButtonElement>("launch-new-game");
+  const launchResumeButtonEl = getElement<HTMLButtonElement>("launch-resume");
+  const launchResumeNoteEl = getElement<HTMLElement>("launch-resume-note");
+  const actionFieldEl = getElement<HTMLElement>("action-field");
 
   const state: {
     playerId: string;
@@ -144,6 +150,7 @@ function initializeApp(): void {
     sessionDebug: SessionDebugPayload | null;
     lastTurnDebug: TurnDebugPayload | null;
     assistTimer: number | null;
+    hasEnteredFlow: boolean;
     pending: boolean;
     fatalError: FatalUiErrorState | null;
   } = {
@@ -153,12 +160,16 @@ function initializeApp(): void {
     sessionDebug: null,
     lastTurnDebug: null,
     assistTimer: null,
+    hasEnteredFlow: false,
     pending: false,
     fatalError: activeFatalUiError
   };
 
   nameEl.value = state.playerName;
+  setAssist([], []);
   renderDebugPanels();
+  renderLaunchPanel();
+  renderPlaySurface();
   renderSessionSummary();
   renderPreflightPanel();
   setPending(false);
@@ -250,6 +261,33 @@ function initializeApp(): void {
     const vram = typeof selection.detected_vram_gb === "number" ? `${selection.detected_vram_gb} GB detected` : null;
     const parts = [label, source, vram].filter((value): value is string => Boolean(value));
     return parts.join(" | ");
+  }
+
+  function hasSavedSession(): boolean {
+    return Boolean(state.playerId);
+  }
+
+  function renderLaunchPanel(): void {
+    const fatalBlocked = Boolean(state.fatalError || activeFatalUiError);
+    const resumeAvailable = hasSavedSession();
+
+    launchPanelEl.hidden = state.hasEnteredFlow || fatalBlocked;
+    launchNewGameButtonEl.disabled = state.pending || fatalBlocked;
+    launchResumeButtonEl.disabled = state.pending || fatalBlocked || !resumeAvailable;
+    launchResumeNoteEl.textContent = resumeAvailable
+      ? "Resume uses the last game saved in this browser."
+      : "No saved game is stored in this browser yet. Start a new game to begin.";
+  }
+
+  function renderPlaySurface(): void {
+    const showPlaySurface = state.hasEnteredFlow || Boolean(state.player || state.sessionDebug || state.lastTurnDebug);
+
+    sessionToolbarEl.hidden = !showPlaySurface;
+    logEl.hidden = !showPlaySurface;
+    actionFieldEl.hidden = !showPlaySurface;
+    sendButtonEl.hidden = !showPlaySurface;
+    assistEl.hidden = !showPlaySurface;
+    optionsEl.hidden = !showPlaySurface;
   }
 
   function setOptions(options: string[] = []): void {
@@ -459,15 +497,23 @@ function initializeApp(): void {
     if (preflight?.status === "action-required") runtimeParts.push("setup required");
     if (preflight?.status === "checking") runtimeParts.push("checking AI");
     if (session && typeof session.player_id === "string") runtimeParts.push(`player ${session.player_id.slice(0, 8)}`);
-    runtimeSummaryEl.textContent = runtimeParts.length ? runtimeParts.join(" / ") : "Waiting for session...";
+    runtimeSummaryEl.textContent = runtimeParts.length
+      ? runtimeParts.join(" / ")
+      : hasSavedSession()
+        ? "Saved game ready to resume"
+        : "Choose a start option";
     const overrideCount = diagnostics?.profile_overrides?.length || 0;
     const localGpuSummary = formatLocalGpuSummary(localGpu);
     profileSummaryEl.textContent = profile
       ? `${profile.label || profile.id || "Setup profile"}${overrideCount ? ` | ${overrideCount} override${overrideCount === 1 ? "" : "s"}` : ""}${localGpuSummary ? ` | ${localGpuSummary}` : ""}`
-      : localGpuSummary || "Setup profile loading...";
+      : localGpuSummary || (state.hasEnteredFlow ? "Setup profile loading..." : "No session loaded yet.");
 
     if (!state.player) {
-      sessionSummaryEl.textContent = "No active session yet.";
+      sessionSummaryEl.textContent = state.hasEnteredFlow
+        ? "Waiting for the opening scene."
+        : hasSavedSession()
+          ? "Resume the last game saved in this browser or start over with a new run."
+          : "Choose a name and start when you're ready.";
       return;
     }
 
@@ -481,6 +527,8 @@ function initializeApp(): void {
 
     if (!data.player) {
       state.player = null;
+      renderLaunchPanel();
+      renderPlaySurface();
       renderSessionSummary();
       renderPreflightPanel();
       renderDebugPanels();
@@ -496,6 +544,8 @@ function initializeApp(): void {
       nameEl.value = data.player.name;
     }
     rememberPlayerName();
+    renderLaunchPanel();
+    renderPlaySurface();
     renderSessionSummary();
     renderPreflightPanel();
     renderDebugPanels();
@@ -534,7 +584,7 @@ function initializeApp(): void {
     return data.detail || data.error || fallback;
   }
 
-  async function ensurePlayer({ force = false, showStatus = false, announce = false } = {}): Promise<PlayerState | null> {
+  async function ensurePlayer({ force = false, showStatus = false } = {}): Promise<PlayerState | null> {
     if (state.fatalError || activeFatalUiError) {
       return null;
     }
@@ -572,10 +622,6 @@ function initializeApp(): void {
       throw new Error("Player initialization failed.");
     }
 
-    if (announce) {
-      addEntry("System", `${state.player.name} is ready in ${state.player.location}.`);
-    }
-
     if (showStatus) {
       if (preflight?.status === "action-required") {
         setStatus("Setup required", "error");
@@ -588,8 +634,66 @@ function initializeApp(): void {
     return state.player;
   }
 
+  function clearSessionView({ clearSavedPlayerId }: { clearSavedPlayerId: boolean }): void {
+    if (clearSavedPlayerId) {
+      localStorage.removeItem("playerId");
+      state.playerId = "";
+    }
+
+    state.player = null;
+    state.sessionDebug = null;
+    state.lastTurnDebug = null;
+    logEl.innerHTML = "";
+    setOptions([]);
+    setAssist([], []);
+    renderLaunchPanel();
+    renderPlaySurface();
+    renderSessionSummary();
+    renderPreflightPanel();
+    renderDebugPanels();
+  }
+
+  async function startGameFlow(mode: "new" | "resume"): Promise<void> {
+    if (state.pending || state.fatalError || activeFatalUiError) {
+      return;
+    }
+
+    if (mode === "resume" && !hasSavedSession()) {
+      setStatus("No saved game to resume", "error");
+      return;
+    }
+
+    state.hasEnteredFlow = true;
+    clearSessionView({ clearSavedPlayerId: mode === "new" });
+    setPending(true);
+    setStatus(mode === "resume" ? "Resuming game" : "Starting new game", "working");
+
+    try {
+      const player = await ensurePlayer({ force: true });
+      if (!player) {
+        setStatus("Setup required", "error");
+        return;
+      }
+
+      const guideMessage =
+        mode === "resume"
+          ? `Back in ${player.location}. Continue where you left off or try "look around" to get your bearings.`
+          : `${player.name} arrives in ${player.location}. Try "look around" or any short action to begin.`;
+      addEntry("Guide", guideMessage, "system");
+      setStatus(mode === "resume" ? "Game resumed" : "New game ready", "ok");
+    } catch (error) {
+      addEntry("System", error instanceof Error ? error.message : "Session start failed.", "system");
+      setStatus(mode === "resume" ? "Resume failed" : "Start failed", "error");
+    } finally {
+      setPending(false);
+      if (state.player && !state.fatalError && !activeFatalUiError) {
+        inputEl.focus();
+      }
+    }
+  }
+
   async function requestAssist(): Promise<void> {
-    if (state.pending || state.fatalError || activeFatalUiError) return;
+    if (state.pending || state.fatalError || activeFatalUiError || !state.hasEnteredFlow || !state.player) return;
 
     const input = inputEl.value.trim();
     if (!input) {
@@ -622,14 +726,19 @@ function initializeApp(): void {
     const preflight = getRuntimePreflight();
     const setupBlocked = preflight?.status === "action-required";
     const fatalBlocked = Boolean(state.fatalError || activeFatalUiError);
-    sendButtonEl.disabled = pending || setupBlocked || fatalBlocked;
-    inputEl.disabled = pending || setupBlocked || fatalBlocked;
-    nameEl.disabled = fatalBlocked;
-    refreshSessionButtonEl.disabled = pending || fatalBlocked;
-    newSessionButtonEl.disabled = pending || fatalBlocked;
+    const readyForTurns = state.hasEnteredFlow && Boolean(state.player) && !setupBlocked && !fatalBlocked && !pending;
+
+    renderLaunchPanel();
+    renderPlaySurface();
+
+    sendButtonEl.disabled = !readyForTurns;
+    inputEl.disabled = !readyForTurns;
+    nameEl.disabled = pending || fatalBlocked;
+    refreshSessionButtonEl.disabled = pending || fatalBlocked || !state.hasEnteredFlow;
+    newSessionButtonEl.disabled = pending || fatalBlocked || !state.hasEnteredFlow;
 
     Array.from(optionsEl.querySelectorAll("button")).forEach((button) => {
-      button.disabled = pending || setupBlocked || fatalBlocked;
+      button.disabled = !readyForTurns;
     });
   }
 
@@ -642,7 +751,7 @@ function initializeApp(): void {
 
   formEl.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (state.pending || state.fatalError || activeFatalUiError) return;
+    if (state.pending || state.fatalError || activeFatalUiError || !state.hasEnteredFlow) return;
 
     const input = inputEl.value.trim();
     if (!input) return;
@@ -700,7 +809,7 @@ function initializeApp(): void {
       setStatus("Request failed", "error");
     } finally {
       setPending(false);
-      if (!state.fatalError && !activeFatalUiError) {
+      if (state.player && !state.fatalError && !activeFatalUiError) {
         inputEl.focus();
       }
     }
@@ -727,13 +836,32 @@ function initializeApp(): void {
   nameEl.addEventListener("change", rememberPlayerName);
   nameEl.addEventListener("blur", rememberPlayerName);
 
+  launchNewGameButtonEl.addEventListener("click", () => {
+    startGameFlow("new").catch((error) => {
+      addEntry("System", error instanceof Error ? error.message : "Failed to start a new game.", "system");
+      setStatus("Start failed", "error");
+      setPending(false);
+    });
+  });
+
+  launchResumeButtonEl.addEventListener("click", () => {
+    startGameFlow("resume").catch((error) => {
+      addEntry("System", error instanceof Error ? error.message : "Failed to resume the saved game.", "system");
+      setStatus("Resume failed", "error");
+      setPending(false);
+    });
+  });
+
   refreshSessionButtonEl.addEventListener("click", async () => {
-    if (state.fatalError || activeFatalUiError) return;
+    if (state.fatalError || activeFatalUiError || !state.hasEnteredFlow) return;
 
     try {
-      setStatus("Refreshing state", "working");
-      await ensurePlayer({ force: true });
-      addEntry("System", "Session state refreshed.", "system");
+      setPending(true);
+      setStatus("Refreshing game", "working");
+      const player = await ensurePlayer({ force: true });
+      if (player) {
+        addEntry("System", "Game state refreshed.", "system");
+      }
       const preflight = getRuntimePreflight();
       if (preflight?.status === "action-required") {
         setStatus("Setup required", "error");
@@ -745,43 +873,20 @@ function initializeApp(): void {
     } catch (error) {
       addEntry("System", error instanceof Error ? error.message : "Refresh failed.", "system");
       setStatus("Refresh failed", "error");
+    } finally {
+      setPending(false);
     }
   });
 
   newSessionButtonEl.addEventListener("click", async () => {
-    if (state.fatalError || activeFatalUiError) return;
+    if (state.fatalError || activeFatalUiError || !state.hasEnteredFlow) return;
 
-    localStorage.removeItem("playerId");
-    state.playerId = "";
-    state.player = null;
-    state.sessionDebug = null;
-    state.lastTurnDebug = null;
-    logEl.innerHTML = "";
-    setOptions([]);
-    setAssist([], []);
-    renderSessionSummary();
-    renderPreflightPanel();
-    renderDebugPanels();
-
-    try {
-      await ensurePlayer({ force: true, showStatus: true, announce: true });
-    } catch (error) {
-      addEntry("System", error instanceof Error ? error.message : "Failed to create a new session.", "system");
-      setStatus("Session failed", "error");
-    }
+    await startGameFlow("new");
   });
 
   async function bootstrap(): Promise<void> {
-    setAssist([], []);
-
-    try {
-      await ensurePlayer({ force: true, showStatus: true, announce: true });
-    } catch (error) {
-      handleFatalError(createFatalUiErrorState(error));
-      return;
-    }
-
-    inputEl.focus();
+    setStatus(hasSavedSession() ? "Resume or start new" : "Start a new game", "idle");
+    nameEl.focus();
   }
 
   bootstrap().catch((error) => {
@@ -852,7 +957,7 @@ function renderAppFatalError(state: FatalUiErrorState): void {
 }
 
 function disableInteractiveControls(): void {
-  const ids = ["player-name", "player-input", "send-button", "refresh-session", "new-session"];
+  const ids = ["player-name", "player-input", "send-button", "refresh-session", "new-session", "launch-new-game", "launch-resume"];
 
   ids.forEach((id) => {
     const element = document.getElementById(id);

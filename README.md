@@ -462,6 +462,8 @@ See `packaging/decision-memo.md` for the option comparison, save or log implicat
 
 The browser UI includes:
 
+- a first-screen onboarding panel with `Start New Game` and `Resume Last Game` actions instead of auto-starting a session on page load
+- one short turn-loop explainer on the launch screen so players can begin without opening project docs
 - a text log for player and narrator turns
 - player naming plus a multiline turn input with local assist chips
 - a startup setup panel that uses one shared preflight contract with `blocker`, `warning`, and `info` issues before the first turn

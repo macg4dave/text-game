@@ -8,9 +8,7 @@ import { config, formatConfigErrors, getSafeConfigDiagnostics } from "../core/co
 import { initDb } from "../core/db.js";
 import { createLogger } from "../core/logging.js";
 import {
-  AUTHORITATIVE_STATE_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
-  type AuthoritativePlayerState,
   type Player,
   type QuestSpec,
   type RuntimePreflightIssue,
@@ -32,10 +30,11 @@ import { assistText } from "../utils/assist.js";
 import { applyDirectorRules, getCurrentBeat, loadDirectorSpec, reloadDirectorSpec } from "../story/director.js";
 import {
   parseTurnInput,
-  validateAuthoritativePlayerState,
   validateDirectorSpec,
   validateQuestSpec,
+  validateStateResponse,
   validateStateUpdates,
+  validateTurnResponse,
   validateTurnOutput
 } from "../rules/validator.js";
 import { loadQuestSpec, reloadQuestSpec } from "../story/quest.js";
@@ -47,6 +46,7 @@ import { SYSTEM_PROMPT } from "./prompt.js";
 import { createRuntimePreflightService } from "./runtime-preflight.js";
 import { sanitizeTurnResult } from "./turn-result.js";
 import { createGlobalProcessHandler } from "./global-handler.js";
+import { createAuthoritativePlayerState, createStateResponsePayload, createTurnResponsePayload } from "./http-contract.js";
 
 type ServerTurnDebugParams = Omit<TurnDebugParams, "config" | "runtimePreflight">;
 
@@ -117,14 +117,15 @@ app.get("/api/state", async (req: Request, res: Response) => {
   }
 
   const authoritativePlayer = createAuthoritativePlayerState(player);
-  const authoritativeStateValidation = validateAuthoritativePlayerState(authoritativePlayer);
-  if (!authoritativeStateValidation.ok) {
-    getRequestLogger(res).error("state request produced invalid authoritative player state", {
-      validationErrors: authoritativeStateValidation.errors
+  const stateResponse = createStateResponsePayload(authoritativePlayer);
+  const stateResponseValidation = validateStateResponse(stateResponse);
+  if (!stateResponseValidation.ok) {
+    getRequestLogger(res).error("state request produced invalid response payload", {
+      validationErrors: stateResponseValidation.errors
     });
     return res.status(500).json({
-      error: "Invalid authoritative state",
-      detail: authoritativeStateValidation.errors,
+      error: "Invalid state response",
+      detail: stateResponseValidation.errors,
       debug: {
         runtime: buildRuntimeDebugPayload(),
         session: null
@@ -133,7 +134,7 @@ app.get("/api/state", async (req: Request, res: Response) => {
   }
 
   res.json({
-    player: authoritativePlayer,
+    ...stateResponse,
     debug: {
       runtime: buildRuntimeDebugPayload(),
       session: buildSessionDebug(authoritativePlayer)
@@ -462,14 +463,19 @@ app.post("/api/turn", async (req: Request, res: Response) => {
 
     refreshedPlayer = getOrCreatePlayer({ playerId: player.id });
     const authoritativePlayer = createAuthoritativePlayerState(refreshedPlayer);
-    const authoritativeStateValidation = validateAuthoritativePlayerState(authoritativePlayer);
-    if (!authoritativeStateValidation.ok) {
-      requestLogger.error("turn produced invalid authoritative player state", {
-        validationErrors: authoritativeStateValidation.errors
+    if (!result) {
+      throw new Error("Validated turn result missing.");
+    }
+
+    const turnResponse = createTurnResponsePayload(result, authoritativePlayer);
+    const turnResponseValidation = validateTurnResponse(turnResponse);
+    if (!turnResponseValidation.ok) {
+      requestLogger.error("turn produced invalid response payload", {
+        validationErrors: turnResponseValidation.errors
       });
       return res.status(500).json({
-        error: "Invalid authoritative state",
-        detail: authoritativeStateValidation.errors,
+        error: "Invalid turn response",
+        detail: turnResponseValidation.errors,
         debug: buildTurnDebugPayload({
           requestId,
           startedAt,
@@ -499,12 +505,7 @@ app.post("/api/turn", async (req: Request, res: Response) => {
     });
 
     return res.json({
-      schema_version: result.schema_version,
-      narrative: result.narrative,
-      player_options: result.player_options,
-      state_updates: result.state_updates,
-      director_updates: result.director_updates,
-      player: authoritativePlayer,
+      ...turnResponse,
       debug: buildTurnDebugPayload({
         requestId,
         startedAt,
@@ -580,13 +581,6 @@ function buildTurnDebugPayload(params: ServerTurnDebugParams) {
     config,
     runtimePreflight: runtimePreflight.getCurrentReport()
   });
-}
-
-function createAuthoritativePlayerState(player: Player): AuthoritativePlayerState {
-  return {
-    schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
-    ...player
-  };
 }
 
 function mergeList(existing: string[], addList: string[] = [], removeList: string[] = []): string[] {

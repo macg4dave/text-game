@@ -105,14 +105,14 @@ Use this exact shape when adding new work:
 | T02h | Now | P0 | P1 | GPU-first Docker launcher default | Done | T02g | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/core/config.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T05 | Next | P0 | P2 | Error boundary and global handler | Done | None | `npm test` |
 | T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Done | T02f | Matrix review |
-| T06 | Next | P1 | P1 | Turn input, output, and state schemas | Review | T02 | `npm test` |
+| T06 | Next | P1 | P1 | Turn input, output, and state schemas | Done | T02 | `npm test` |
 | T07 | Next | P1 | P1 | Turn handler and model orchestration | Ready | T06 | `npm test` |
 | T07a | Next | P1 | P1 | LiteLLM default chat route for turn generation | Ready | T02f, T07 | Manual turn submission against LiteLLM |
 | T08 | Next | P1 | P1 | Deterministic state reducer | Ready | T06 | `npm test` |
 | T09 | Next | P1 | P1 | Event log persistence and replay | Ready | T04, T08 | Replay fixture execution |
 | T10 | Next | P1 | P1 | Output validator and sanitizer | Ready | T06 | `npm test` |
-| T11 | Next | P1 | P1 | Minimal player UI loop | Review | T06 | Manual browser smoke test |
-| T12 | Next | P1 | P1 | New game onboarding | Ready | T06 | Manual new-game flow check |
+| T11 | Next | P1 | P1 | Minimal player UI loop | Done | T06 | `docker compose run --rm --no-deps app npm test` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + manual browser smoke test |
+| T12 | Next | P1 | P1 | New game onboarding | Review | T06 | Manual new-game flow check |
 | T12b | Next | P1 | P1 | First-run setup wizard and connection test | Ready | T02f, T11, T12 | Manual first-run flow check |
 | T12c | Next | P1 | P1 | Guided recovery actions and advanced setup details | Ready | T12b, T01c, T02i, T04a, T02j | Manual recovery flow check |
 | T29 | Next | P1 | P1 | Save slots UI | Ready | T08, T09 | Manual save/load check |
@@ -312,7 +312,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T06 - Turn Input, Output, And State Schemas
 
-- Status: Review
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -328,6 +328,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - src/rules/validator.ts
   - src/rules/validator.test.ts
   - src/server/index.ts
+  - src/server/http-contract.ts
+  - src/server/http-contract.test.ts
   - REQUIREMENTS.md
 - Do Not Touch:
   - public/styles.css
@@ -345,13 +347,18 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - implemented on 2026-03-08 with three HTTP-boundary schema markers: `turn-input/v1`, `turn-output/v1`, and `authoritative-state/v1`
   - `/api/turn` now normalizes the legacy camelCase request body (`playerId`, `name`) into the versioned turn-input contract so the current UI keeps working while later tasks move fully to the explicit schema
   - `/api/state` and `/api/turn` now return versioned authoritative player snapshots, and `/api/turn` also returns a top-level `schema_version` for the turn-output payload
-  - added focused coverage in `src/rules/validator.test.ts` for turn-input parsing, turn-output validation, and authoritative-state validation
-  - validation on 2026-03-08: `docker compose build app` passed, `docker compose run --rm --no-deps app npm run type-check` passed, and `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` passed
-  - `docker compose run --rm --no-deps app npm test` still fails because of the pre-existing unrelated failure in `src/core/config.test.ts` (`buildConfigPreflightIssues turns config failures into player-facing recovery steps` expects `3` issues but currently receives `4`)
+  - completed follow-up on 2026-03-08 to make the shared `/api/turn` response contract explicit before `T07`, `T08`, and `T09` build on it
+  - added `StateResponsePayload` and `TurnResponsePayload` in `src/core/types.ts` so the Phase 1 server boundary has named response types instead of ad hoc object assembly
+  - added `validateStateResponse` and `validateTurnResponse` plus focused coverage in `src/rules/validator.test.ts` so response envelopes are checked alongside the inner turn and player payloads
+  - added `src/server/http-contract.ts` and `src/server/http-contract.test.ts` to stamp authoritative-state versions and assemble the shared `/api/state` and `/api/turn` payloads in one place
+  - `/api/turn` now returns the full validated turn-output payload, including `memory_updates`, alongside the versioned authoritative player snapshot
+  - added focused coverage in `src/rules/validator.test.ts` for turn-input parsing, turn-output validation, authoritative-state validation, and the new state or turn response envelopes
+  - validation on 2026-03-08 passed with `git diff --check`, `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts`, and `docker compose run --rm --no-deps app npm test`
+  - note for future agents: the `app` service runs from the built image, not a bind-mounted workspace, so new source files require `docker compose build app` before Docker-based test runs will see them
 
 ### T11 - Minimal Player UI Loop
 
-- Status: Review
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -367,9 +374,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - README.md
   - REQUIREMENTS.md
   - public/index.html
-  - public/app.ts
+  - src/ui/app.ts
   - public/styles.css
-  - src/server.ts
+  - src/server/index.ts
 - Do Not Touch:
   - data/spec/
   - src/ai.ts
@@ -378,8 +385,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Dependencies:
   - T06
 - Validation:
-  - `npm install`
-  - `npm run dev`
+  - `docker compose run --rm --no-deps app npm test`
+  - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
   - manual browser smoke test against the configured local AI path
 - Definition of Done:
   - a player can create or resume a session in the browser and submit turns
@@ -390,11 +397,13 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - user assigned this ahead of queue order on 2026-03-07 to make local AI iteration easier before deeper roadmap work
   - implemented a browser play shell with session refresh or new-session controls, multiline text input, suggestion chips, and a persistent debug panel
   - `/api/state` now returns safe runtime or session debug data and `/api/turn` now returns safe debug data including request id, latency, prompt preview, embedding fallback status, validation result, and before or after player snapshots
-  - local validation was limited to code inspection plus `git diff --check`; `npm install`, `npm run dev`, and the manual browser smoke test were not runnable because `node` and `npm` were unavailable in this shell environment
+  - task card paths were aligned on 2026-03-08 with the current authoring layout: `src/ui/app.ts` is the browser source of truth and `src/server/index.ts` is the server entrypoint
+  - validation completed on 2026-03-08 with `docker compose run --rm --no-deps app npm test`, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, a page-load smoke at `http://127.0.0.1:3100/`, and a live `/api/turn` submission returning narrative, options, debug payload, and versioned player state through the LiteLLM plus Ollama path
+  - no additional implementation changes were required in this session because the existing UI loop already satisfied the task once the supported Docker-backed validation path was available
 
 ### T12 - New Game Onboarding
 
-- Status: Ready
+- Status: Review
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -408,11 +417,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - BACKLOG.md
   - README.md
   - public/index.html
-  - public/app.ts
+  - public/app.js
+  - src/ui/app.ts
   - public/styles.css
 - Do Not Touch:
-  - src/ai.ts
-  - src/db.ts
+  - src/ai/service.ts
+  - src/core/db.ts
 - Dependencies:
   - T06
 - Validation:
@@ -423,6 +433,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - the onboarding flow hands off cleanly to the tutorial and setup diagnostics paths
 - Handoff Notes:
   - keep the first screen short enough that it still feels like an app launch, not a configuration checklist
+  - updated on 2026-03-08 to add a browser-side onboarding gate in `src/ui/app.ts` so the page no longer auto-creates a session on load; instead it shows `Start New Game` and `Resume Last Game` actions before revealing the turn controls
+  - the first-screen copy, toolbar labels, and input labels were rewritten in `public/index.html` and `public/styles.css` to remove more developer-facing wording from the initial player flow while keeping the existing debug panel intact
+  - validation on 2026-03-08 ran `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npm run build:client`, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, and HTTP smoke checks against `/` plus `/api/state` on the launched app
+  - the full interactive browser click-through for `Start New Game` and `Resume Last Game` was not completed cleanly in this session because the headless-browser automation attempt hung; leave this task in `Review` until a short manual browser check confirms both buttons reveal the expected flow end to end
 
 ### T12b - First-Run Setup Wizard And Connection Test
 

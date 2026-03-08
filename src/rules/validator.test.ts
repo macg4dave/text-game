@@ -5,11 +5,15 @@ import {
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
   type AuthoritativePlayerState,
+  type StateResponsePayload,
+  type TurnResponsePayload,
   type TurnOutputPayload
 } from "../core/types.js";
 import {
   parseTurnInput,
   validateAuthoritativePlayerState,
+  validateStateResponse,
+  validateTurnResponse,
   validateTurnOutput
 } from "./validator.js";
 
@@ -144,4 +148,137 @@ test("validateAuthoritativePlayerState rejects malformed versioned player snapsh
   assert.equal(result.ok, false);
   assert.match(result.errors.join(" "), /quests/i);
   assert.match(result.errors.join(" "), /director_state/i);
+});
+
+test("validateStateResponse accepts a versioned authoritative player envelope", () => {
+  const payload: StateResponsePayload = {
+    player: {
+      schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      id: "player-123",
+      name: "Avery",
+      created_at: "2026-03-08T00:00:00.000Z",
+      location: "Rooftop Market",
+      summary: "You arrived at the market.",
+      inventory: ["signal shard"],
+      flags: ["market_seen"],
+      quests: [
+        {
+          id: "intro-signal",
+          status: "active",
+          summary: "You noticed the first signal marker."
+        }
+      ],
+      director_state: {
+        end_goal: "Reach the tower",
+        current_act_id: "act-1",
+        current_act: "Arrival",
+        current_beat_id: "beat-1",
+        current_beat_label: "Find the signal",
+        story_beats_remaining: 3,
+        end_goal_progress: "You have started the search.",
+        completed_beats: []
+      }
+    }
+  };
+
+  assert.deepEqual(validateStateResponse(payload), { ok: true, errors: [] });
+});
+
+test("validateTurnResponse accepts a full versioned turn payload plus authoritative player state", () => {
+  const payload: TurnResponsePayload = {
+    schema_version: TURN_OUTPUT_SCHEMA_VERSION,
+    narrative: "You scan the market from the rooftop.",
+    player_options: ["Inspect the signal lantern", "Leave quietly"],
+    state_updates: {
+      location: "Rooftop Market",
+      inventory_add: ["signal shard"],
+      inventory_remove: [],
+      flags_add: ["market_seen"],
+      flags_remove: [],
+      quests: [
+        {
+          id: "intro-signal",
+          status: "active",
+          summary: "You noticed the first signal marker."
+        }
+      ]
+    },
+    director_updates: {
+      end_goal_progress: "The signal is now visible."
+    },
+    memory_updates: ["The player found a signal shard in the market."],
+    player: {
+      schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      id: "player-123",
+      name: "Avery",
+      created_at: "2026-03-08T00:00:00.000Z",
+      location: "Rooftop Market",
+      summary: "You arrived at the market.",
+      inventory: ["signal shard"],
+      flags: ["market_seen"],
+      quests: [
+        {
+          id: "intro-signal",
+          status: "active",
+          summary: "You noticed the first signal marker."
+        }
+      ],
+      director_state: {
+        end_goal: "Reach the tower",
+        current_act_id: "act-1",
+        current_act: "Arrival",
+        current_beat_id: "beat-1",
+        current_beat_label: "Find the signal",
+        story_beats_remaining: 3,
+        end_goal_progress: "You have started the search.",
+        completed_beats: []
+      }
+    }
+  };
+
+  assert.deepEqual(validateTurnResponse(payload), { ok: true, errors: [] });
+});
+
+test("validateTurnResponse rejects missing full turn fields and invalid authoritative player state", () => {
+  const result = validateTurnResponse({
+    schema_version: TURN_OUTPUT_SCHEMA_VERSION,
+    narrative: "The turn is incomplete.",
+    player_options: [],
+    state_updates: {
+      location: "Rooftop Market",
+      inventory_add: [],
+      inventory_remove: [],
+      flags_add: [],
+      flags_remove: [],
+      quests: []
+    },
+    director_updates: {
+      end_goal_progress: "No progress."
+    },
+    player: {
+      schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      id: 123,
+      name: "Avery",
+      created_at: "2026-03-08T00:00:00.000Z",
+      location: "Rooftop Market",
+      summary: "You arrived at the market.",
+      inventory: [],
+      flags: [],
+      quests: [],
+      director_state: {
+        end_goal: "Reach the tower",
+        current_act_id: "act-1",
+        current_act: "Arrival",
+        current_beat_id: "beat-1",
+        current_beat_label: "Find the signal",
+        story_beats_remaining: 3,
+        end_goal_progress: "You have started the search.",
+        completed_beats: []
+      }
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /memory_updates/i);
+  assert.match(result.errors.join(" "), /player\.id/i);
 });
