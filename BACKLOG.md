@@ -110,7 +110,7 @@ Use this exact shape when adding new work:
 | T03 | Now | P0 | P1 | Logging with levels and redaction | Done | None | `npm test` |
 | T04 | Now | P0 | P1 | DB migrations and seed flow | Done | None | Manual DB reset verification |
 | T04a | Now | P0 | P1 | Storage, save, and migration preflight | Done | T04, T01b | Manual DB and save preflight smoke test |
-| T02j | Now | P0 | P1 | End-user config profiles and validated developer overrides | Ready | T01b, T02a, T02g | `npm test`; manual profile resolution check |
+| T02j | Now | P0 | P1 | End-user config profiles and validated developer overrides | Done | T01b, T02a, T02g | `npm test`; manual profile resolution check |
 | T05 | Next | P0 | P2 | Error boundary and global handler | Ready | None | `npm test` |
 | T35a | Next | P0 | P1 | Packaged AI runtime decision for Docker LiteLLM | Done | T35, T02f | Decision memo review |
 | T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Review | T02f | Matrix review |
@@ -705,7 +705,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T02j - End-User Config Profiles And Validated Developer Overrides
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -721,10 +721,13 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - REQUIREMENTS.md
   - README.md
   - .env.example
-  - src/config.ts
-  - src/config.test.ts
-  - public/app.ts
+  - src/core/config.ts
+  - src/core/config.test.ts
+  - src/core/config/
+  - src/core/types.ts
+  - src/ui/app.ts
   - public/index.html
+  - scripts/lib/shared.ps1
   - scripts/start-dev.ps1
 - Do Not Touch:
   - data/spec/
@@ -743,6 +746,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Handoff Notes:
   - the main value here is reducing blank-slate config ambiguity, not adding endless profile permutations
   - keep the end-user surface small and move complexity behind the advanced override path
+  - completed on 2026-03-08 with a new validated `AI_PROFILE` contract covering `hosted-default`, `local-gpu-small`, `local-gpu-large`, and `custom`
+  - config resolution now treats explicit profile selection as the first starter layer, but preserves the existing provider inference path when `AI_PROFILE` is unset so older `OPENAI_*`, `AI_*`, and `OLLAMA_*` setups still behave correctly
+  - safe runtime diagnostics now expose the active profile plus a `profile_overrides` list that only reports explicit env vars that actually differ from the selected profile defaults
+  - the browser runtime card and setup panel now show the active setup profile, and the launcher now prints the selected profile before starting Docker
+  - updated `.env.example`, `README.md`, and `REQUIREMENTS.md` so profile-first setup is documented without creating a second hidden config path outside the main validation contract
+  - validated on 2026-03-08 with `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npm test`, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` plus `/api/state` inspection on `PORT=3317` confirming runtime profile metadata for `hosted-default`
 
 ### T02 - Config Module With Schema Validation
 
@@ -919,6 +928,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - default `docker-compose.yml` now starts the app plus LiteLLM sidecar, and `docker-compose.gpu.yml` adds an optional Ollama backend with Docker GPU reservations
   - `scripts/start-dev.ps1` now supports `-AiStack hosted` and `-AiStack local-gpu`; both launcher modes force the supported LiteLLM stack instead of inheriting stale direct-provider `.env` experiments
   - validated on 2026-03-08 with `docker compose config`, `docker compose -f docker-compose.yml -f docker-compose.gpu.yml config`, `$env:PORT='3300'; docker compose up --build -d`, `Invoke-WebRequest http://127.0.0.1:3300/api/state?name=ComposeSmoke`, `$env:PORT='3301'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, `$env:PORT='3302'; docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`, `Invoke-WebRequest http://127.0.0.1:3302/api/state?name=GpuSmoke`, and `$env:PORT='3303'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu -NoBrowser`
+  - follow-up on 2026-03-08 changed the default Docker smoke path to start a repo-managed `ollama` service in `docker-compose.yml` so LiteLLM no longer depends on host Ollama for the default stack; the GPU override now layers GPU reservations and the `config.local-gpu.yaml` swap onto the same service name
   - current limitation: without a real hosted provider key, runtime preflight still reports the AI service as blocked before the first turn because LiteLLM returns HTTP 400 during the app's startup connectivity probe; container startup and launcher orchestration are verified, but real turn-generation validation still needs a valid upstream credential
 
 ### T03 - Logging With Levels And Redaction

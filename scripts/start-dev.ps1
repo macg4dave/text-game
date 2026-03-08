@@ -906,6 +906,7 @@ $config = Resolve-ProviderConfig -DotEnv $dotEnv
 Write-Host "Text Game Docker startup" -ForegroundColor Green
 Write-Info ("repo: {0}" -f $repoRoot)
 Write-Info ("ai stack: {0}" -f $AiStack)
+Write-Info ("profile: {0}" -f $config.profile)
 Write-Info ("provider: {0}" -f $config.provider)
 if ($config.hasDotEnv) {
   Write-Info "configuration: using .env"

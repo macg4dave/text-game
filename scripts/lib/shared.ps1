@@ -235,7 +235,20 @@ function Resolve-RepoAiConfig {
     [switch]$IncludePort
   )
 
+  $profile = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROFILE") -Default "hosted-default"
+  if ([string]::IsNullOrWhiteSpace($profile)) {
+    $profile = "hosted-default"
+  }
+  $profile = $profile.Trim().ToLowerInvariant()
+
+  if ($profile -notin @("hosted-default", "local-gpu-small", "local-gpu-large", "custom")) {
+    $profile = "hosted-default"
+  }
+
   $provider = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROVIDER") -Default ""
+  if (-not (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("AI_PROVIDER")) -and $profile -ne "custom") {
+    $provider = "litellm"
+  }
   if ([string]::IsNullOrWhiteSpace($provider)) {
     if (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "LITELLM_API_KEY", "LITELLM_CHAT_MODEL", "LITELLM_EMBEDDING_MODEL")) {
       $provider = "litellm"
@@ -276,6 +289,7 @@ function Resolve-RepoAiConfig {
 
   $config = [ordered]@{
     hasDotEnv = $HasDotEnv
+    profile = $profile
     provider = $provider
     baseUrl = $baseUrl.TrimEnd("/")
     apiKey = $apiKey

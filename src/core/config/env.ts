@@ -1,15 +1,24 @@
-import type { AiConfig, EnvSource, LoggingConfig, PublicRuntimeConfig } from "../types.js";
-import type { SafeConfigDiagnostics, ConfigEnvSource, ConfigLike, ConfigValueSource, AiConfigField } from "./shared.js";
+import type { AiConfig, ConfigProfileSelection, EnvSource, LoggingConfig, PublicRuntimeConfig } from "../types.js";
+import type {
+  AiConfigField,
+  ConfigEnvSource,
+  ConfigLike,
+  ConfigProfileDefinition,
+  ConfigValueSource,
+  ProfileOverrideDiagnostic,
+  SafeConfigDiagnostics
+} from "./shared.js";
 import {
   AI_ENV_VAR_CANDIDATES,
   classifyAiEnvVarSource,
+  getConfigProfileDefinition,
   getProviderDefaults,
   isSupportedAiProvider,
   normalizeBaseUrl,
   normalizeProvider,
   readFirstEnvValue
 } from "./shared.js";
-import { parseLogLevel, parsePort, validateAiConfig } from "./validation.js";
+import { parseAiProfile, parseLogLevel, parsePort, validateAiConfig } from "./validation.js";
 
 export function getAiEnvVarNames(provider: string, field: AiConfigField): string[] {
   const candidates = AI_ENV_VAR_CANDIDATES[field];
@@ -26,14 +35,47 @@ export function resolveAiSetting(
   env: EnvSource,
   provider: string,
   field: AiConfigField,
-  fallbackValue: string
+  fallbackValue: string,
+  profile: ConfigProfileSelection,
+  profileDefinition: ConfigProfileDefinition = getConfigProfileDefinition(profile.id)
 ): { value: string; source: ConfigValueSource; envVar: string | null } {
   const resolved = readFirstEnvValue(env, getAiEnvVarNames(provider, field));
 
+  if (resolved.envVar) {
+    return {
+      value: resolved.value ?? fallbackValue,
+      source: classifyAiEnvVarSource(provider, field, resolved.envVar),
+      envVar: resolved.envVar
+    };
+  }
+
+  if (canApplyProfileDefaults(profile)) {
+    const profileValue = profileDefinition.defaults?.[field];
+    if (typeof profileValue === "string" && profileValue.trim()) {
+      return {
+        value: profileValue.trim(),
+        source: "profile",
+        envVar: "AI_PROFILE"
+      };
+    }
+  }
+
   return {
-    value: resolved.value ?? fallbackValue,
-    source: classifyAiEnvVarSource(provider, field, resolved.envVar),
-    envVar: resolved.envVar
+    value: fallbackValue,
+    source: "default",
+    envVar: null
+  };
+}
+
+export function resolveProfile(env: EnvSource): ConfigProfileSelection {
+  const raw = readFirstEnvValue(env, ["AI_PROFILE"]);
+  const parsed = parseAiProfile(raw.value);
+  const definition = getConfigProfileDefinition(parsed.value);
+
+  return {
+    ...definition,
+    source: raw.envVar ? (parsed.errors.length ? "invalid-env" : "env") : "default",
+    envVar: raw.envVar
   };
 }
 
@@ -73,7 +115,10 @@ export function inferProviderFromEnv(env: EnvSource): { value: string; envVar: s
   return null;
 }
 
-export function resolveProvider(env: EnvSource): { value: string; source: ConfigEnvSource; envVar: string | null } {
+export function resolveProvider(
+  env: EnvSource,
+  profile: ConfigProfileSelection = resolveProfile(env)
+): { value: string; source: ConfigEnvSource; envVar: string | null } {
   const resolved = readFirstEnvValue(env, ["AI_PROVIDER"]);
   if (resolved.envVar) {
     return {
@@ -81,6 +126,18 @@ export function resolveProvider(env: EnvSource): { value: string; source: Config
       source: "env",
       envVar: resolved.envVar
     };
+  }
+
+  if (canApplyProfileDefaults(profile)) {
+    const profileDefinition = getConfigProfileDefinition(profile.id);
+    const profileProvider = profileDefinition.defaults?.provider;
+    if (profileProvider) {
+      return {
+        value: profileProvider,
+        source: "profile",
+        envVar: "AI_PROFILE"
+      };
+    }
   }
 
   const inferred = inferProviderFromEnv(env);
@@ -122,12 +179,21 @@ export function resolveLogLevel(env: EnvSource): { value: LoggingConfig["level"]
 }
 
 export function resolveAiConfig(env: EnvSource): AiConfig {
-  const provider = resolveProvider(env).value;
+  const profile = resolveProfile(env);
+  const profileDefinition = getConfigProfileDefinition(profile.id);
+  const provider = resolveProvider(env, profile).value;
   const defaults = getProviderDefaults(provider);
-  const apiKey = resolveAiSetting(env, provider, "apiKey", defaults.apiKey);
-  const baseUrl = resolveAiSetting(env, provider, "baseUrl", defaults.baseUrl);
-  const chatModel = resolveAiSetting(env, provider, "chatModel", defaults.chatModel);
-  const embeddingModel = resolveAiSetting(env, provider, "embeddingModel", defaults.embeddingModel);
+  const apiKey = resolveAiSetting(env, provider, "apiKey", defaults.apiKey, profile, profileDefinition);
+  const baseUrl = resolveAiSetting(env, provider, "baseUrl", defaults.baseUrl, profile, profileDefinition);
+  const chatModel = resolveAiSetting(env, provider, "chatModel", defaults.chatModel, profile, profileDefinition);
+  const embeddingModel = resolveAiSetting(
+    env,
+    provider,
+    "embeddingModel",
+    defaults.embeddingModel,
+    profile,
+    profileDefinition
+  );
 
   return {
     provider,
@@ -142,21 +208,64 @@ export function getSafeConfigDiagnostics(
   configToSummarize: ConfigLike,
   env: EnvSource
 ): SafeConfigDiagnostics {
-  const provider = resolveProvider(env);
+  const profile = resolveProfile(env);
+  const profileDefinition = getConfigProfileDefinition(profile.id);
+  const provider = resolveProvider(env, profile);
   const port = resolvePort(env);
   const logLevel = resolveLogLevel(env);
   const defaults = getProviderDefaults(configToSummarize.ai.provider);
-  const apiKey = resolveAiSetting(env, configToSummarize.ai.provider, "apiKey", defaults.apiKey);
-  const baseUrl = resolveAiSetting(env, configToSummarize.ai.provider, "baseUrl", defaults.baseUrl);
-  const chatModel = resolveAiSetting(env, configToSummarize.ai.provider, "chatModel", defaults.chatModel);
+  const apiKey = resolveAiSetting(
+    env,
+    configToSummarize.ai.provider,
+    "apiKey",
+    defaults.apiKey,
+    profile,
+    profileDefinition
+  );
+  const baseUrl = resolveAiSetting(
+    env,
+    configToSummarize.ai.provider,
+    "baseUrl",
+    defaults.baseUrl,
+    profile,
+    profileDefinition
+  );
+  const chatModel = resolveAiSetting(
+    env,
+    configToSummarize.ai.provider,
+    "chatModel",
+    defaults.chatModel,
+    profile,
+    profileDefinition
+  );
   const embeddingModel = resolveAiSetting(
     env,
     configToSummarize.ai.provider,
     "embeddingModel",
-    defaults.embeddingModel
+    defaults.embeddingModel,
+    profile,
+    profileDefinition
   );
+  const profileOverrides = buildProfileOverrides({
+    profile,
+    profileDefinition,
+    config: configToSummarize,
+    provider,
+    apiKey,
+    baseUrl,
+    chatModel,
+    embeddingModel
+  });
 
   return {
+    profile: {
+      value: profile.id,
+      label: profile.label,
+      description: profile.description,
+      recommended_ai_stack: profile.recommendedAiStack,
+      source: profile.source,
+      env_var: profile.envVar
+    },
     provider: {
       value: configToSummarize.ai.provider,
       source: provider.source,
@@ -199,11 +308,14 @@ export function getSafeConfigDiagnostics(
     validation: {
       ok: Boolean(configToSummarize.validation?.ok),
       error_count: configToSummarize.validation?.errors?.length || 0
-    }
+    },
+    profile_overrides: profileOverrides
   };
 }
 
-export function getPublicRuntimeConfig(configToSummarize: ConfigLike): PublicRuntimeConfig {
+export function getPublicRuntimeConfig(configToSummarize: ConfigLike, env: EnvSource): PublicRuntimeConfig {
+  const diagnostics = getSafeConfigDiagnostics(configToSummarize, env);
+
   return {
     port: configToSummarize.port,
     provider: configToSummarize.ai.provider,
@@ -212,6 +324,13 @@ export function getPublicRuntimeConfig(configToSummarize: ConfigLike): PublicRun
     base_url: configToSummarize.ai.baseUrl || null,
     api_key_configured: Boolean(configToSummarize.ai.apiKey),
     log_level: configToSummarize.logging.level,
+    profile: {
+      id: configToSummarize.profile.id,
+      label: configToSummarize.profile.label,
+      description: configToSummarize.profile.description,
+      recommended_ai_stack: configToSummarize.profile.recommendedAiStack,
+      override_count: diagnostics.profile_overrides.length
+    },
     validation: {
       ok: Boolean(configToSummarize.validation?.ok),
       errors: (configToSummarize.validation?.errors || []).map((error) => ({
@@ -225,6 +344,7 @@ export function getPublicRuntimeConfig(configToSummarize: ConfigLike): PublicRun
 
 export function loadConfig(env: EnvSource): {
   port: number;
+  profile: ConfigProfileSelection;
   ai: AiConfig;
   logging: LoggingConfig;
   validation: {
@@ -233,18 +353,21 @@ export function loadConfig(env: EnvSource): {
   };
   runtime: PublicRuntimeConfig;
 } {
+  const profileResult = parseAiProfile(readFirstEnvValue(env, ["AI_PROFILE"]).value);
+  const profile = resolveProfile(env);
   const portResult = parsePort(readFirstEnvValue(env, ["PORT"]).value);
   const logLevelResult = parseLogLevel(readFirstEnvValue(env, ["LOG_LEVEL"]).value);
   const ai = resolveAiConfig(env);
   const loadedConfig = {
     port: portResult.value,
+    profile,
     ai,
     logging: {
       level: logLevelResult.value
     },
     validation: {
       ok: false,
-      errors: [...portResult.errors, ...logLevelResult.errors, ...validateAiConfig(ai)]
+      errors: [...profileResult.errors, ...portResult.errors, ...logLevelResult.errors, ...validateAiConfig(ai)]
     }
   };
 
@@ -252,6 +375,128 @@ export function loadConfig(env: EnvSource): {
 
   return {
     ...loadedConfig,
-    runtime: getPublicRuntimeConfig(loadedConfig)
+    runtime: getPublicRuntimeConfig(loadedConfig, env)
   };
+}
+
+function canApplyProfileDefaults(profile: ConfigProfileSelection): boolean {
+  return profile.source === "env" && profile.id !== "custom";
+}
+
+function buildProfileOverrides({
+  profile,
+  profileDefinition,
+  config,
+  provider,
+  apiKey,
+  baseUrl,
+  chatModel,
+  embeddingModel
+}: {
+  profile: ConfigProfileSelection;
+  profileDefinition: ConfigProfileDefinition;
+  config: ConfigLike;
+  provider: { source: ConfigEnvSource; envVar: string | null };
+  apiKey: { source: ConfigValueSource; envVar: string | null };
+  baseUrl: { source: ConfigValueSource; envVar: string | null };
+  chatModel: { source: ConfigValueSource; envVar: string | null };
+  embeddingModel: { source: ConfigValueSource; envVar: string | null };
+}): ProfileOverrideDiagnostic[] {
+  const overrides: ProfileOverrideDiagnostic[] = [];
+
+  if (profile.source !== "env") {
+    return overrides;
+  }
+
+  if (profile.id === "custom") {
+    pushProfileOverride(overrides, "ai.provider", provider.source, provider.envVar);
+    pushProfileOverride(overrides, "ai.api_key", apiKey.source, apiKey.envVar);
+    pushProfileOverride(overrides, "ai.base_url", baseUrl.source, baseUrl.envVar);
+    pushProfileOverride(overrides, "ai.chat_model", chatModel.source, chatModel.envVar);
+    pushProfileOverride(overrides, "ai.embedding_model", embeddingModel.source, embeddingModel.envVar);
+    return overrides;
+  }
+
+  pushProfileOverrideIfChanged(
+    overrides,
+    "ai.provider",
+    provider.source,
+    provider.envVar,
+    config.ai.provider,
+    profileDefinition.defaults?.provider || null
+  );
+  pushProfileOverrideIfChanged(
+    overrides,
+    "ai.api_key",
+    apiKey.source,
+    apiKey.envVar,
+    config.ai.apiKey,
+    profileDefinition.defaults?.apiKey || null
+  );
+  pushProfileOverrideIfChanged(
+    overrides,
+    "ai.base_url",
+    baseUrl.source,
+    baseUrl.envVar,
+    config.ai.baseUrl || null,
+    profileDefinition.defaults?.baseUrl || null
+  );
+  pushProfileOverrideIfChanged(
+    overrides,
+    "ai.chat_model",
+    chatModel.source,
+    chatModel.envVar,
+    config.ai.chatModel,
+    profileDefinition.defaults?.chatModel || null
+  );
+  pushProfileOverrideIfChanged(
+    overrides,
+    "ai.embedding_model",
+    embeddingModel.source,
+    embeddingModel.envVar,
+    config.ai.embeddingModel,
+    profileDefinition.defaults?.embeddingModel || null
+  );
+
+  return overrides;
+}
+
+function pushProfileOverride(
+  overrides: ProfileOverrideDiagnostic[],
+  field: ProfileOverrideDiagnostic["field"],
+  source: ProfileOverrideDiagnostic["source"],
+  envVar: string | null
+): void {
+  if (source === "default" || source === "profile") {
+    return;
+  }
+
+  overrides.push({
+    field,
+    source,
+    env_var: envVar
+  });
+}
+
+function pushProfileOverrideIfChanged(
+  overrides: ProfileOverrideDiagnostic[],
+  field: ProfileOverrideDiagnostic["field"],
+  source: ProfileOverrideDiagnostic["source"],
+  envVar: string | null,
+  resolvedValue: string | null,
+  profileValue: string | null
+): void {
+  if (source === "default" || source === "profile") {
+    return;
+  }
+
+  if ((resolvedValue || null) === (profileValue || null)) {
+    return;
+  }
+
+  overrides.push({
+    field,
+    source,
+    env_var: envVar
+  });
 }

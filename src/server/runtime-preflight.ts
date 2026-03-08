@@ -172,6 +172,10 @@ export function createRuntimePreflightService(
 
     const healthProbe = await fetchJsonProbeWithLiteLlmRetry(healthUrl);
     if (healthProbe instanceof Error) {
+      if (isIgnorableLiteLlmHealthTimeout(healthProbe)) {
+        return [];
+      }
+
       return [buildTransportIssue(healthUrl, healthProbe)];
     }
 
@@ -870,6 +874,10 @@ function buildIssueDetails(details: RuntimePreflightIssueDetails): RuntimePrefli
 
 function isEmbeddingOnlyHealthFalsePositive(endpointModel: string, errorMessage: string): boolean {
   return matchesAny(endpointModel, ["embedding"]) && matchesAny(errorMessage, ["does not support generate"]);
+}
+
+function isIgnorableLiteLlmHealthTimeout(error: Error): boolean {
+  return matchesAny(getErrorMessage(error), ["aborted due to timeout", "aborterror"]);
 }
 
 function delay(ms: number): Promise<void> {

@@ -30,6 +30,34 @@ interface RuntimePreflightPayload {
   issues?: RuntimePreflightIssue[];
 }
 
+interface RuntimeConfigProfile {
+  id?: string;
+  label?: string;
+  description?: string;
+  recommended_ai_stack?: string | null;
+  override_count?: number;
+}
+
+interface RuntimeConfigDiagnosticsProfile {
+  value?: string;
+  label?: string;
+  description?: string;
+  recommended_ai_stack?: string | null;
+  source?: string;
+  env_var?: string | null;
+}
+
+interface RuntimeConfigDiagnosticsOverride {
+  field?: string;
+  source?: string;
+  env_var?: string | null;
+}
+
+interface RuntimeConfigDiagnostics {
+  profile?: RuntimeConfigDiagnosticsProfile;
+  profile_overrides?: RuntimeConfigDiagnosticsOverride[];
+}
+
 interface TurnDebugPayload extends SessionDebugPayload {
   request_id?: string | null;
   turn?: Record<string, unknown> | null;
@@ -74,11 +102,13 @@ const statusPillEl = getElement<HTMLElement>("status-pill");
 const preflightPanelEl = getElement<HTMLElement>("preflight-panel");
 const preflightTitleEl = getElement<HTMLElement>("preflight-title");
 const preflightSummaryEl = getElement<HTMLElement>("preflight-summary");
+const preflightProfileEl = getElement<HTMLElement>("preflight-profile");
 const preflightIssuesEl = getElement<HTMLElement>("preflight-issues");
 const preflightAdvancedEl = getElement<HTMLDetailsElement>("preflight-advanced");
 const preflightAdvancedJsonEl = getElement<HTMLElement>("preflight-advanced-json");
 const runtimeSummaryEl = getElement<HTMLElement>("runtime-summary");
 const sessionSummaryEl = getElement<HTMLElement>("session-summary");
+const profileSummaryEl = getElement<HTMLElement>("profile-summary");
 const connectionDebugEl = getElement<HTMLElement>("connection-debug");
 const stateDebugEl = getElement<HTMLElement>("state-debug");
 const turnDebugEl = getElement<HTMLElement>("turn-debug");
@@ -142,6 +172,34 @@ function getRuntimePreflight(): RuntimePreflightPayload | null {
   }
 
   return candidate as RuntimePreflightPayload;
+}
+
+function getRuntimeConfigDiagnostics(): RuntimeConfigDiagnostics | null {
+  const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
+  if (!runtime || typeof runtime !== "object") {
+    return null;
+  }
+
+  const candidate = (runtime as { config_diagnostics?: unknown }).config_diagnostics;
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  return candidate as RuntimeConfigDiagnostics;
+}
+
+function getRuntimeProfile(): RuntimeConfigProfile | null {
+  const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
+  if (!runtime || typeof runtime !== "object") {
+    return null;
+  }
+
+  const candidate = (runtime as { profile?: unknown }).profile;
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  return candidate as RuntimeConfigProfile;
 }
 
 function setOptions(options: string[] = []): void {
@@ -270,9 +328,11 @@ function renderDebugPanels(): void {
 
 function renderPreflightPanel(): void {
   const preflight = getRuntimePreflight();
+  const diagnostics = getRuntimeConfigDiagnostics();
   if (!preflight || (preflight.ok && !(preflight.issues || []).length)) {
     preflightPanelEl.hidden = true;
     preflightSummaryEl.textContent = "";
+    preflightProfileEl.textContent = "";
     preflightIssuesEl.innerHTML = "";
     preflightAdvancedEl.hidden = true;
     preflightAdvancedEl.open = false;
@@ -283,6 +343,11 @@ function renderPreflightPanel(): void {
   preflightPanelEl.hidden = false;
   preflightTitleEl.textContent = preflight.status === "checking" ? "Checking setup" : "Setup required";
   preflightSummaryEl.textContent = preflight.summary || "The app needs setup changes before the first turn.";
+  const profileLabel = diagnostics?.profile?.label || getRuntimeProfile()?.label || "Setup profile";
+  const overrideCount = diagnostics?.profile_overrides?.length || 0;
+  preflightProfileEl.textContent = overrideCount
+    ? `${profileLabel} with ${overrideCount} advanced override${overrideCount === 1 ? "" : "s"}.`
+    : `${profileLabel} is active.`;
   preflightIssuesEl.innerHTML = "";
   const advancedIssues: Array<Record<string, unknown>> = [];
 
@@ -329,6 +394,8 @@ function renderSessionSummary(): void {
   const runtime = state.sessionDebug?.runtime || state.lastTurnDebug?.runtime;
   const session = state.sessionDebug?.session || state.lastTurnDebug?.session;
   const preflight = getRuntimePreflight();
+  const profile = getRuntimeProfile();
+  const diagnostics = getRuntimeConfigDiagnostics();
   const beat = state.player?.director_state?.current_beat_label;
 
   const runtimeParts: string[] = [];
@@ -338,6 +405,10 @@ function renderSessionSummary(): void {
   if (preflight?.status === "checking") runtimeParts.push("checking AI");
   if (session && typeof session.player_id === "string") runtimeParts.push(`player ${session.player_id.slice(0, 8)}`);
   runtimeSummaryEl.textContent = runtimeParts.length ? runtimeParts.join(" / ") : "Waiting for session...";
+  const overrideCount = diagnostics?.profile_overrides?.length || 0;
+  profileSummaryEl.textContent = profile
+    ? `${profile.label || profile.id || "Setup profile"}${overrideCount ? ` • ${overrideCount} override${overrideCount === 1 ? "" : "s"}` : ""}`
+    : "Setup profile loading...";
 
   if (!state.player) {
     sessionSummaryEl.textContent = "No active session yet.";

@@ -59,6 +59,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 
 ## Configuration
 
+- `AI_PROFILE` (optional; default `hosted-default`; supported values: `hosted-default`, `local-gpu-small`, `local-gpu-large`, `custom`)
 - `AI_PROVIDER` (optional; default `litellm`)
 - `AI_API_KEY` (primary key in generic provider mode)
 - `AI_BASE_URL` (optional; for OpenAI-compatible providers)

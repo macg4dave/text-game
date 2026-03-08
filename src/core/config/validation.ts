@@ -1,8 +1,43 @@
-import type { AiConfig, AppConfig, ConfigError, LogLevel } from "../types.js";
-import { buildConfigError, DEFAULT_PORT, isSupportedAiProvider, SUPPORTED_AI_PROVIDERS } from "./shared.js";
+import type { AiConfig, AppConfig, ConfigError, LogLevel, SupportedAiProfile } from "../types.js";
+import {
+  buildConfigError,
+  DEFAULT_PORT,
+  isSupportedAiProvider,
+  isSupportedAiProfile,
+  normalizeProfile,
+  SUPPORTED_AI_PROFILES,
+  SUPPORTED_AI_PROVIDERS
+} from "./shared.js";
 import { getAiEnvVarNames } from "./env.js";
 
 const SUPPORTED_LOG_LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
+
+export function parseAiProfile(value: string | undefined): { value: SupportedAiProfile; errors: ConfigError[] } {
+  if (value === undefined) {
+    return { value: "hosted-default", errors: [] };
+  }
+
+  const normalized = normalizeProfile(value);
+  if (!String(value).trim()) {
+    return { value: "hosted-default", errors: [] };
+  }
+
+  if (isSupportedAiProfile(normalized)) {
+    return { value: normalized, errors: [] };
+  }
+
+  return {
+    value: "hosted-default",
+    errors: [
+      buildConfigError({
+        path: "profile",
+        message: `AI_PROFILE must be one of: ${SUPPORTED_AI_PROFILES.join(", ")}.`,
+        envVars: ["AI_PROFILE"],
+        code: "invalid_ai_profile"
+      })
+    ]
+  };
+}
 
 export function parsePort(value: string | undefined): { value: number; errors: ConfigError[] } {
   if (value === undefined) {

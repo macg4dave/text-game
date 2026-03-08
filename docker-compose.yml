@@ -1,4 +1,19 @@
 services:
+  ollama:
+    image: "${OLLAMA_IMAGE:-ollama/ollama}"
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: "${OLLAMA_KEEP_ALIVE:-24h}"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+
   litellm:
     build:
       context: .
@@ -6,13 +21,16 @@ services:
       args:
         LITELLM_BASE_IMAGE: "${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:main-stable}"
     image: text-game-litellm:latest
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--drop_params"]
     ports:
       - "${LITELLM_PORT:-4000}:4000"
+    depends_on:
+      ollama:
+        condition: service_healthy
     environment:
       OPENAI_API_KEY: "${OPENAI_API_KEY:-sk-placeholder}"
       LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-anything}"
-      OLLAMA_BASE_URL: "${LITELLM_OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
+      OLLAMA_BASE_URL: "${LITELLM_OLLAMA_BASE_URL:-http://ollama:11434}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -45,7 +63,7 @@ services:
       LITELLM_API_KEY: "${LITELLM_API_KEY:-anything}"
       LITELLM_CHAT_MODEL: "${LITELLM_CHAT_MODEL:-game-chat}"
       LITELLM_EMBEDDING_MODEL: "${LITELLM_EMBEDDING_MODEL:-game-embedding}"
-      OLLAMA_BASE_URL: "${COMPOSE_OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}"
+      OLLAMA_BASE_URL: "${COMPOSE_OLLAMA_BASE_URL:-http://ollama:11434/v1}"
       OLLAMA_API_KEY: "${OLLAMA_API_KEY:-ollama}"
       OLLAMA_CHAT_MODEL: "${OLLAMA_CHAT_MODEL:-gemma3:4b}"
       OLLAMA_EMBEDDING_MODEL: "${OLLAMA_EMBEDDING_MODEL:-embeddinggemma}"
@@ -61,3 +79,4 @@ services:
 
 volumes:
   game_data:
+  ollama_data:

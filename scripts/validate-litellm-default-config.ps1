@@ -19,13 +19,13 @@ function Add-Pass {
 }
 
 if ($content -match [regex]::Escape("model: ollama_chat/gemma3:4b")) {
-  Add-Pass "Default chat alias routes to host Ollama gemma3:4b."
+  Add-Pass "Default chat alias routes to Docker Ollama gemma3:4b."
 } else {
   Add-Failure "Default chat alias must route to ollama_chat/gemma3:4b."
 }
 
 if ($content -match [regex]::Escape("model: ollama/embeddinggemma")) {
-  Add-Pass "Default embedding alias routes to host Ollama embeddinggemma."
+  Add-Pass "Default embedding alias routes to Docker Ollama embeddinggemma."
 } else {
   Add-Failure "Default embedding alias must route to ollama/embeddinggemma."
 }

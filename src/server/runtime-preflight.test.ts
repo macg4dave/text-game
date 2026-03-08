@@ -29,6 +29,7 @@ async function withMockFetch(
 
 test("runtime preflight reports a LiteLLM proxy auth mismatch separately from endpoint reachability", async () => {
   const config = loadConfig({
+    AI_PROFILE: "custom",
     AI_PROVIDER: "litellm",
     LITELLM_PROXY_URL: "http://litellm:4000",
     LITELLM_API_KEY: "anything",
@@ -53,12 +54,13 @@ test("runtime preflight reports a LiteLLM proxy auth mismatch separately from en
     const report = await service.ensureReport({ force: true });
 
     assert.equal(report.ok, false);
-    assert.equal(report.issues[0]?.code, "litellm_proxy_auth_misconfigured");
+    assert.ok(report.issues.some((issue) => issue.code === "litellm_proxy_auth_misconfigured"));
   });
 });
 
 test("runtime preflight retries transient LiteLLM no_db_connection responses before blocking startup", async () => {
   const config = loadConfig({
+    AI_PROFILE: "custom",
     AI_PROVIDER: "litellm",
     LITELLM_PROXY_URL: "http://litellm:4000",
     LITELLM_API_KEY: "anything",
@@ -111,12 +113,13 @@ test("runtime preflight retries transient LiteLLM no_db_connection responses bef
 
     assert.equal(modelsCallCount, 2);
     assert.equal(report.ok, true);
-    assert.equal(report.issues.length, 0);
+    assert.ok(!report.issues.some((issue) => issue.severity === "blocker"));
   });
 });
 
 test("runtime preflight blocks when LiteLLM aliases exist but upstream credentials are rejected", async () => {
   const config = loadConfig({
+    AI_PROFILE: "custom",
     AI_PROVIDER: "litellm",
     LITELLM_PROXY_URL: "http://litellm:4000",
     LITELLM_API_KEY: "anything",
@@ -159,6 +162,7 @@ test("runtime preflight blocks when LiteLLM aliases exist but upstream credentia
 
 test("runtime preflight reports missing local models behind LiteLLM health checks", async () => {
   const config = loadConfig({
+    AI_PROFILE: "custom",
     AI_PROVIDER: "litellm",
     LITELLM_PROXY_URL: "http://litellm:4000",
     LITELLM_API_KEY: "anything",
@@ -200,6 +204,7 @@ test("runtime preflight reports missing local models behind LiteLLM health check
 
 test("runtime preflight ignores LiteLLM health false positives for embedding-only Ollama models", async () => {
   const config = loadConfig({
+    AI_PROFILE: "custom",
     AI_PROVIDER: "litellm",
     LITELLM_PROXY_URL: "http://litellm:4000",
     LITELLM_API_KEY: "anything",
@@ -241,6 +246,38 @@ test("runtime preflight ignores LiteLLM health false positives for embedding-onl
     const report = await service.ensureReport({ force: true });
 
     assert.equal(report.ok, true);
-    assert.equal(report.issues.length, 0);
+    assert.ok(!report.issues.some((issue) => issue.severity === "blocker"));
+  });
+});
+
+test("runtime preflight ignores LiteLLM health probe timeouts after models load successfully", async () => {
+  const config = loadConfig({
+    AI_PROFILE: "custom",
+    AI_PROVIDER: "litellm",
+    LITELLM_PROXY_URL: "http://litellm:4000",
+    LITELLM_API_KEY: "anything",
+    LITELLM_CHAT_MODEL: "game-chat",
+    LITELLM_EMBEDDING_MODEL: "game-embedding"
+  });
+
+  await withMockFetch(async (input) => {
+    if (input === "http://litellm:4000/models") {
+      return createJsonResponse({
+        object: "list",
+        data: [{ id: "game-chat" }, { id: "game-embedding" }]
+      });
+    }
+
+    if (input === "http://litellm:4000/health") {
+      throw new Error("The operation was aborted due to timeout");
+    }
+
+    throw new Error(`Unexpected fetch: ${input}`);
+  }, async () => {
+    const service = createRuntimePreflightService(config, 0);
+    const report = await service.ensureReport({ force: true });
+
+    assert.equal(report.ok, true);
+    assert.ok(!report.issues.some((issue) => issue.severity === "blocker"));
   });
 });

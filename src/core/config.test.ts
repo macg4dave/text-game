@@ -29,11 +29,69 @@ test("loadConfig defaults to LiteLLM when no provider-specific env is supplied",
   const loaded = loadConfig({});
 
   assert.equal(loaded.validation.ok, true);
+  assert.equal(loaded.profile.id, "hosted-default");
+  assert.equal(loaded.profile.recommendedAiStack, "hosted");
   assert.equal(loaded.ai.provider, "litellm");
   assert.equal(loaded.ai.apiKey, "anything");
   assert.equal(loaded.ai.baseUrl, "http://127.0.0.1:4000");
   assert.equal(loaded.ai.chatModel, "game-chat");
   assert.equal(loaded.ai.embeddingModel, "game-embedding");
+});
+
+test("loadConfig applies the selected end-user profile before falling back to plain defaults", () => {
+  const loaded = loadConfig({ AI_PROFILE: "local-gpu-small" });
+  const diagnostics = getSafeConfigDiagnostics(loaded, { AI_PROFILE: "local-gpu-small" });
+
+  assert.equal(loaded.validation.ok, true);
+  assert.equal(loaded.profile.id, "local-gpu-small");
+  assert.equal(loaded.profile.recommendedAiStack, "local-gpu");
+  assert.equal(loaded.ai.provider, "litellm");
+  assert.equal(diagnostics.profile.value, "local-gpu-small");
+  assert.equal(diagnostics.profile.source, "env");
+  assert.equal(diagnostics.ai.api_key.source, "profile");
+  assert.equal(diagnostics.ai.base_url.source, "profile");
+  assert.equal(diagnostics.ai.chat_model.source, "profile");
+  assert.equal(diagnostics.ai.embedding_model.source, "profile");
+  assert.equal(diagnostics.profile_overrides.length, 0);
+});
+
+test("getSafeConfigDiagnostics reports when explicit env vars override the selected profile", () => {
+  const env = {
+    AI_PROFILE: "hosted-default",
+    AI_PROVIDER: "openai-compatible",
+    AI_API_KEY: "sk-test",
+    AI_BASE_URL: "https://example.test/v1",
+    AI_CHAT_MODEL: "custom-chat",
+    AI_EMBEDDING_MODEL: "custom-embedding"
+  };
+  const loaded = loadConfig(env);
+  const diagnostics = getSafeConfigDiagnostics(loaded, env);
+
+  assert.equal(loaded.validation.ok, true);
+  assert.equal(loaded.profile.id, "hosted-default");
+  assert.equal(diagnostics.profile.value, "hosted-default");
+  assert.equal(diagnostics.provider.source, "env");
+  assert.deepEqual(
+    diagnostics.profile_overrides.map((item) => item.field),
+    ["ai.provider", "ai.api_key", "ai.base_url", "ai.chat_model", "ai.embedding_model"]
+  );
+  assert.deepEqual(
+    diagnostics.profile_overrides.map((item) => item.env_var),
+    ["AI_PROVIDER", "AI_API_KEY", "AI_BASE_URL", "AI_CHAT_MODEL", "AI_EMBEDDING_MODEL"]
+  );
+});
+
+test("loadConfig validates unsupported AI_PROFILE values clearly", () => {
+  const env = {
+    AI_PROFILE: "retro-wave"
+  };
+  const loaded = loadConfig(env);
+  const issues = buildConfigPreflightIssues(loaded, env);
+
+  assert.equal(loaded.validation.ok, false);
+  assert.equal(loaded.profile.id, "hosted-default");
+  assert.equal(loaded.validation.errors.some((error) => error.code === "invalid_ai_profile"), true);
+  assert.equal(issues.some((issue) => issue.code === "invalid_ai_profile"), true);
 });
 
 test("loadConfig supports legacy OPENAI_* environment variables", () => {

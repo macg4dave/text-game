@@ -5,7 +5,7 @@ The default app-facing setup for this repo is still LiteLLM.
 Use this guide when you want an optional larger local model on Windows without changing the app-facing contract. The preferred shape is now:
 
 - the app stays on `AI_PROVIDER=litellm`
-- the default Docker stack now starts the app plus LiteLLM and routes the stable aliases to a host-local Ollama by default
+- the default Docker stack now starts the app plus LiteLLM plus a repo-managed `ollama` service and routes the stable aliases there by default
 - an optional Docker override adds a local Ollama backend
 - LiteLLM keeps the stable aliases `game-chat` and `game-embedding`
 - LiteLLM routes `game-chat` to the local model only when you intentionally opt into that path
@@ -39,7 +39,12 @@ This is the first-class developer override path for Windows:
 2. Make sure WSL2 is enabled for Docker Desktop.
 3. Install NVIDIA drivers on the host and confirm `nvidia-smi` works in PowerShell.
 4. Copy `.env.example` to `.env` if you have not already.
-5. Make sure host Ollama has `gemma3:4b` and `embeddinggemma` pulled.
+5. Pull the default models into the repo-managed Docker `ollama` service:
+
+```powershell
+docker compose exec ollama ollama pull gemma3:4b
+docker compose exec ollama ollama pull embeddinggemma
+```
 6. Start the stack with the GPU override:
 
 ```powershell
@@ -66,7 +71,7 @@ Notes:
 - The GPU reservation is attached only to the `ollama` container, not the app or LiteLLM containers.
 - `litellm.local-gpu.config.yaml` now tracks `local-gpu-8gb` as the active default profile.
 - `game-embedding` stays hosted by default in the active `local-gpu-8gb` path, so keep `OPENAI_API_KEY` populated unless you intentionally switch to the `local-gpu-20gb-plus` manual swap guidance.
-- the plain `docker compose up --build` path now uses host-local Ollama for both stable aliases through `litellm.config.yaml`
+- the plain `docker compose up --build` path now uses the repo-managed Docker `ollama` service for both stable aliases through `litellm.config.yaml`
 
 ## Install Ollama On Windows
 
@@ -117,7 +122,7 @@ If you use the default Docker stack from this repo, you do not need to change th
 
 Then choose one of these LiteLLM configs:
 
-- `litellm.config.yaml` for the default host-local Ollama smoke path
+- `litellm.config.yaml` for the default Docker Ollama smoke path
 - `litellm.local-gpu.config.yaml` for the Docker-backed Ollama GPU override
 
 The included `litellm.local-gpu.config.yaml` keeps `local-gpu-8gb` active and includes commented manual swap references for `local-gpu-12gb` and `local-gpu-20gb-plus`. T02g does not add runtime profile-selection env vars yet.
@@ -137,7 +142,7 @@ If you do not want to run LiteLLM for a quick smoke test, set your `.env` file l
 
 ```env
 AI_PROVIDER=ollama
-OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+OLLAMA_BASE_URL=http://ollama:11434/v1
 OLLAMA_API_KEY=ollama
 OLLAMA_CHAT_MODEL=gemma3:4b
 OLLAMA_EMBEDDING_MODEL=embeddinggemma
@@ -157,7 +162,7 @@ Notes:
 Recommended gateway-first flow:
 
 1. Keep the app on the LiteLLM `.env` values shown above.
-2. Use the default Docker stack for hosted-first runs.
+2. Use the default Docker stack for the repo-managed Docker Ollama route.
 3. Use the GPU override only when you intentionally want the local model path.
 
 For normal local development after installing Node.js, use the direct TypeScript workflow:
@@ -170,7 +175,7 @@ npm run dev
 
 That path runs the server from TypeScript source and rebuilds the browser asset before startup.
 
-For the default hosted-first Docker path:
+For the default Docker-Ollama path:
 
 ```powershell
 docker compose up --build

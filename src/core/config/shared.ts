@@ -1,24 +1,51 @@
 import type {
   AiConfig,
   AppConfig,
+  ConfigProfile,
   ConfigError,
   RuntimePreflightIssue,
   RuntimePreflightIssueDetails,
+  SupportedAiProfile,
   RuntimePreflightSeverity
 } from "../types.js";
 
 export const DEFAULT_PORT = 3000;
 
 export const SUPPORTED_AI_PROVIDERS = ["openai-compatible", "litellm", "ollama"] as const;
+export const SUPPORTED_AI_PROFILES = ["hosted-default", "local-gpu-small", "local-gpu-large", "custom"] as const;
 
 export type SupportedAiProvider = (typeof SUPPORTED_AI_PROVIDERS)[number];
 export type AiConfigField = "apiKey" | "baseUrl" | "chatModel" | "embeddingModel";
 export type ProviderDefaults = Omit<AiConfig, "provider">;
-export type ConfigLike = Pick<AppConfig, "port" | "ai" | "logging" | "validation">;
-export type ConfigValueSource = "provider-specific" | "generic" | "legacy" | "default";
-export type ConfigEnvSource = "env" | "default" | "invalid-env" | "inferred";
+export type ConfigLike = Pick<AppConfig, "port" | "profile" | "ai" | "logging" | "validation">;
+export type ConfigValueSource = "provider-specific" | "generic" | "legacy" | "profile" | "default";
+export type ConfigEnvSource = "env" | "default" | "invalid-env" | "inferred" | "profile";
+export type ConfigOverrideField =
+  | "ai.provider"
+  | "ai.api_key"
+  | "ai.base_url"
+  | "ai.chat_model"
+  | "ai.embedding_model";
+
+export interface ConfigProfileDefinition extends ConfigProfile {
+  defaults?: Partial<AiConfig> & { provider?: SupportedAiProvider };
+}
+
+export interface ProfileOverrideDiagnostic {
+  field: ConfigOverrideField;
+  source: ConfigEnvSource | ConfigValueSource;
+  env_var: string | null;
+}
 
 export interface SafeConfigDiagnostics {
+  profile: {
+    value: SupportedAiProfile;
+    label: string;
+    description: string;
+    recommended_ai_stack: ConfigProfile["recommendedAiStack"];
+    source: "env" | "default" | "invalid-env";
+    env_var: string | null;
+  };
   provider: {
     value: string;
     source: ConfigEnvSource;
@@ -62,7 +89,56 @@ export interface SafeConfigDiagnostics {
     ok: boolean;
     error_count: number;
   };
+  profile_overrides: ProfileOverrideDiagnostic[];
 }
+
+export const CONFIG_PROFILE_DEFINITIONS: Record<SupportedAiProfile, ConfigProfileDefinition> = {
+  "hosted-default": {
+    id: "hosted-default",
+    label: "Hosted default",
+    description: "Use the supported LiteLLM Docker sidecar with the hosted-first repo defaults.",
+    recommendedAiStack: "hosted",
+    defaults: {
+      provider: "litellm",
+      apiKey: "anything",
+      baseUrl: "http://127.0.0.1:4000",
+      chatModel: "game-chat",
+      embeddingModel: "game-embedding"
+    }
+  },
+  "local-gpu-small": {
+    id: "local-gpu-small",
+    label: "Local GPU small",
+    description: "Use the LiteLLM local-GPU path with the conservative 8 GB tier guidance.",
+    recommendedAiStack: "local-gpu",
+    defaults: {
+      provider: "litellm",
+      apiKey: "anything",
+      baseUrl: "http://127.0.0.1:4000",
+      chatModel: "game-chat",
+      embeddingModel: "game-embedding"
+    }
+  },
+  "local-gpu-large": {
+    id: "local-gpu-large",
+    label: "Local GPU large",
+    description: "Use the LiteLLM local-GPU path with the documented 12 GB+ matrix guidance.",
+    recommendedAiStack: "local-gpu",
+    defaults: {
+      provider: "litellm",
+      apiKey: "anything",
+      baseUrl: "http://127.0.0.1:4000",
+      chatModel: "game-chat",
+      embeddingModel: "game-embedding"
+    }
+  },
+  custom: {
+    id: "custom",
+    label: "Custom overrides",
+    description: "Use the validated advanced env vars directly instead of a starter profile.",
+    recommendedAiStack: null
+  }
+};
 
 export const AI_ENV_VAR_CANDIDATES: Record<
   AiConfigField,
@@ -108,6 +184,10 @@ export const AI_ENV_VAR_CANDIDATES: Record<
 
 export function isSupportedAiProvider(value: string): value is SupportedAiProvider {
   return SUPPORTED_AI_PROVIDERS.includes(value as SupportedAiProvider);
+}
+
+export function isSupportedAiProfile(value: string): value is SupportedAiProfile {
+  return SUPPORTED_AI_PROFILES.includes(value as SupportedAiProfile);
 }
 
 export function readEnv(env: Record<string, string | undefined>, ...keys: Array<string | undefined>): string | undefined {
@@ -179,6 +259,14 @@ export function normalizeProvider(value: string | undefined): string {
   return value.trim().toLowerCase() || "litellm";
 }
 
+export function normalizeProfile(value: string | undefined): string {
+  if (!value || typeof value !== "string") {
+    return "hosted-default";
+  }
+
+  return value.trim().toLowerCase() || "hosted-default";
+}
+
 export function normalizeBaseUrl(value: string | undefined): string {
   if (!value || typeof value !== "string") {
     return "";
@@ -222,6 +310,10 @@ export function getProviderDefaults(provider: string): ProviderDefaults {
     chatModel: "game-chat",
     embeddingModel: "game-embedding"
   };
+}
+
+export function getConfigProfileDefinition(profile: SupportedAiProfile): ConfigProfileDefinition {
+  return CONFIG_PROFILE_DEFINITIONS[profile] || CONFIG_PROFILE_DEFINITIONS["hosted-default"];
 }
 
 export function buildConfigError({

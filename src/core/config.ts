@@ -54,7 +54,7 @@ export function getSafeConfigDiagnostics(
 }
 
 export function getPublicRuntimeConfig(configToSummarize: ConfigLike) {
-  return getPublicRuntimeConfigInternal(configToSummarize);
+  return getPublicRuntimeConfigInternal(configToSummarize, process.env);
 }
 
 export function assertValidConfig(configToValidate: AppConfig = config): AppConfig {

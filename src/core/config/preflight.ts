@@ -22,7 +22,9 @@ function buildIssueFromConfigError(
 ): RuntimePreflightIssue {
   const provider = configToSummarize.ai.provider;
   const detailSource =
-    error.path === "port"
+    error.path === "profile"
+      ? diagnostics.profile.source
+      : error.path === "port"
       ? diagnostics.port.source
       : error.path === "ai.provider"
         ? diagnostics.provider.source
@@ -36,7 +38,9 @@ function buildIssueFromConfigError(
                 ? diagnostics.ai.embedding_model.source
                 : null;
   const detailValue =
-    error.path === "port"
+    error.path === "profile"
+      ? diagnostics.profile.value
+      : error.path === "port"
       ? configToSummarize.port
       : error.path === "ai.provider"
         ? configToSummarize.ai.provider
@@ -59,6 +63,20 @@ function buildIssueFromConfigError(
   };
 
   switch (error.code) {
+    case "invalid_ai_profile":
+      return buildPreflightIssue({
+        code: error.code,
+        severity: "blocker",
+        area: "config",
+        title: "Choose a supported setup profile",
+        message: "AI_PROFILE is set to a value this build does not recognize.",
+        recovery: [
+          "Use one of these values: hosted-default, local-gpu-small, local-gpu-large, custom.",
+          "Save .env and start the app again."
+        ],
+        envVars: error.envVars,
+        details
+      });
     case "missing_api_key":
       return buildPreflightIssue({
         code: error.code,
@@ -234,6 +252,31 @@ function buildConfigAdvisoryIssues(
           provider: configToSummarize.ai.provider,
           config_source: "legacy",
           notes: legacyFields.map((field) => `${field.label}: ${field.envVar}`)
+        }
+      })
+    );
+  }
+
+  if (diagnostics.profile_overrides.length) {
+    issues.push(
+      buildPreflightIssue({
+        code: "profile_overrides_active",
+        severity: "info",
+        area: "config",
+        title: "Advanced overrides are active",
+        message: `The ${diagnostics.profile.label.toLowerCase()} profile is active, but one or more explicit env vars override it.`,
+        recovery: [
+          "Clear the listed override env vars if you want to return to the plain profile defaults."
+        ],
+        envVars: diagnostics.profile_overrides
+          .map((override) => override.env_var)
+          .filter((envVar): envVar is string => Boolean(envVar)),
+        details: {
+          check: "config",
+          provider: configToSummarize.ai.provider,
+          config_path: "profile_overrides",
+          config_source: diagnostics.profile.source,
+          notes: diagnostics.profile_overrides.map((override) => `${override.field}: ${override.source}`)
         }
       })
     );

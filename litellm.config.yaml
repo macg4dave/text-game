@@ -6,7 +6,7 @@
 # - game-embedding
 #
 # Recommended baseline for the current Docker smoke path:
-# - route both aliases to a host-local Ollama instance first
+# - route both aliases to the repo-managed Docker Ollama service first
 # - keep the app-facing alias names stable
 # - if you later want a hosted route again, change only the upstream targets
 #   behind these aliases while leaving the alias names alone
@@ -19,7 +19,7 @@ model_list:
       model: ollama_chat/gemma3:4b
       api_base: os.environ/OLLAMA_BASE_URL
 
-  # Default local embedding route for a host-local Ollama smoke path.
+  # Default local embedding route for the Docker Ollama smoke path.
   - model_name: game-embedding
     litellm_params:
       model: ollama/embeddinggemma

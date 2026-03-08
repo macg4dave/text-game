@@ -81,8 +81,9 @@ The default Docker stack is now:
 
 - app
 - LiteLLM sidecar
+- `ollama` sidecar
 
-An optional developer override adds a local Ollama backend with NVIDIA GPU passthrough.
+An optional developer override keeps the same repo-managed `ollama` service but adds NVIDIA GPU passthrough for local inference.
 
 Required host tool:
 
@@ -101,7 +102,7 @@ What this gives you:
 - Node 22 is pinned inside the container
 - `better-sqlite3` builds inside the container instead of on the host
 - LiteLLM starts inside the same Compose project by default, so you no longer need to launch it separately for the supported Docker path
-- the default LiteLLM template now routes the stable `game-chat` and `game-embedding` aliases to a host-local Ollama instance for a fast local smoke path
+- the default LiteLLM template now routes the stable `game-chat` and `game-embedding` aliases to the repo-managed Docker `ollama` service for a fast local smoke path
 - the LiteLLM sidecar now bakes the repo-owned config files into its image so startup does not depend on fragile single-file bind mounts from secondary Windows drives
 - the Docker image builds the browser asset and compiled server output up front, then runs `dist/server.js`
 - the app source is baked into the image so startup works even when Docker bind mounts from a Windows secondary drive are flaky
@@ -222,7 +223,7 @@ If your distro package is too old for current packages, use the official downloa
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and start with the LiteLLM gateway settings unless you intentionally need a different provider mode.
-1. Start a local Ollama instance on the host and make sure it has `gemma3:4b` plus `embeddinggemma` pulled for the default Docker smoke route.
+1. Start the default Docker stack and make sure the repo-managed `ollama` service has `gemma3:4b` plus `embeddinggemma` pulled for the default Docker smoke route.
 1. For local development, run:
 
 ```bash
@@ -337,13 +338,18 @@ Recommended baseline:
 
 1. Copy `.env.example` to `.env`.
 2. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding`.
-3. Make sure host Ollama is reachable and has `gemma3:4b` plus `embeddinggemma` pulled.
+3. Pull the default Docker-Ollama models once:
+
+```bash
+docker compose exec ollama ollama pull gemma3:4b
+docker compose exec ollama ollama pull embeddinggemma
+```
 4. Start the Docker stack with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
 5. Start the app with `docker compose up --build`, `npm run dev`, or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
 
 Current default Docker smoke guidance:
 
-- keep the app on LiteLLM and let LiteLLM route the stable aliases to host-local Ollama by default
+- keep the app on LiteLLM and let LiteLLM route the stable aliases to the repo-managed Docker `ollama` service by default
 - keep `game-chat` on `gemma3:4b` and `game-embedding` on `embeddinggemma` for the simplest repo-local smoke test
 - if you want to move back to hosted providers, repoint the upstream targets in `litellm.config.yaml` without changing the app-facing alias names
 
@@ -368,14 +374,30 @@ That keeps the player-facing and app-facing setup stable even when the upstream 
 
 The runtime config module now applies one consistent precedence order instead of making each caller guess:
 
+- `AI_PROFILE` picks a small supported startup profile first: `hosted-default`, `local-gpu-small`, `local-gpu-large`, or `custom`
+- when the selected profile is not `custom`, its defaults seed the AI provider and model contract before plain runtime defaults apply
 - provider-specific env vars win when `AI_PROVIDER` is `litellm` or `ollama`
 - generic `AI_*` vars are the next fallback
 - legacy `OPENAI_*` names remain supported as the last fallback during migration
 - blank values are treated as unset, so provider defaults still apply when a field is optional
 
+The intended setup flow is now:
+
+1. pick `AI_PROFILE`
+2. start with the profile defaults
+3. add explicit env overrides only when you need advanced behavior
+
+Current profiles:
+
+- `hosted-default` - the normal supported Docker LiteLLM path
+- `local-gpu-small` - the optional local GPU path aligned with the conservative 8 GB tier guidance
+- `local-gpu-large` - the optional local GPU path aligned with the documented 12 GB+ guidance
+- `custom` - skip starter defaults and drive setup with validated explicit env vars instead
+
 Provider selection now behaves like this:
 
 - explicit `AI_PROVIDER` always wins
+- when `AI_PROFILE` is not `custom` and `AI_PROVIDER` is unset, the selected profile supplies the starting provider
 - if `AI_PROVIDER` is unset, existing `LITELLM_*`, `OLLAMA_*`, or legacy direct-provider env vars are inferred so older setups keep working
 - if nothing provider-specific is configured, the app defaults to `litellm`
 
@@ -384,6 +406,7 @@ Examples:
 - in LiteLLM mode, `LITELLM_CHAT_MODEL` overrides `AI_CHAT_MODEL`, which overrides `OPENAI_MODEL`
 - in Ollama mode, `OLLAMA_BASE_URL` overrides `AI_BASE_URL`, which overrides `OPENAI_BASE_URL`
 - in default OpenAI-compatible mode, `AI_API_KEY` overrides `OPENAI_API_KEY`
+- runtime diagnostics and the browser setup panel now show which startup profile is active and which explicit env vars override it
 
 ## Desktop Packaging Prototype
 
@@ -501,7 +524,7 @@ For local GPU matrix consistency checks, run `powershell -ExecutionPolicy Bypass
 
 When the app runs in Docker, `localhost` inside the container is not your host machine.
 
-- For Ollama in Docker, use `OLLAMA_BASE_URL=http://host.docker.internal:11434/v1`
+- For the repo-managed Docker `ollama` service, use `OLLAMA_BASE_URL=http://ollama:11434/v1`
 - For LiteLLM in Docker, use `LITELLM_PROXY_URL=http://host.docker.internal:4000`
 - For any other local OpenAI-compatible gateway, use `host.docker.internal` instead of `127.0.0.1` or `localhost`
 
@@ -538,15 +561,15 @@ The app should talk to LiteLLM first. LiteLLM can then route hosted providers fo
 
 Recommended local setup:
 
-1. Use the included [litellm.config.yaml](./litellm.config.yaml) as the default hosted-first template.
+1. Use the included [litellm.config.yaml](./litellm.config.yaml) as the default Docker-Ollama template.
 2. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding` in `.env`.
-3. Put `OPENAI_API_KEY` in `.env` for the default hosted route.
+3. Pull `gemma3:4b` and `embeddinggemma` into the repo-managed Docker `ollama` service.
 4. Start the supported Docker path with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
 5. Keep `LITELLM_MASTER_KEY` equal to `LITELLM_API_KEY` in `.env`. The default Docker smoke path now uses `anything` for both unless you override them together.
 
 The runtime automatically prefers LiteLLM-specific env vars when `AI_PROVIDER=litellm`, and now falls back to LiteLLM as the blank-slate default when no provider-specific env is configured.
 
-The included template now keeps both aliases on host-local Ollama for the default Docker smoke path. When you want an optional larger local-model route, use the included `litellm.local-gpu.config.yaml` path through the Docker GPU override or mirror that pattern in your own LiteLLM config while leaving the alias names alone so the app contract stays stable.
+The included template now keeps both aliases on the repo-managed Docker `ollama` service for the default Docker smoke path. The LiteLLM container also starts with `--drop_params` so Ollama-backed embeddings do not fail on unsupported OpenAI-compatible extras such as `encoding_format`. When you want an optional larger local-model route, use the included `litellm.local-gpu.config.yaml` path through the Docker GPU override or mirror that pattern in your own LiteLLM config while leaving the alias names alone so the app contract stays stable.
 
 The included local-GPU config now tracks the `local-gpu-8gb` matrix profile by default. Higher-tier manual swap references for `local-gpu-12gb` and `local-gpu-20gb-plus` are left in the file as commented guidance until launcher or UI selection work lands.
 

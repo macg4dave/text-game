@@ -1,4 +1,6 @@
 export type SupportedAiProvider = "openai-compatible" | "litellm" | "ollama";
+export type SupportedAiProfile = "hosted-default" | "local-gpu-small" | "local-gpu-large" | "custom";
+export type RecommendedAiStack = "hosted" | "local-gpu";
 
 export interface ConfigError {
   path: string;
@@ -24,6 +26,18 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface LoggingConfig {
   level: LogLevel;
+}
+
+export interface ConfigProfile {
+  id: SupportedAiProfile;
+  label: string;
+  description: string;
+  recommendedAiStack: RecommendedAiStack | null;
+}
+
+export interface ConfigProfileSelection extends ConfigProfile {
+  source: "env" | "default" | "invalid-env";
+  envVar: string | null;
 }
 
 export interface PublicRuntimeValidationError {
@@ -83,6 +97,13 @@ export interface PublicRuntimeConfig {
   base_url: string | null;
   api_key_configured: boolean;
   log_level: LogLevel;
+  profile: {
+    id: SupportedAiProfile;
+    label: string;
+    description: string;
+    recommended_ai_stack: RecommendedAiStack | null;
+    override_count: number;
+  };
   validation: {
     ok: boolean;
     errors: PublicRuntimeValidationError[];
@@ -91,6 +112,7 @@ export interface PublicRuntimeConfig {
 
 export interface AppConfig {
   port: number;
+  profile: ConfigProfileSelection;
   ai: AiConfig;
   logging: LoggingConfig;
   validation: ValidationResult<ConfigError>;
