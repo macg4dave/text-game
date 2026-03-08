@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
@@ -76,6 +76,27 @@ interface TableInfoRow {
   name: string;
 }
 
+interface PlayerMetadataRow {
+  id: string;
+  inventory: string;
+  flags: string;
+  quests: string;
+  director_state: string;
+}
+
+export interface DbStorageHealthReport {
+  dataDirectory: string;
+  dbPath: string;
+  backupDirectory: string;
+  dbExists: boolean;
+  openError: string | null;
+  integrityMessage: string | null;
+  appliedMigrationIds: string[];
+  missingMigrationIds: string[];
+  unexpectedMigrationIds: string[];
+  corruptedPlayerIds: string[];
+}
+
 export function initDb(): void {
   runMigrations();
 }
@@ -92,7 +113,63 @@ export function getDbPath(): string {
   return dbPath;
 }
 
-export function runMigrations(): { applied: string[]; pending: string[]; dbPath: string } {
+export function getDataDirectory(): string {
+  return path.dirname(dbPath);
+}
+
+export function getBackupDirectory(): string {
+  return path.join(getDataDirectory(), "backups");
+}
+
+export function getExpectedMigrationIds(): string[] {
+  return MIGRATIONS.map((migration) => migration.id);
+}
+
+export function inspectDbStorageHealth(): DbStorageHealthReport {
+  const report: DbStorageHealthReport = {
+    dataDirectory: getDataDirectory(),
+    dbPath,
+    backupDirectory: getBackupDirectory(),
+    dbExists: existsSync(dbPath),
+    openError: null,
+    integrityMessage: null,
+    appliedMigrationIds: [],
+    missingMigrationIds: [],
+    unexpectedMigrationIds: [],
+    corruptedPlayerIds: []
+  };
+
+  if (!report.dbExists) {
+    return report;
+  }
+
+  let inspectionDb: Database.Database | null = null;
+
+  try {
+    inspectionDb = new Database(dbPath, { readonly: true, fileMustExist: true });
+    report.appliedMigrationIds = readAppliedMigrationIds(inspectionDb);
+    const expectedMigrationIds = getExpectedMigrationIds();
+    report.missingMigrationIds = expectedMigrationIds.filter((id) => !report.appliedMigrationIds.includes(id));
+    report.unexpectedMigrationIds = report.appliedMigrationIds.filter((id) => !expectedMigrationIds.includes(id));
+    report.integrityMessage = readIntegrityMessage(inspectionDb);
+    report.corruptedPlayerIds = readCorruptedPlayerIds(inspectionDb);
+  } catch (error) {
+    report.openError = getErrorMessage(error);
+  } finally {
+    inspectionDb?.close();
+  }
+
+  return report;
+}
+
+export function runMigrations(): { applied: string[]; pending: string[]; dbPath: string; backupPath: string | null } {
+  const inspection = inspectDbStorageHealth();
+  let backupPath: string | null = null;
+  if (inspection.dbExists && !inspection.openError && inspection.missingMigrationIds.length > 0) {
+    closeDb();
+    backupPath = createDbBackup("migration");
+  }
+
   const database = getDb();
   ensureDbDirectory();
   ensureMigrationTable(database);
@@ -121,11 +198,13 @@ export function runMigrations(): { applied: string[]; pending: string[]; dbPath:
     pending: MIGRATIONS.filter((migration) => !appliedBefore.has(migration.id) && !applied.includes(migration.id)).map(
       (migration) => migration.id
     ),
-    dbPath
+    dbPath,
+    backupPath
   };
 }
 
-export function resetDb(): { dbPath: string; removed: boolean; applied: string[] } {
+export function resetDb(): { dbPath: string; removed: boolean; applied: string[]; backupPath: string | null } {
+  const backupPath = existsSync(dbPath) ? createDbBackup("reset") : null;
   closeDb();
   const removed = removeDbFiles(dbPath);
   const database = openDb();
@@ -136,7 +215,8 @@ export function resetDb(): { dbPath: string; removed: boolean; applied: string[]
   return {
     dbPath: result.dbPath,
     removed,
-    applied: result.applied
+    applied: result.applied,
+    backupPath
   };
 }
 
@@ -173,6 +253,53 @@ function getAppliedMigrationIds(database: Database.Database): Set<string> {
   return new Set(rows.map((row) => row.id));
 }
 
+function readAppliedMigrationIds(database: Database.Database): string[] {
+  if (!hasTable(database, "schema_migrations")) {
+    return [];
+  }
+
+  const rows = database.prepare("SELECT id FROM schema_migrations ORDER BY applied_at ASC").all() as MigrationRow[];
+  return rows.map((row) => row.id);
+}
+
+function readIntegrityMessage(database: Database.Database): string | null {
+  const results = database.prepare("PRAGMA quick_check").pluck().all() as string[];
+  const firstProblem = results.find((value) => value !== "ok");
+  return firstProblem ?? null;
+}
+
+function readCorruptedPlayerIds(database: Database.Database): string[] {
+  if (!hasTable(database, "players")) {
+    return [];
+  }
+
+  const rows = database
+    .prepare("SELECT id, inventory, flags, quests, director_state FROM players ORDER BY created_at ASC LIMIT 25")
+    .all() as PlayerMetadataRow[];
+
+  const corruptedPlayerIds = new Set<string>();
+  for (const row of rows) {
+    for (const value of [row.inventory, row.flags, row.quests, row.director_state]) {
+      try {
+        JSON.parse(value);
+      } catch {
+        corruptedPlayerIds.add(row.id);
+        break;
+      }
+    }
+  }
+
+  return Array.from(corruptedPlayerIds);
+}
+
+function hasTable(database: Database.Database, tableName: string): boolean {
+  const row = database
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1")
+    .get(tableName) as { name?: string } | undefined;
+
+  return row?.name === tableName;
+}
+
 function addColumnIfMissing(database: Database.Database, table: string, column: string, type: string): void {
   const columns = database.prepare(`PRAGMA table_info(${table})`).all() as TableInfoRow[];
   const exists = columns.some((col) => col.name === column);
@@ -196,6 +323,26 @@ function removeDbFiles(filePath: string): boolean {
   return removed;
 }
 
+function createDbBackup(reason: "migration" | "reset"): string {
+  ensureDbDirectory();
+  const backupDirectory = getBackupDirectory();
+  mkdirSync(backupDirectory, { recursive: true });
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupPath = path.join(backupDirectory, `game.${reason}.${timestamp}.db`);
+
+  copyFileSync(dbPath, backupPath);
+
+  for (const suffix of ["-wal", "-shm"]) {
+    const candidate = `${dbPath}${suffix}`;
+    if (existsSync(candidate)) {
+      copyFileSync(candidate, `${backupPath}${suffix}`);
+    }
+  }
+
+  return backupPath;
+}
+
 function resolveDbPath(): string {
   const explicitPath = readEnv("GAME_DB_PATH", "DB_PATH");
   if (explicitPath) {
@@ -208,6 +355,14 @@ function resolveDbPath(): string {
   }
 
   return DEFAULT_DB_PATH;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
 }
 
 function readEnv(...keys: string[]): string | undefined {
@@ -244,6 +399,7 @@ function runCli(): void {
             dbPath: result.dbPath,
             applied: result.applied,
             pending: result.pending,
+            backupPath: result.backupPath,
             migrationsApplied
           },
           null,
@@ -262,7 +418,8 @@ function runCli(): void {
             command,
             dbPath: result.dbPath,
             removed: result.removed,
-            applied: result.applied
+            applied: result.applied,
+            backupPath: result.backupPath
           },
           null,
           2

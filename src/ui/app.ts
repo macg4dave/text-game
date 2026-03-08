@@ -14,9 +14,13 @@ interface SessionDebugPayload {
 }
 
 interface RuntimePreflightIssue {
+  severity?: string;
   title?: string;
   message?: string;
   recovery?: string[];
+  recommended_fix?: string | null;
+  env_vars?: string[];
+  details?: Record<string, unknown> | null;
 }
 
 interface RuntimePreflightPayload {
@@ -32,7 +36,7 @@ interface TurnDebugPayload extends SessionDebugPayload {
 }
 
 interface StateApiResponse {
-  player?: PlayerState;
+  player?: PlayerState | null;
   debug?: SessionDebugPayload;
   error?: string;
   detail?: string | string[];
@@ -71,6 +75,8 @@ const preflightPanelEl = getElement<HTMLElement>("preflight-panel");
 const preflightTitleEl = getElement<HTMLElement>("preflight-title");
 const preflightSummaryEl = getElement<HTMLElement>("preflight-summary");
 const preflightIssuesEl = getElement<HTMLElement>("preflight-issues");
+const preflightAdvancedEl = getElement<HTMLDetailsElement>("preflight-advanced");
+const preflightAdvancedJsonEl = getElement<HTMLElement>("preflight-advanced-json");
 const runtimeSummaryEl = getElement<HTMLElement>("runtime-summary");
 const sessionSummaryEl = getElement<HTMLElement>("session-summary");
 const connectionDebugEl = getElement<HTMLElement>("connection-debug");
@@ -268,24 +274,55 @@ function renderPreflightPanel(): void {
     preflightPanelEl.hidden = true;
     preflightSummaryEl.textContent = "";
     preflightIssuesEl.innerHTML = "";
+    preflightAdvancedEl.hidden = true;
+    preflightAdvancedEl.open = false;
+    preflightAdvancedJsonEl.textContent = "";
     return;
   }
 
   preflightPanelEl.hidden = false;
-  preflightTitleEl.textContent =
-    preflight.status === "checking" ? "Checking setup" : preflight.ok ? "Setup notes" : "Setup required";
+  preflightTitleEl.textContent = preflight.status === "checking" ? "Checking setup" : "Setup required";
   preflightSummaryEl.textContent = preflight.summary || "The app needs setup changes before the first turn.";
   preflightIssuesEl.innerHTML = "";
+  const advancedIssues: Array<Record<string, unknown>> = [];
 
   (preflight.issues || []).forEach((issue) => {
     const item = document.createElement("li");
+    const severity = typeof issue.severity === "string" ? `[${issue.severity.toUpperCase()}] ` : "";
     const parts = [issue.title, issue.message].filter((value): value is string => Boolean(value));
     const recovery = Array.isArray(issue.recovery) ? issue.recovery.filter(Boolean) : [];
-    item.textContent = recovery.length
-      ? `${parts.join(": ")} Fix: ${recovery.join(" ")}`
-      : parts.join(": ");
+    const recommendedFix = issue.recommended_fix || recovery[0] || "";
+    item.textContent = recommendedFix
+      ? `${severity}${parts.join(": ")} Recommended next step: ${recommendedFix}`
+      : `${severity}${parts.join(": ")}`;
     preflightIssuesEl.appendChild(item);
+
+    if (issue.details || (issue.env_vars && issue.env_vars.length)) {
+      advancedIssues.push({
+        title: issue.title || null,
+        severity: issue.severity || null,
+        env_vars: issue.env_vars || [],
+        details: issue.details || null
+      });
+    }
   });
+
+  if (advancedIssues.length) {
+    preflightAdvancedEl.hidden = false;
+    preflightAdvancedJsonEl.textContent = JSON.stringify(
+      {
+        status: preflight.status || null,
+        summary: preflight.summary || null,
+        issues: advancedIssues
+      },
+      null,
+      2
+    );
+  } else {
+    preflightAdvancedEl.hidden = true;
+    preflightAdvancedEl.open = false;
+    preflightAdvancedJsonEl.textContent = "";
+  }
 }
 
 function renderSessionSummary(): void {
@@ -313,11 +350,19 @@ function renderSessionSummary(): void {
 }
 
 function updateSessionData(data: StateApiResponse): void {
-  if (!data.player) return;
+  state.sessionDebug = data.debug || state.sessionDebug;
+
+  if (!data.player) {
+    state.player = null;
+    renderSessionSummary();
+    renderPreflightPanel();
+    renderDebugPanels();
+    setPending(state.pending);
+    return;
+  }
 
   state.player = data.player;
   state.playerId = data.player.id;
-  state.sessionDebug = data.debug || state.sessionDebug;
 
   localStorage.setItem("playerId", state.playerId);
   if (!nameEl.value.trim()) {
@@ -327,6 +372,7 @@ function updateSessionData(data: StateApiResponse): void {
   renderSessionSummary();
   renderPreflightPanel();
   renderDebugPanels();
+  setPending(state.pending);
 }
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<{
@@ -361,7 +407,7 @@ function formatErrorMessage(data: { detail?: string | string[]; error?: string }
   return data.detail || data.error || fallback;
 }
 
-async function ensurePlayer({ force = false, showStatus = false, announce = false } = {}): Promise<PlayerState> {
+async function ensurePlayer({ force = false, showStatus = false, announce = false } = {}): Promise<PlayerState | null> {
   if (!force && state.playerId && state.player) {
     rememberPlayerName();
     return state.player;
@@ -382,7 +428,16 @@ async function ensurePlayer({ force = false, showStatus = false, announce = fals
 
   updateSessionData(result.data);
 
+  const preflight = getRuntimePreflight();
+
   if (!state.player) {
+    if (preflight?.status === "action-required") {
+      if (showStatus) {
+        setStatus("Setup required", "error");
+      }
+      return null;
+    }
+
     throw new Error("Player initialization failed.");
   }
 
@@ -391,7 +446,6 @@ async function ensurePlayer({ force = false, showStatus = false, announce = fals
   }
 
   if (showStatus) {
-    const preflight = getRuntimePreflight();
     if (preflight?.status === "action-required") {
       setStatus("Setup required", "error");
     } else if (preflight?.status === "checking") {
@@ -413,7 +467,8 @@ async function requestAssist(): Promise<void> {
   }
 
   try {
-    await ensurePlayer();
+    const player = await ensurePlayer();
+    if (!player) return;
     const result = await fetchJson<AssistApiResponse>("/api/assist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -456,7 +511,11 @@ formEl.addEventListener("submit", async (event) => {
   setStatus("Sending turn", "working");
 
   try {
-    await ensurePlayer();
+    const player = await ensurePlayer();
+    if (!player) {
+      setStatus("Setup required", "error");
+      return;
+    }
     addEntry("You", input, "player");
     inputEl.value = "";
     setAssist([], []);

@@ -2,11 +2,11 @@ import "dotenv/config";
 import crypto from "node:crypto";
 import path from "node:path";
 import process from "node:process";
-import express, { type Request, type Response } from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { config, formatConfigErrors, getSafeConfigDiagnostics } from "../core/config.js";
 import { initDb } from "../core/db.js";
 import { createLogger } from "../core/logging.js";
-import type { Player, QuestSpec } from "../core/types.js";
+import type { Player, QuestSpec, RuntimePreflightIssue, RuntimePreflightReport } from "../core/types.js";
 import {
   addEvent,
   addMemories,
@@ -24,6 +24,7 @@ import { validateDirectorSpec, validateQuestSpec, validateStateUpdates } from ".
 import { loadQuestSpec, reloadQuestSpec } from "../story/quest.js";
 import { generateTurn, getEmbedding, getEmbeddings } from "../ai/service.js";
 import { buildRuntimeDebug, buildSessionDebug, buildTurnDebug, type TurnDebugParams } from "./debug.js";
+import { buildStorageStartupIssue } from "./host-preflight.js";
 import { normalizeDirectorState } from "./player-state.js";
 import { SYSTEM_PROMPT } from "./prompt.js";
 import { createRuntimePreflightService } from "./runtime-preflight.js";
@@ -38,12 +39,12 @@ const embeddingModel = config.ai.embeddingModel;
 const logger = createLogger({ level: config.logging.level }).child({ component: "server" });
 let directorSpec = loadDirectorSpec();
 let questSpec: QuestSpec = loadQuestSpec();
-const runtimePreflight = createRuntimePreflightService(config);
-
-initDb();
+let dbStartupIssue: RuntimePreflightIssue | null = null;
+let dbInitialized = false;
+const runtimePreflight = createRuntimePreflightService(config, undefined, () => (dbStartupIssue ? [dbStartupIssue] : []));
 
 app.use(express.json());
-app.use((req: Request, res: Response, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const requestId = readRequestIdHeader(req.headers["x-request-id"]) || crypto.randomUUID();
   const startedAt = Date.now();
   const requestLogger = logger.child({
@@ -70,7 +71,24 @@ app.use((req: Request, res: Response, next) => {
 app.use(express.static(path.resolve(process.cwd(), "public")));
 
 app.get("/api/state", async (req: Request, res: Response) => {
-  await runtimePreflight.ensureReport();
+  let preflight = await runtimePreflight.ensureReport();
+  if (!hasStorageBlocker(preflight)) {
+    const dbIssue = ensureDatabaseReady();
+    if (dbIssue) {
+      preflight = await runtimePreflight.ensureReport({ force: true });
+    }
+  }
+
+  if (hasStorageBlocker(preflight)) {
+    return res.json({
+      player: null,
+      debug: {
+        runtime: buildRuntimeDebug(config, preflight),
+        session: null
+      }
+    });
+  }
+
   const playerId = readQueryValue(req.query.playerId);
   const name = readQueryValue(req.query.name);
   const player = getOrCreatePlayer({ playerId, name });
@@ -89,7 +107,20 @@ app.get("/api/state", async (req: Request, res: Response) => {
   });
 });
 
-app.post("/api/assist", (req: Request, res: Response) => {
+app.post("/api/assist", async (req: Request, res: Response) => {
+  const dbIssue = ensureDatabaseReady();
+  if (dbIssue) {
+    const preflight = await runtimePreflight.ensureReport({ force: true });
+    return res.status(503).json({
+      error: "Setup required",
+      detail: preflight.summary,
+      debug: {
+        runtime: buildRuntimeDebug(config, preflight),
+        session: null
+      }
+    });
+  }
+
   const body = req.body as Partial<{ playerId: string; name: string; input: string }> | undefined;
   const input = typeof body?.input === "string" ? body.input : "";
   if (!input) {
@@ -219,6 +250,37 @@ app.post("/api/turn", async (req: Request, res: Response) => {
           memoryEmbeddings,
           memoryEmbeddingError,
           error: preflight.summary
+        })
+      });
+    }
+
+    const dbIssue = ensureDatabaseReady();
+    if (dbIssue) {
+      const refreshedPreflight = await runtimePreflight.ensureReport({ force: true });
+      requestLogger.warn("turn blocked by storage startup preflight", {
+        blockerCount: refreshedPreflight.counts.blocker,
+        warningCount: refreshedPreflight.counts.warning
+      });
+      return res.status(503).json({
+        error: "Setup required",
+        detail: refreshedPreflight.issues.map((issue) => `${issue.title}: ${issue.message}`),
+        debug: buildTurnDebugPayload({
+          requestId,
+          startedAt,
+          input,
+          player,
+          refreshedPlayer,
+          shortHistory,
+          memories,
+          statePack,
+          inputEmbedding,
+          inputEmbeddingError,
+          rawResult,
+          result,
+          updateValidation,
+          memoryEmbeddings,
+          memoryEmbeddingError,
+          error: refreshedPreflight.summary
         })
       });
     }
@@ -483,4 +545,26 @@ function readRequestIdHeader(value: string | string[] | undefined): string | nul
   }
 
   return null;
+}
+
+function ensureDatabaseReady(): RuntimePreflightIssue | null {
+  if (dbInitialized) {
+    return null;
+  }
+
+  try {
+    initDb();
+    dbInitialized = true;
+    dbStartupIssue = null;
+    return null;
+  } catch (error) {
+    dbInitialized = false;
+    dbStartupIssue = buildStorageStartupIssue(error);
+    logger.warn("database startup check failed", { error });
+    return dbStartupIssue;
+  }
+}
+
+function hasStorageBlocker(preflight: RuntimePreflightReport): boolean {
+  return preflight.issues.some((issue) => issue.severity === "blocker" && issue.area === "storage");
 }

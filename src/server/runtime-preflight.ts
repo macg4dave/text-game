@@ -50,7 +50,8 @@ export interface RuntimePreflightService {
 
 export function createRuntimePreflightService(
   config: AppConfig,
-  cacheMs = DEFAULT_PREFLIGHT_CACHE_MS
+  cacheMs = DEFAULT_PREFLIGHT_CACHE_MS,
+  getAdditionalIssues: () => RuntimePreflightIssue[] = () => []
 ): RuntimePreflightService {
   let runtimePreflight = createInitialRuntimePreflight(config);
   let runtimePreflightCheckStartedAt = 0;
@@ -88,19 +89,23 @@ export function createRuntimePreflightService(
     runtimePreflightCheckStartedAt = Date.now();
 
     const configIssues = buildConfigPreflightIssues(config);
-    if (hasBlockingPreflightIssue(configIssues)) {
-      runtimePreflight = createPreflightReport(configIssues);
+    const additionalIssues = dedupeIssues(getAdditionalIssues());
+    const baseIssues = dedupeIssues([...configIssues, ...additionalIssues]);
+
+    if (hasBlockingPreflightIssue(baseIssues)) {
+      runtimePreflight = createPreflightReport(baseIssues);
       return runtimePreflight;
     }
 
     const hostIssues = await probeHostPrerequisiteIssues();
-    if (hasBlockingPreflightIssue(hostIssues)) {
-      runtimePreflight = createPreflightReport([...configIssues, ...hostIssues]);
+    const storageIssues = dedupeIssues([...baseIssues, ...hostIssues]);
+    if (hasBlockingPreflightIssue(storageIssues)) {
+      runtimePreflight = createPreflightReport(storageIssues);
       return runtimePreflight;
     }
 
     const aiIssues = await probeAiRuntimeIssues();
-    runtimePreflight = createPreflightReport([...configIssues, ...hostIssues, ...aiIssues]);
+    runtimePreflight = createPreflightReport(dedupeIssues([...storageIssues, ...aiIssues]));
     return runtimePreflight;
   }
 

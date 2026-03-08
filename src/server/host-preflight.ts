@@ -1,19 +1,27 @@
 import { constants as fsConstants } from "node:fs";
 import { access, mkdir, statfs, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { getDataDirectory, inspectDbStorageHealth, type DbStorageHealthReport } from "../core/db.js";
 import type { RuntimePreflightIssue, RuntimePreflightIssueDetails } from "../core/types.js";
 
 export const LOW_DISK_WARNING_BYTES = 2 * 1024 * 1024 * 1024;
 export const LOW_DISK_BLOCKER_BYTES = 512 * 1024 * 1024;
 
-export async function probeHostPrerequisiteIssues(cwd = process.cwd()): Promise<RuntimePreflightIssue[]> {
+export async function probeHostPrerequisiteIssues(): Promise<RuntimePreflightIssue[]> {
   const issues: RuntimePreflightIssue[] = [];
-  const dataDirectory = getRuntimeDataDirectory(cwd);
-  const dbPath = path.join(dataDirectory, "game.db");
+  const storageHealth = inspectDbStorageHealth();
+  const dataDirectory = storageHealth.dataDirectory;
+  const dbPath = storageHealth.dbPath;
+  const backupDirectory = storageHealth.backupDirectory;
 
-  const writeIssue = await probeWritableDataDirectory(dataDirectory, dbPath);
+  const writeIssue = await probeWritableDataDirectory(dataDirectory, dbPath, backupDirectory);
   if (writeIssue) {
     issues.push(writeIssue);
+    return issues;
+  }
+
+  issues.push(...buildStorageHealthIssues(storageHealth));
+  if (issues.some((issue) => issue.severity === "blocker")) {
     return issues;
   }
 
@@ -30,8 +38,121 @@ export async function probeHostPrerequisiteIssues(cwd = process.cwd()): Promise<
   return issues;
 }
 
-export function getRuntimeDataDirectory(cwd = process.cwd()): string {
-  return path.resolve(cwd, "data");
+export function getRuntimeDataDirectory(): string {
+  return getDataDirectory();
+}
+
+export function buildStorageHealthIssues(report: DbStorageHealthReport): RuntimePreflightIssue[] {
+  const issues: RuntimePreflightIssue[] = [];
+
+  if (report.openError) {
+    issues.push({
+      code: "runtime_db_unreadable",
+      severity: "blocker",
+      area: "storage",
+      title: "Fix the saved-game database before playing",
+      message: `The app found a saved-game database at ${report.dbPath}, but it could not open it safely.`,
+      recovery: [
+        `Restore the database from ${report.backupDirectory} if a recent backup exists, or move the damaged file out of ${report.dataDirectory} before retrying.`,
+        "Restart the app after the saved-game database is readable again."
+      ],
+      recommended_fix: `Restore the database from ${report.backupDirectory} if a recent backup exists, or move the damaged file out of ${report.dataDirectory} before retrying.`,
+      env_vars: [],
+      details: buildIssueDetails({
+        check: "runtime-db-open",
+        probe_target: report.dbPath,
+        notes: [report.openError]
+      })
+    });
+  }
+
+  if (report.integrityMessage) {
+    issues.push({
+      code: "runtime_db_corrupted",
+      severity: "blocker",
+      area: "storage",
+      title: "Repair or replace the saved-game database",
+      message: "SQLite reported corruption in the saved-game database during startup.",
+      recovery: [
+        `Restore the database from ${report.backupDirectory} if a recent backup exists, or reset the local save data if you can afford to lose the current session.`,
+        "Restart the app after the database integrity problem is fixed."
+      ],
+      recommended_fix: `Restore the database from ${report.backupDirectory} if a recent backup exists, or reset the local save data if you can afford to lose the current session.`,
+      env_vars: [],
+      details: buildIssueDetails({
+        check: "runtime-db-integrity",
+        probe_target: report.dbPath,
+        notes: [report.integrityMessage]
+      })
+    });
+  }
+
+  if (report.corruptedPlayerIds.length > 0) {
+    issues.push({
+      code: "save_metadata_corrupted",
+      severity: "blocker",
+      area: "storage",
+      title: "Repair or replace the saved-game metadata",
+      message: "At least one saved session contains corrupted state metadata that the app cannot safely replay.",
+      recovery: [
+        `Restore the affected save from ${report.backupDirectory} if a recent backup exists, or remove the damaged save data before retrying.`,
+        "Restart the app after the saved-game metadata is valid again."
+      ],
+      recommended_fix: `Restore the affected save from ${report.backupDirectory} if a recent backup exists, or remove the damaged save data before retrying.`,
+      env_vars: [],
+      details: buildIssueDetails({
+        check: "runtime-save-metadata",
+        probe_target: report.dbPath,
+        notes: [
+          `Affected player ids: ${report.corruptedPlayerIds.join(", ")}`,
+          `Applied migrations: ${report.appliedMigrationIds.join(", ") || "none recorded"}`
+        ]
+      })
+    });
+  }
+
+  return issues;
+}
+
+export function buildStorageStartupIssue(
+  error: unknown,
+  report = inspectDbStorageHealth()
+): RuntimePreflightIssue {
+  const [primaryIssue] = buildStorageHealthIssues(report);
+  if (primaryIssue) {
+    return primaryIssue;
+  }
+
+  const errorMessage = getErrorMessage(error);
+  const needsBackupFix = /backup/i.test(errorMessage);
+
+  return {
+    code: needsBackupFix ? "runtime_backup_recovery_failed" : "runtime_storage_startup_failed",
+    severity: "blocker",
+    area: "storage",
+    title: needsBackupFix ? "Fix the recovery backup folder before continuing" : "Fix the saved-game storage before continuing",
+    message: needsBackupFix
+      ? `The app could not create or use its recovery backup folder at ${report.backupDirectory} during startup.`
+      : "The app could not finish preparing the saved-game storage during startup.",
+    recovery: needsBackupFix
+      ? [
+          `Confirm that ${report.backupDirectory} exists on a writable drive and your user account can create files there.`,
+          "Restart the app after the recovery backup folder is writable again."
+        ]
+      : [
+          `Inspect ${report.dbPath} and ${report.backupDirectory}, fix the reported storage problem, then retry startup.`,
+          "If the local save cannot be recovered, move it aside or reset the local DB before retrying."
+        ],
+    recommended_fix: needsBackupFix
+      ? `Confirm that ${report.backupDirectory} exists on a writable drive and your user account can create files there.`
+      : `Inspect ${report.dbPath} and ${report.backupDirectory}, fix the reported storage problem, then retry startup.`,
+    env_vars: [],
+    details: buildIssueDetails({
+      check: needsBackupFix ? "runtime-backup-path" : "runtime-storage-startup",
+      probe_target: needsBackupFix ? report.backupDirectory : report.dbPath,
+      notes: [errorMessage]
+    })
+  };
 }
 
 export function buildLowDiskSpaceIssue(freeBytes: number, targetPath: string): RuntimePreflightIssue | null {
@@ -75,7 +196,11 @@ export function buildLowDiskSpaceIssue(freeBytes: number, targetPath: string): R
   };
 }
 
-async function probeWritableDataDirectory(dataDirectory: string, dbPath: string): Promise<RuntimePreflightIssue | null> {
+async function probeWritableDataDirectory(
+  dataDirectory: string,
+  dbPath: string,
+  backupDirectory: string
+): Promise<RuntimePreflightIssue | null> {
   try {
     await mkdir(dataDirectory, { recursive: true });
   } catch (error) {
@@ -112,6 +237,30 @@ async function probeWritableDataDirectory(dataDirectory: string, dbPath: string)
         dbPath,
         error
       );
+    }
+
+    try {
+      await mkdir(backupDirectory, { recursive: true });
+      await access(backupDirectory, fsConstants.R_OK | fsConstants.W_OK);
+    } catch (error) {
+      return {
+        code: "runtime_backup_path_unwritable",
+        severity: "blocker",
+        area: "storage",
+        title: "Fix the recovery backup folder permissions",
+        message: `The app could not use its recovery backup folder at ${backupDirectory}.`,
+        recovery: [
+          `Confirm that ${backupDirectory} exists on a writable drive and your user account can create files there.`,
+          "Restart the app after fixing the backup folder permissions or moving the project data to a writable location."
+        ],
+        recommended_fix: `Confirm that ${backupDirectory} exists on a writable drive and your user account can create files there.`,
+        env_vars: [],
+        details: buildIssueDetails({
+          check: "runtime-backup-path",
+          probe_target: backupDirectory,
+          notes: [getErrorMessage(error)]
+        })
+      };
     }
   }
 

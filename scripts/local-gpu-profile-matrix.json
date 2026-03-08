@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "defaultProfileId": "local-gpu-8gb",
+  "profiles": [
+    {
+      "id": "local-gpu-8gb",
+      "displayName": "Local GPU 8 GB",
+      "minVramGb": 8,
+      "maxVramGb": 11,
+      "recommendedChatModel": "gemma3:4b",
+      "recommendedEmbeddingRoute": {
+        "mode": "hosted",
+        "model": "text-embedding-3-small",
+        "aliasTarget": "game-embedding"
+      },
+      "ollamaPullModels": [
+        "gemma3:4b"
+      ],
+      "fallbackProfileId": null,
+      "skuExamples": [
+        "RTX 4060 Ti 8 GB",
+        "RTX 3070 8 GB",
+        "RTX 4070 Laptop 8 GB"
+      ],
+      "verificationStatus": "verified",
+      "notes": [
+        "Default local-gpu profile for this repo.",
+        "If gemma3:4b still runs out of memory or is too slow, gemma3:1b is an unofficial smoke-test-only fallback rather than a supported tier profile.",
+        "Keep game-embedding on the hosted text-embedding-3-small route for this tier.",
+        "Official Ollama artifact size for gemma3:4b is about 3.3 GB; usable VRAM headroom must be higher than the model artifact size."
+      ]
+    },
+    {
+      "id": "local-gpu-12gb",
+      "displayName": "Local GPU 12 GB",
+      "minVramGb": 12,
+      "maxVramGb": 19,
+      "recommendedChatModel": "gemma3:12b",
+      "recommendedEmbeddingRoute": {
+        "mode": "hosted",
+        "model": "text-embedding-3-small",
+        "aliasTarget": "game-embedding"
+      },
+      "ollamaPullModels": [
+        "gemma3:12b"
+      ],
+      "fallbackProfileId": "local-gpu-8gb",
+      "skuExamples": [
+        "RTX 3060 12 GB",
+        "RTX 4070 SUPER 12 GB",
+        "RTX 3080 Ti Laptop 16 GB"
+      ],
+      "verificationStatus": "heuristic",
+      "notes": [
+        "Use this tier only when detected VRAM is comfortably above the 8 GB tier.",
+        "Fall back to local-gpu-8gb if startup reliability is poor or the 12B model feels too slow.",
+        "Keep game-embedding on the hosted text-embedding-3-small route for this tier.",
+        "Official Ollama artifact size for gemma3:12b is about 8.1 GB; artifact size is not the same as safe minimum VRAM."
+      ]
+    },
+    {
+      "id": "local-gpu-20gb-plus",
+      "displayName": "Local GPU 20 GB+",
+      "minVramGb": 20,
+      "maxVramGb": null,
+      "recommendedChatModel": "gemma3:27b",
+      "recommendedEmbeddingRoute": {
+        "mode": "local",
+        "model": "embeddinggemma",
+        "aliasTarget": "game-embedding"
+      },
+      "ollamaPullModels": [
+        "gemma3:27b",
+        "embeddinggemma"
+      ],
+      "fallbackProfileId": "local-gpu-12gb",
+      "skuExamples": [
+        "RTX 4090 24 GB",
+        "RTX 6000 Ada 48 GB",
+        "RTX A5000 24 GB"
+      ],
+      "verificationStatus": "heuristic",
+      "notes": [
+        "Use local embeddings only on this tier, and switch game-embedding back to the hosted default if local embedding throughput is poor.",
+        "Fall back to local-gpu-12gb if gemma3:27b startup is unreliable or if the local embedding path is unavailable.",
+        "Official Ollama artifact sizes are about 17 GB for gemma3:27b and about 622 MB for embeddinggemma.",
+        "VRAM remains the authoritative selector even when a GPU SKU is listed as an example."
+      ]
+    }
+  ]
+}

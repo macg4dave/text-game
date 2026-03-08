@@ -119,6 +119,8 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 
 This adds an Ollama container and reserves NVIDIA GPU access for that local inference service only. The app and LiteLLM containers themselves do not need GPU access.
 
+The authoritative local-GPU profile matrix for this override now lives in [scripts/local-gpu-profile-matrix.json](/g:/text-game/scripts/local-gpu-profile-matrix.json). T02g defines three VRAM tiers keyed by detected memory first: `local-gpu-8gb`, `local-gpu-12gb`, and `local-gpu-20gb-plus`.
+
 On Windows, the launcher wraps the same compiled Docker path and opens the browser for you:
 
 ```powershell
@@ -145,7 +147,8 @@ docker compose run --rm --no-deps app npm run db:reset
 What those do:
 
 - `db:migrate` applies any pending migrations and leaves existing data in place
-- `db:reset` removes `game.db` plus SQLite sidecar files such as `-wal` and `-shm`, then reapplies the baseline migrations
+- `db:migrate` now creates a timestamped backup in `data/backups/` before applying pending migrations to an existing database
+- `db:reset` now creates a timestamped backup in `data/backups/` before removing `game.db` plus SQLite sidecar files such as `-wal` and `-shm`, then reapplies the baseline migrations
 
 After a reset, restart the app with your normal path:
 
@@ -266,6 +269,11 @@ Optional developer GPU-backed local model path:
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu
 ```
 
+Current profile status:
+
+- `local-gpu-8gb` is the active default profile and is the only profile intended to be sanity-checked in this task
+- `local-gpu-12gb` and `local-gpu-20gb-plus` are documented for later selection work and should be treated as heuristic until they are exercised on matching hardware
+
 Or, if `npm` is already installed and on `PATH`:
 
 ```bash
@@ -343,7 +351,15 @@ Optional larger local-model path through the same gateway UX:
 - keep the app on `AI_PROVIDER=litellm`
 - leave the app-facing aliases as `game-chat` and `game-embedding`
 - use `docker-compose.gpu.yml` or `-AiStack local-gpu` to start an Ollama backend with NVIDIA GPU passthrough
-- let LiteLLM switch to `litellm.local-gpu.config.yaml` for `game-chat` while `game-embedding` stays hosted by default
+- let LiteLLM switch to `litellm.local-gpu.config.yaml` for `game-chat` while `game-embedding` stays hosted by default on smaller tiers
+
+Current VRAM-tier matrix for the optional local GPU path:
+
+- `local-gpu-8gb` uses `gemma3:4b` for chat and keeps `game-embedding` on hosted `text-embedding-3-small`; if that route is still too heavy, `gemma3:1b` is only a smoke-test fallback, not a supported matrix tier
+- `local-gpu-12gb` uses `gemma3:12b` for chat and keeps `game-embedding` on hosted `text-embedding-3-small`; fall back to `local-gpu-8gb` if startup reliability is worse than the smaller tier
+- `local-gpu-20gb-plus` uses `gemma3:27b` for chat and can route `game-embedding` to local `embeddinggemma`; fall back to `local-gpu-12gb` or switch embeddings back to hosted if the local embedding route is unavailable or too slow
+
+VRAM remains the selector of record. GPU marketing names are only examples for documentation and must not override detected memory.
 
 That keeps the player-facing and app-facing setup stable even when the upstream model stack changes.
 
@@ -435,6 +451,8 @@ The browser UI includes:
 For a Windows-only local model setup, use [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md).
 
 For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`.
+
+For local GPU matrix consistency checks, run `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1`.
 
 ## Key Files
 
@@ -529,6 +547,8 @@ The runtime automatically prefers LiteLLM-specific env vars when `AI_PROVIDER=li
 
 The included template keeps both aliases on hosted providers first. When you want an optional larger local-model route, use the included `litellm.local-gpu.config.yaml` path through the Docker GPU override or mirror that pattern in your own LiteLLM config while leaving the alias names alone so the app contract stays stable.
 
+The included local-GPU config now tracks the `local-gpu-8gb` matrix profile by default. Higher-tier manual swap references for `local-gpu-12gb` and `local-gpu-20gb-plus` are left in the file as commented guidance until launcher or UI selection work lands.
+
 ## Windows Local AI
 
 The repo includes an optional Docker GPU override intended for larger local-model experiments on Windows dev machines. The recommended gateway-aligned route is to keep the app on LiteLLM and place the local model behind the `game-chat` alias. A direct `AI_PROVIDER=ollama` path still exists for smoke tests when you want the thinnest possible local loop.
@@ -540,6 +560,14 @@ The direct preset keeps the same OpenAI-compatible adapter boundary and only swa
 - base URL default: `http://127.0.0.1:11434/v1`
 
 Setup steps and GPU notes live in [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md). Treat the local-model path as optional, not as the default small-task or end-user setup.
+
+The first-pass VRAM-tier matrix is intentionally conservative and uses one chat family across all supported tiers:
+
+- `local-gpu-8gb` -> `gemma3:4b` chat, hosted embeddings, `verified`
+- `local-gpu-12gb` -> `gemma3:12b` chat, hosted embeddings, `heuristic`
+- `local-gpu-20gb-plus` -> `gemma3:27b` chat, local `embeddinggemma` allowed, `heuristic`
+
+Artifact-size references for those recommendations come from the official Ollama library pages for [gemma3:4b](https://ollama.com/library/gemma3:4b), [gemma3:12b](https://ollama.com/library/gemma3:12b), [gemma3:27b](https://ollama.com/library/gemma3:27b), and [embeddinggemma](https://ollama.com/library/embeddinggemma). Usable VRAM headroom must be higher than the raw artifact size.
 
 For the Docker-backed GPU path, the quickest Windows startup path is:
 
@@ -574,6 +602,7 @@ The browser client is intentionally useful for local AI debugging:
   - `issues`: each issue has `severity`, `area`, `title`, `message`, `recommended_fix`, `env_vars`, and optional advanced `details`
   - `counts`: blocker/warning/info totals so the launcher and browser can decide whether play should stay blocked
 - host and storage preflight now covers writable app-data path checks plus low-disk warnings or blockers before the first turn
+- storage preflight now also checks whether the saved-game database can be opened safely, whether SQLite reports corruption, and whether existing player metadata is still valid JSON before the first turn
 - runtime debug now also includes a non-secret `config_diagnostics` block showing whether each resolved config value came from provider-specific, generic, legacy, or default config paths
 - `POST /api/turn` returns the narrator payload plus safe debug details such as request id, latency, prompt preview, embedding fallback status, validation result, and before/after player state
 - API keys are not returned by the debug payload; only non-secret runtime metadata is exposed
@@ -616,3 +645,5 @@ Common fixes:
 - if the launcher warns that GPU tooling was not detected, expect the optional local path to fail or fall back to very slow CPU inference
 - if the launcher or runtime reports low disk space, free up space on the drive that contains the app `data/` folder before starting another session
 - if the launcher or runtime reports an unwritable app-data path, fix the folder permissions or move the repo to a writable location before retrying
+- if the launcher or runtime reports an unreadable or corrupted saved-game database, restore the latest copy from `data/backups/` or move the damaged DB out of `data/` before retrying
+- if the launcher or runtime reports corrupted save metadata, restore the affected save from `data/backups/` or remove the damaged local save before retrying

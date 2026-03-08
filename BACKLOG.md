@@ -109,11 +109,11 @@ Use this exact shape when adding new work:
 | T02i | Now | P0 | P1 | AI readiness, network, and model-availability probes | Done | T01b, T02f | Manual LiteLLM readiness probe |
 | T03 | Now | P0 | P1 | Logging with levels and redaction | Done | None | `npm test` |
 | T04 | Now | P0 | P1 | DB migrations and seed flow | Done | None | Manual DB reset verification |
-| T04a | Now | P0 | P1 | Storage, save, and migration preflight | Ready | T04, T01b | Manual DB and save preflight smoke test |
+| T04a | Now | P0 | P1 | Storage, save, and migration preflight | Done | T04, T01b | Manual DB and save preflight smoke test |
 | T02j | Now | P0 | P1 | End-user config profiles and validated developer overrides | Ready | T01b, T02a, T02g | `npm test`; manual profile resolution check |
 | T05 | Next | P0 | P2 | Error boundary and global handler | Ready | None | `npm test` |
 | T35a | Next | P0 | P1 | Packaged AI runtime decision for Docker LiteLLM | Done | T35, T02f | Decision memo review |
-| T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Ready | T02f | Matrix review |
+| T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Review | T02f | Matrix review |
 | T06 | Next | P1 | P1 | Turn input, output, and state schemas | Ready | T02 | `npm test` |
 | T07 | Next | P1 | P1 | Turn handler and model orchestration | Ready | T06 | `npm test` |
 | T02h | Next | P1 | P1 | Auto-select local GPU model profile | Ready | T02g, T02j, T12b | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`; manual local GPU startup check |
@@ -562,7 +562,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T02g - GPU Tier Matrix And Local Model Profiles
 
-- Status: Ready
+- Status: Review
 - Queue: Next
 - Phase: P0
 - Priority: P1
@@ -598,6 +598,11 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - user requested on 2026-03-08 that the roadmap and backlog cover auto-setup for different GPU capabilities
   - do not hardcode incorrect SKU-to-VRAM assumptions into the matrix; treat VRAM as authoritative and model names as convenience labels only
   - examples should be expressed as tiers such as `8 GB`, `12 GB`, and `20 GB+` even when common cards are listed alongside them
+  - authoritative matrix data now lives in `scripts/local-gpu-profile-matrix.json` so future launcher and setup work can read one repo-owned JSON contract without introducing YAML parsing into app code
+  - `litellm.local-gpu.config.yaml` now pins `local-gpu-8gb` as the active default profile and leaves `local-gpu-12gb` plus `local-gpu-20gb-plus` as commented manual swap references for later T02h selection work
+  - `local-gpu-8gb` is documented as `verified` for this task's matrix sanity check path; `local-gpu-12gb` and `local-gpu-20gb-plus` remain `heuristic` until they are exercised on matching hardware
+  - validation on 2026-03-08 ran `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1` and a manual repo consistency review across `README.md`, `setup_local_a.i.md`, `.env.example`, `litellm.local-gpu.config.yaml`, `ROADMAP.md`, and this task card
+  - a real local GPU runtime smoke was not available in this session, so the task remains `Review` rather than `Done`
 
 ### T02h - Auto-Select Local GPU Model Profile
 
@@ -1001,7 +1006,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T04a - Storage, Save, And Migration Preflight
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -1015,9 +1020,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Files to Touch:
   - BACKLOG.md
   - README.md
-  - src/db.ts
-  - src/server.ts
-  - public/app.ts
+  - src/core/db.ts
+  - src/server/host-preflight.ts
+  - src/server/host-preflight.test.ts
+  - src/server/runtime-preflight.ts
+  - src/server/index.ts
+  - src/ui/app.ts
   - public/index.html
   - scripts/start-dev.ps1
 - Do Not Touch:
@@ -1036,6 +1044,14 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Handoff Notes:
   - classify actual write-risk issues as blockers
   - save compatibility messaging should stay readable to non-developers even when schema versions are involved
+  - completed on 2026-03-08 by extending startup storage preflight beyond writable-folder checks to inspect the actual SQLite save store, including unreadable DB files, SQLite corruption, and malformed saved player metadata
+  - `src/core/db.ts` now exposes DB storage inspection helpers and writes timestamped backups into `data/backups/` before both migration-on-existing-DB and `db:reset` flows
+  - `src/server/host-preflight.ts` now checks backup-folder writability and maps unreadable DB, corrupted SQLite, and corrupted save metadata into shared storage preflight blockers; `src/server/host-preflight.test.ts` now covers those mappings
+  - `src/server/index.ts` now avoids touching the DB when storage preflight is blocked, keeps `/api/state` reachable with `player: null`, and surfaces DB-startup failures through the shared preflight contract instead of crashing the server on startup
+  - `src/ui/app.ts` now treats `action-required` as the blocking startup state consistently, preserves runtime preflight data even when no player can be loaded, and renders advanced setup details for storage issues
+  - `README.md` now documents backup creation during migrate/reset and the new recovery guidance for unreadable DB files and corrupted save metadata
+  - validation on 2026-03-08 passed with `docker compose build app`, `docker compose run --rm --no-deps app npx tsx --test src/server/host-preflight.test.ts`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npm test`, a one-off corrupt-DB smoke on port `3314` that returned `runtime_db_unreadable` from `/api/state`, a one-off corrupted-save smoke on port `3315` that returned `save_metadata_corrupted` from `/api/state` after the runtime preflight cache refreshed, a one-off `node dist/core/db.js reset` smoke that returned a non-null `backupPath`, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+  - current nuance: runtime preflight is cached for 15 seconds, so storage corruption introduced while the app is already running may take up to one refresh cycle or a forced recheck to appear; startup-time corruption is still caught before the first turn
 
 ### T06 - Turn Input, Output, And State Schemas
 
@@ -1419,7 +1435,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 | D04 | MVP packaging shell: launcher-only, Tauri, or Electron | Before Phase 0 exit | Release lead | Locked |
 | D05 | Default end-user AI setup: repo-managed LiteLLM Docker sidecar as the default control plane, with hosted small-task routing and an optional GPU-backed local-model path | Before Phase 0 exit | Tech lead | Locked |
 | D06 | MVP packaged AI runtime: require Docker Desktop for the LiteLLM sidecar, or stage the gateway another way while preserving the same app-facing contract | Before T36 starts | Release lead | Locked |
-| D07 | Initial local GPU tier matrix: which VRAM tiers are officially supported first, and which model profiles map to them | Before T02h starts | AI systems lead | Open |
+| D07 | Initial local GPU tier matrix: which VRAM tiers are officially supported first, and which model profiles map to them | Before T02h starts | AI systems lead | Locked |
 | D08 | Preflight policy: which startup failures are blockers versus warnings versus info in end-user mode, and which actions can auto-fix safely | Before T01b starts | Tech lead | Open |
 
 ## Agent Execution Rules

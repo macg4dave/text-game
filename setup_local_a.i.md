@@ -15,19 +15,21 @@ If you only want the thinnest local smoke-test loop and do not want the Docker o
 
 This guide uses Ollama because it has an official Docker image, works well with LiteLLM routing, and supports local NVIDIA GPU acceleration when Docker is configured for GPU passthrough.
 
-## Recommended Model Pair
+## GPU Tier Matrix
 
-- chat: `gemma3:4b`
-- embeddings: `embeddinggemma`
+The authoritative local-GPU matrix for this repo lives in [scripts/local-gpu-profile-matrix.json](/g:/text-game/scripts/local-gpu-profile-matrix.json).
 
-This keeps the download small enough for dev use while still giving the game loop a better chance of returning valid JSON than the tiniest models.
+Current first-pass profiles:
 
-Recommended gateway split:
+- `local-gpu-8gb` (`verified`): `gemma3:4b` for chat, hosted `text-embedding-3-small` for `game-embedding`
+- `local-gpu-12gb` (`heuristic`): `gemma3:12b` for chat, hosted `text-embedding-3-small` for `game-embedding`
+- `local-gpu-20gb-plus` (`heuristic`): `gemma3:27b` for chat, local `embeddinggemma` may back `game-embedding`
 
-- keep `game-chat` eligible for a local route such as `gemma3:4b` when you want a larger optional generation path
-- keep `game-embedding` on a hosted embedding model unless you are intentionally testing local embeddings
+Use VRAM as the selection key. GPU SKU names are documentation-only examples.
 
-If your machine is tight on RAM or download space, you can try `gemma3:1b` instead. Expect lower structured-output reliability.
+Artifact-size references for these recommendations come from the official Ollama library pages for [gemma3:4b](https://ollama.com/library/gemma3:4b), [gemma3:12b](https://ollama.com/library/gemma3:12b), [gemma3:27b](https://ollama.com/library/gemma3:27b), and [embeddinggemma](https://ollama.com/library/embeddinggemma). Treat those artifact sizes as lower than the real VRAM headroom you need for stable local inference.
+
+If your machine is tight on VRAM or download space, `gemma3:1b` remains a smoke-test-only fallback for the `local-gpu-8gb` route. Expect lower structured-output reliability.
 
 ## Recommended Docker GPU Path
 
@@ -62,7 +64,8 @@ Notes:
 
 - GPU passthrough in this repo is officially targeted at **NVIDIA on Windows via Docker Desktop + WSL2** first.
 - The GPU reservation is attached only to the `ollama` container, not the app or LiteLLM containers.
-- `game-embedding` stays hosted by default in this path, so keep `OPENAI_API_KEY` populated unless you intentionally build a local embedding variant too.
+- `litellm.local-gpu.config.yaml` now tracks `local-gpu-8gb` as the active default profile.
+- `game-embedding` stays hosted by default in the active `local-gpu-8gb` path, so keep `OPENAI_API_KEY` populated unless you intentionally switch to the `local-gpu-20gb-plus` manual swap guidance.
 
 ## Install Ollama On Windows
 
@@ -78,7 +81,7 @@ The Windows app normally keeps the local API running in the background on `http:
 
 ## Download The Models
 
-Run these in PowerShell:
+Run these in PowerShell for the active `local-gpu-8gb` default:
 
 ```powershell
 ollama pull gemma3:4b
@@ -90,6 +93,11 @@ Optional smaller chat model:
 ```powershell
 ollama pull gemma3:1b
 ```
+
+Additional model pulls for documented higher tiers:
+
+- `local-gpu-12gb`: `ollama pull gemma3:12b`
+- `local-gpu-20gb-plus`: `ollama pull gemma3:27b` and `ollama pull embeddinggemma`
 
 ## Gateway-Aligned Repo Configuration
 
@@ -110,6 +118,8 @@ Then choose one of these LiteLLM configs:
 
 - `litellm.config.yaml` for the default hosted-first path
 - `litellm.local-gpu.config.yaml` for the Docker-backed Ollama GPU override
+
+The included `litellm.local-gpu.config.yaml` keeps `local-gpu-8gb` active and includes commented manual swap references for `local-gpu-12gb` and `local-gpu-20gb-plus`. T02g does not add runtime profile-selection env vars yet.
 
 If you build your own equivalent config, keep these rules:
 
@@ -190,6 +200,7 @@ What the current startup checks will tell you on the local GPU path:
 - if LiteLLM is up but Ollama cannot be reached, startup now reports that the local model service is unavailable instead of a generic AI failure
 - if the selected Ollama model is missing, startup now reports that the local model must be pulled or that you should switch back to the hosted default path
 - if the launcher cannot find `nvidia-smi`, it now warns that the local path may fail or fall back to very slow CPU inference
+- if you manually swap to a larger heuristic profile and it proves unreliable, step back one tier instead of trying to force the biggest model to fit
 
 If you are using the direct `AI_PROVIDER=ollama` fallback instead of LiteLLM, the same app startup commands still work.
 
@@ -220,6 +231,12 @@ Recommended loop:
 4. Re-run the harness.
 5. If it fails, fix the contract break before touching unrelated code.
 
+When you change the GPU tier matrix or the active local-GPU config, run this first:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1
+```
+
 ## Smoke Test Checklist
 
 1. Open the app and start a new player.
@@ -236,6 +253,7 @@ Recommended loop:
 - This path is for local smoke tests, not quality or balance validation.
 - Small local models may drift from the JSON schema more often than the default hosted path.
 - Turn quality, pacing, and quest progression will likely be worse than the default LiteLLM or hosted OpenAI-compatible setup.
+- Only the `local-gpu-8gb` profile is treated as sanity-check-ready in this task. The `12 GB` and `20 GB+` tiers remain heuristic until they are tested on matching hardware.
 
 ## Official References
 

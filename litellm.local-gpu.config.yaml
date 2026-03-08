@@ -6,17 +6,24 @@
 # This file is mounted by the default Compose stack and activated by
 # `docker-compose.gpu.yml` or `scripts/start-dev.ps1 -AiStack local-gpu`.
 #
-# Recommended shape:
-# - route `game-chat` to a local Ollama model
-# - keep `game-embedding` on a small hosted model unless you are explicitly
-#   validating a local embedding path too
+# The authoritative tier matrix lives in:
+# - scripts/local-gpu-profile-matrix.json
+#
+# active_profile_id: local-gpu-8gb
+#
+# The active block below is intentionally conservative:
+# - route `game-chat` to gemma3:4b for the 8 GB tier
+# - keep `game-embedding` on the hosted default for the 8 GB tier
+# - leave higher-tier manual swap blocks commented until T02h adds selection logic
 
 model_list:
+  # profile_id: local-gpu-8gb
   - model_name: game-chat
     litellm_params:
       model: ollama_chat/gemma3:4b
       api_base: os.environ/OLLAMA_BASE_URL
 
+  # profile_id: local-gpu-8gb
   - model_name: game-embedding
     litellm_params:
       model: openai/text-embedding-3-small
@@ -24,3 +31,21 @@ model_list:
 
 litellm_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
+
+# Manual swap reference blocks for later profile-selection work:
+#
+# profile_id: local-gpu-12gb
+# game-chat:
+#   model: ollama_chat/gemma3:12b
+#   api_base: os.environ/OLLAMA_BASE_URL
+# game-embedding:
+#   model: openai/text-embedding-3-small
+#   api_key: os.environ/OPENAI_API_KEY
+#
+# profile_id: local-gpu-20gb-plus
+# game-chat:
+#   model: ollama_chat/gemma3:27b
+#   api_base: os.environ/OLLAMA_BASE_URL
+# game-embedding:
+#   model: ollama_embeddings/embeddinggemma
+#   api_base: os.environ/OLLAMA_BASE_URL

@@ -101,7 +101,7 @@ Exit gate:
 - Host prerequisite checks cover Docker, ports, writable data paths, and baseline disk headroom before gameplay starts.
 - Logging, migrations, and error handling are wired into the baseline app.
 - The supported AI startup path brings up the app and repo-managed LiteLLM sidecar together, and the optional GPU override for local inference is documented.
-- The optional local GPU path has a documented VRAM-tier model matrix with at least one verified low-VRAM tier and one verified high-VRAM tier.
+- The optional local GPU path has a documented VRAM-tier model matrix with at least one verified low-VRAM tier and one documented high-VRAM tier, with heuristic labeling until matching hardware validation is complete.
 - AI readiness checks distinguish LiteLLM health, alias availability, network reachability, auth failures, and local-model availability before the first turn.
 - LiteLLM default alias names for chat and embeddings are documented and exercised manually.
 - A packaging spike or wrapper decision is documented well enough to unblock early playtest builds.
@@ -218,7 +218,7 @@ Exit gate:
 
 - Lock the supported Windows-first double-click target and capture the packaging or wrapper decision early.
 - Close the remaining validation and packaging implications of the Docker-managed LiteLLM sidecar plus optional GPU override.
-- Define the first GPU-tier model matrix for the optional local inference path so setup can stop depending on manual model guesswork.
+- Define the first GPU-tier model matrix for the optional local inference path so setup can stop depending on manual model guesswork, starting with `8 GB`, `12 GB`, and `20 GB+` tiers.
 - Lock the shared blocker, warning, and info preflight policy and extend it to host, AI, storage, and save checks.
 - Finish launcher preflight, config validation, and clear recovery messaging.
 - Make onboarding, first-run troubleshooting, and save or load part of the core loop scope instead of late polish.
