@@ -105,7 +105,7 @@ Use this exact shape when adding new work:
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
 | T01b | Now | P0 | P1 | Preflight blocker contract and advanced diagnostics | Done | T01a, T02 | `npm test`; manual blocked and warning preflight check |
-| T01c | Now | P0 | P1 | Host runtime and path prerequisite checks | Ready | T01, T01b | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
+| T01c | Now | P0 | P1 | Host runtime and path prerequisite checks | Done | T01, T01b | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T02i | Now | P0 | P1 | AI readiness, network, and model-availability probes | Ready | T01b, T02f | Manual LiteLLM readiness probe |
 | T03 | Now | P0 | P1 | Logging with levels and redaction | Ready | None | `npm test` |
 | T04 | Now | P0 | P1 | DB migrations and seed flow | Ready | None | Manual DB reset verification |
@@ -431,7 +431,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T01c - Host Runtime And Path Prerequisite Checks
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -445,10 +445,11 @@ When a human assigns a task directly, the assigned task overrides queue order.
 - Files to Touch:
   - BACKLOG.md
   - README.md
+  - scripts/lib/shared.ps1
   - scripts/start-dev.ps1
-  - src/server.ts
-  - src/config.ts
-  - packaging/
+  - src/server/runtime-preflight.ts
+  - src/server/host-preflight.ts
+  - src/server/host-preflight.test.ts
 - Do Not Touch:
   - data/spec/
 - Dependencies:
@@ -463,8 +464,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - optional local GPU prerequisites are warnings or blockers only when that mode is selected
   - launcher and packaged-path wording can reuse the same host-prerequisite results
 - Handoff Notes:
-  - keep the hosted-default path tolerant of missing GPU tooling
-  - prioritize early detection of issues that would otherwise look like random startup hangs
+  - completed on 2026-03-08 with a new `src/server/host-preflight.ts` module so runtime preflight now reports storage blockers and warnings for unwritable app-data paths plus low disk headroom before the first turn
+  - the Windows launcher now fails earlier on missing Docker, missing Compose support, Windows-containers mode, missing default browser handler for auto-open runs, unwritable repo `data/` paths, and low disk headroom; local GPU tooling still stays a warning unless `-AiStack local-gpu` is selected
+  - shared PowerShell helpers in `scripts/lib/shared.ps1` now own writable-directory probing and free-space lookups for reuse by later launcher and packaging tasks
+  - disk-headroom policy for both launcher and runtime preflight is `warning` below 2 GB free and `blocker` below 512 MB free on the app-data drive
+  - validation completed on 2026-03-08 with `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/server/host-preflight.test.ts`, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, a manual writable-path smoke using `scripts/lib/shared.ps1`, and a manual missing-Docker smoke via a temporary `PATH` override
+  - the launcher validation again exercised the existing host `3000` conflict on this machine and correctly fell back to `3100`
 
 ### T35 - Packaging Prototype And Decision Memo
 

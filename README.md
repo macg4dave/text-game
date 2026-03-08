@@ -242,17 +242,25 @@ npm run dev:windows
 The launcher:
 
 - checks Docker and Compose
+- confirms Docker is using the Linux container runtime required by the supported path
 - reuses shared PowerShell helper functions from `scripts/lib/shared.ps1` for dotenv parsing and HTTP readiness checks
 - reads `.env` when present
 - falls back to the LiteLLM defaults when `.env` is missing
 - uses the LiteLLM stack for the supported Docker launcher modes even if an older `.env` still contains a direct-provider experiment
 - starts the default LiteLLM sidecar for the supported Docker path
 - can opt into the local GPU override with `-AiStack local-gpu`
+- checks that the repo `data/` path is writable and warns or blocks early when disk headroom is too low
+- checks for a default browser handler before auto-opening the play surface unless you use `-NoBrowser`
 - clears any previous `text-game` compose app container before starting the fresh app instance
 - automatically picks a free local port for that run if the configured port is already occupied by another service
 - starts the app and any required Compose dependencies through `docker compose`
 - waits for the app container to become healthy, confirms the player surface is actually being served, then opens the browser automatically
 - stops early with a plain error when an explicitly configured external local AI URL is unreachable
+
+Current disk-headroom policy for launcher and runtime preflight:
+
+- below `512 MB` free on the app-data drive is a `blocker`
+- below `2 GB` free on the app-data drive is a `warning`
 
 Useful flags:
 
@@ -399,6 +407,7 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 
 - `src/server/index.ts` - API server entrypoint and routing
 - `src/server/runtime-preflight.ts` - cached startup probe and AI readiness checks
+- `src/server/host-preflight.ts` - runtime host and storage prerequisite checks for writable paths and disk headroom
 - `src/server/debug.ts` - runtime, session, and turn debug payload shaping
 - `src/server/turn-result.ts` - model output sanitization defaults
 - `src/server/player-state.ts` - player director-state normalization helpers
@@ -529,6 +538,7 @@ The browser client is intentionally useful for local AI debugging:
   - `status`: `checking`, `ready`, or `action-required`
   - `issues`: each issue has `severity`, `area`, `title`, `message`, `recommended_fix`, `env_vars`, and optional advanced `details`
   - `counts`: blocker/warning/info totals so the launcher and browser can decide whether play should stay blocked
+- host and storage preflight now covers writable app-data path checks plus low-disk warnings or blockers before the first turn
 - runtime debug now also includes a non-secret `config_diagnostics` block showing whether each resolved config value came from provider-specific, generic, legacy, or default config paths
 - `POST /api/turn` returns the narrator payload plus safe debug details such as request id, latency, prompt preview, embedding fallback status, validation result, and before/after player state
 - API keys are not returned by the debug payload; only non-secret runtime metadata is exposed
@@ -556,3 +566,5 @@ Common fixes:
 - use a full AI base URL such as `https://api.openai.com/v1`, `http://127.0.0.1:4000`, or `http://127.0.0.1:11434/v1`
 - when the app runs in Docker against a host-local AI service, use `host.docker.internal` instead of `localhost`
 - if LiteLLM or Ollama reports different model names than the ones in `.env`, update the configured chat and embedding model vars to match
+- if the launcher or runtime reports low disk space, free up space on the drive that contains the app `data/` folder before starting another session
+- if the launcher or runtime reports an unwritable app-data path, fix the folder permissions or move the repo to a writable location before retrying

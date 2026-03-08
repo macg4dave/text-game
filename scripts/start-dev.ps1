@@ -13,6 +13,8 @@ $sharedScriptPath = Join-Path $PSScriptRoot "lib\shared.ps1"
 . $sharedScriptPath
 $dotEnvPath = Join-Path $repoRoot ".env"
 $composeFileArgs = @("-f", (Join-Path $repoRoot "docker-compose.yml"))
+$launcherDiskWarningBytes = [double](2GB)
+$launcherDiskBlockerBytes = [double](512MB)
 if ($AiStack -eq "local-gpu") {
   $composeFileArgs += @("-f", (Join-Path $repoRoot "docker-compose.gpu.yml"))
 }
@@ -205,6 +207,129 @@ function Get-CommandPath {
   }
 
   return $command.Source
+}
+
+function Get-RegistryDefaultValue {
+  param([string]$Path)
+
+  try {
+    return (Get-Item -LiteralPath $Path -ErrorAction Stop).GetValue("")
+  } catch {
+    return $null
+  }
+}
+
+function Get-HttpBrowserHandler {
+  $userChoicePath = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
+
+  try {
+    $userChoice = Get-ItemProperty -LiteralPath $userChoicePath -Name "ProgId" -ErrorAction Stop
+    if (-not [string]::IsNullOrWhiteSpace($userChoice.ProgId)) {
+      $handler = Get-RegistryDefaultValue -Path ("Registry::HKEY_CLASSES_ROOT\{0}\shell\open\command" -f $userChoice.ProgId)
+      if (-not [string]::IsNullOrWhiteSpace($handler)) {
+        return $handler
+      }
+    }
+  } catch {
+  }
+
+  return Get-RegistryDefaultValue -Path "Registry::HKEY_CLASSES_ROOT\http\shell\open\command"
+}
+
+function Get-HostPathPreflightIssues {
+  $issues = New-Object System.Collections.Generic.List[object]
+  $dataPath = Join-Path $repoRoot "data"
+  $writeProbe = Test-DirectoryWritable -Path $dataPath
+  if (-not $writeProbe.ok) {
+    $null = $issues.Add((New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "storage" `
+      -Code "launcher_data_path_unwritable" `
+      -Title "Fix the app data folder permissions" `
+      -Message ("The launcher could not create a temporary file in {0}." -f $dataPath) `
+      -Recovery @(
+        ("Confirm that {0} exists on a writable drive and your user account can create files there." -f $dataPath),
+        "Restart the launcher after fixing the folder permissions or moving the project to a writable location."
+      ) `
+      -Details @{
+        check = "launcher-data-path"
+        probe_target = $dataPath
+        notes = @($writeProbe.error)
+      }))
+  }
+
+  $freeBytes = Get-PathFreeSpaceBytes -Path $dataPath
+  if ($null -ne $freeBytes) {
+    if ($freeBytes -lt $launcherDiskBlockerBytes) {
+      $null = $issues.Add((New-PreflightIssue `
+        -Severity "blocker" `
+        -Area "storage" `
+        -Code "launcher_disk_space_blocker" `
+        -Title "Free up disk space before launching the game" `
+        -Message ("The drive that contains {0} only has {1} free." -f $dataPath, (Format-ByteCount -Bytes $freeBytes)) `
+        -Recovery @(
+          ("Free up space on the drive that contains {0} before launching the game." -f $dataPath),
+          ("Keep at least {0} free so builds, saves, and logs have room to work." -f (Format-ByteCount -Bytes $launcherDiskWarningBytes))
+        ) `
+        -Details @{
+          check = "launcher-disk-space"
+          probe_target = $dataPath
+          resolved_value = [math]::Round($freeBytes)
+        }))
+    } elseif ($freeBytes -lt $launcherDiskWarningBytes) {
+      $null = $issues.Add((New-PreflightIssue `
+        -Severity "warning" `
+        -Area "storage" `
+        -Code "launcher_disk_space_warning" `
+        -Title "App storage is getting low" `
+        -Message ("The drive that contains {0} is down to {1} free." -f $dataPath, (Format-ByteCount -Bytes $freeBytes)) `
+        -Recovery @(
+          ("Free up space on the drive that contains {0} soon." -f $dataPath),
+          ("Keeping at least {0} free will reduce the risk of save or log failures." -f (Format-ByteCount -Bytes $launcherDiskWarningBytes))
+        ) `
+        -Details @{
+          check = "launcher-disk-space"
+          probe_target = $dataPath
+          resolved_value = [math]::Round($freeBytes)
+        }))
+    }
+  }
+
+  if (-not $NoBrowser) {
+    $browserHandler = Get-HttpBrowserHandler
+    if ([string]::IsNullOrWhiteSpace($browserHandler)) {
+      $null = $issues.Add((New-PreflightIssue `
+        -Severity "blocker" `
+        -Area "host" `
+        -Code "browser_handler_missing" `
+        -Title "Set a default browser before launching the game" `
+        -Message "Windows did not report a default handler for HTTP links, so the launcher would not be able to open the play surface automatically." `
+        -Recovery @(
+          "Set a default browser for HTTP links in Windows Settings, then rerun the launcher.",
+          "If you only need the server for this run, rerun the launcher with -NoBrowser."
+        ) `
+        -Details @{
+          check = "default-browser"
+        }))
+    }
+  }
+
+  return @($issues.ToArray())
+}
+
+function Confirm-HostPathPrerequisites {
+  $issues = @(Get-HostPathPreflightIssues)
+  if ($issues.Count -eq 0) {
+    return
+  }
+
+  Write-Step "Checking host path prerequisites"
+  Show-PreflightIssues -Issues $issues
+
+  $blockingIssues = @($issues | Where-Object { $_.severity -eq "blocker" })
+  if ($blockingIssues.Count -gt 0) {
+    Fail-PreflightIssue $blockingIssues[0]
+  }
 }
 
 function Get-AppPreflight {
@@ -475,7 +600,29 @@ function Confirm-DockerTooling {
 
   Write-Info ("docker: {0}" -f $dockerPath)
 
-  Invoke-Native -FilePath "docker" -ArgList @("compose", "version")
+  $composeVersion = Invoke-NativeCapture -FilePath "docker" -ArgList @("compose", "version", "--short")
+  if ($composeVersion.ExitCode -ne 0) {
+    $details = ($composeVersion.Output -join [Environment]::NewLine).Trim()
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "host" `
+      -Code "docker_compose_missing" `
+      -Title "Install Docker Compose support before launching the game" `
+      -Message "Docker is installed, but `docker compose` is not available in this shell." `
+      -Recovery @(
+        "Update Docker Desktop or Docker Engine so the Compose plugin is available.",
+        "Open a new PowerShell window after the update, confirm `docker compose version` works, then rerun the launcher."
+      ) `
+      -Details @{
+        check = "docker compose version"
+        docker_output = $details
+      })
+  }
+
+  $composeVersionText = ($composeVersion.Output -join "").Trim()
+  if (-not [string]::IsNullOrWhiteSpace($composeVersionText)) {
+    Write-Info ("docker compose: {0}" -f $composeVersionText)
+  }
 
   $dockerInfo = Invoke-NativeCapture -FilePath "docker" -ArgList @("info", "--format", "{{.ServerVersion}}")
   if ($dockerInfo.ExitCode -ne 0) {
@@ -507,6 +654,30 @@ function Confirm-DockerTooling {
   $serverVersion = ($dockerInfo.Output -join "").Trim()
   if (-not [string]::IsNullOrWhiteSpace($serverVersion)) {
     Write-Info ("docker engine: {0}" -f $serverVersion)
+  }
+
+  $dockerOsType = Invoke-NativeCapture -FilePath "docker" -ArgList @("info", "--format", "{{.OSType}}")
+  if ($dockerOsType.ExitCode -eq 0) {
+    $osType = ($dockerOsType.Output -join "").Trim().ToLowerInvariant()
+    if (-not [string]::IsNullOrWhiteSpace($osType)) {
+      Write-Info ("docker runtime: {0} containers" -f $osType)
+    }
+
+    if ($osType -and $osType -ne "linux") {
+      Fail-PreflightIssue (New-PreflightIssue `
+        -Severity "blocker" `
+        -Area "host" `
+        -Code "docker_linux_containers_required" `
+        -Title "Switch Docker to Linux containers before launching the game" `
+        -Message "The supported launcher path expects the Docker Linux container runtime, but Docker is currently using Windows containers." `
+        -Recovery @(
+          "Switch Docker Desktop back to Linux containers, confirm `docker info` reports `OSType=linux`, then rerun the launcher."
+        ) `
+        -Details @{
+          check = "docker info"
+          resolved_value = $osType
+        })
+    }
   }
 }
 
@@ -743,6 +914,7 @@ if ($config.hasDotEnv) {
 }
 
 Confirm-DockerTooling
+Confirm-HostPathPrerequisites
 Confirm-LocalGpuSupport
 Confirm-ProviderReady -Config $config
 Set-ComposeOverrides -Config $config

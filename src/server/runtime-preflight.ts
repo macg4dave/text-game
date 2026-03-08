@@ -10,6 +10,7 @@ import type {
   RuntimePreflightIssueDetails,
   RuntimePreflightReport
 } from "../core/types.js";
+import { probeHostPrerequisiteIssues } from "./host-preflight.js";
 
 const DEFAULT_PREFLIGHT_CACHE_MS = 15000;
 
@@ -63,12 +64,18 @@ export function createRuntimePreflightService(
       return runtimePreflight;
     }
 
-    const runtimeIssues = await probeRuntimeIssues();
-    runtimePreflight = createPreflightReport([...configIssues, ...runtimeIssues]);
+    const hostIssues = await probeHostPrerequisiteIssues();
+    if (hasBlockingPreflightIssue(hostIssues)) {
+      runtimePreflight = createPreflightReport([...configIssues, ...hostIssues]);
+      return runtimePreflight;
+    }
+
+    const aiIssues = await probeAiRuntimeIssues();
+    runtimePreflight = createPreflightReport([...configIssues, ...hostIssues, ...aiIssues]);
     return runtimePreflight;
   }
 
-  async function probeRuntimeIssues(): Promise<RuntimePreflightIssue[]> {
+  async function probeAiRuntimeIssues(): Promise<RuntimePreflightIssue[]> {
     const modelsUrl = getModelsUrl();
     if (!modelsUrl) {
       return [];
@@ -257,14 +264,14 @@ function createInitialRuntimePreflight(config: AppConfig): RuntimePreflightRepor
   if (issues.length) {
     return createPreflightReport(issues, {
       status: "checking",
-      summary: "Checking the remaining startup requirements before the first turn.",
+      summary: "Checking the remaining host and AI startup requirements before the first turn.",
       checkedAt: null
     });
   }
 
   return createPreflightReport([], {
     status: "checking",
-    summary: "Checking AI connection before the first turn.",
+    summary: "Checking host paths and AI connection before the first turn.",
     checkedAt: null
   });
 }
