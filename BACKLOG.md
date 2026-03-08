@@ -76,10 +76,10 @@ Use this exact shape when adding new work:
 
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T01 | Now | P0 | P1 | Player launch bootstrap path | Review | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
+| T01 | Now | P0 | P1 | Player launch bootstrap path | Done | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
 | T41 | Now | P0 | P1 | Full TypeScript migration | Done | None | `npm run type-check`; `npm test`; `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
 | T01a | Now | P0 | P1 | Runtime preflight and recovery messaging | Review | T01, T02 | Manual launcher failure checks |
-| T35 | Now | P0 | P1 | Packaging prototype and decision memo | Ready | T01 | Prototype build verification |
+| T35 | Now | P0 | P1 | Packaging prototype and decision memo | Done | T01 | Prototype build verification |
 | T02 | Now | P0 | P1 | Config module with schema validation | Review | None | `npm test` |
 | T02a | Now | P0 | P1 | LiteLLM env contract and alias defaults | Ready | T02 | Manual config verification |
 | T02b | Now | P0 | P1 | LiteLLM proxy template and startup docs | Ready | T02a | Manual LiteLLM startup verification |
@@ -202,7 +202,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T01 - Player Launch Bootstrap Path
 
-- Status: Review
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -253,6 +253,8 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - validation completed on 2026-03-08 with `docker compose up --build` equivalent via `docker compose up --build -d` plus host API verification, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` with `PORT=3300`
   - default `PORT=3000` on this machine is occupied by an unrelated local `wslrelay` listener that returns an nginx 404, so the launcher's port-conflict guidance was exercised and the successful runtime validation used a session `PORT` override
   - revalidated on 2026-03-08 with `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` and no manual `PORT` override; the launcher detected the `3000` conflict, selected `3100`, and the app API responded successfully on the fallback port
+  - final closeout validation on 2026-03-08 rechecked the raw Docker path on `PORT=3300` because host port `3000` still resolved to an unrelated responder on this machine; `GET /` returned the `Eclipse Signal` page and `GET /api/state` returned a player payload as expected
+  - final closeout validation on 2026-03-08 rechecked `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` with no manual port override; the launcher again detected `wslrelay` on `3000`, selected `3100`, and served a healthy `/api/state` response there
 
 ### T01a - Runtime Preflight And Recovery Messaging
 
@@ -299,7 +301,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T35 - Packaging Prototype And Decision Memo
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -332,8 +334,18 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - save, log, and config implications are documented for follow-on tasks
   - open blockers are written down clearly enough for T36 and T38
 - Handoff Notes:
-  - keep the gameplay stack shared with the browser dev path
-  - if the launcher-only path is enough for the next milestone, record why and what would force a wrapper later
+  - selected Electron as the packaging spike direction because it can wrap the existing compiled Node plus browser stack without introducing a Rust toolchain or splitting gameplay authority
+  - added `packaging/decision-memo.md` with the comparison against launcher-only and Tauri, save or log implications, an env-file strategy, and a clean-machine Windows smoke checklist for T36
+  - added an Electron prototype shell under `packaging/electron/` that stages runtime files into a writable user-data area, starts `dist/server.js` via `ELECTRON_RUN_AS_NODE=1`, waits for `/api/state`, and then opens the existing player UI in a native window
+  - added package scripts plus a Windows wrapper script at `scripts/start-desktop-prototype.ps1` for the prototype path
+  - bumped `better-sqlite3` to `^12.6.2` so Electron rebuilds can complete during packaging; the previous `^9.4.0` line failed against Electron 36 headers
+  - updated `ROADMAP.md`, `ARCHITECTURE.md`, and `README.md` to record the packaging direction and current prototype caveats
+  - fixed the desktop shell bootstrap on 2026-03-08 by moving the Electron main-process entrypoint to CommonJS at `packaging/electron/main.cjs`; the prior ESM entry hit Electron loader issues in the host validation environment
+  - fixed packaged runtime staging on 2026-03-08 by copying `package.json` and linking packaged `node_modules` into the writable runtime folder so the staged `dist/server.js` can resolve ESM dependencies like `dotenv`
+  - hardened `scripts/start-desktop-prototype.ps1` on 2026-03-08 to clear inherited `ELECTRON_RUN_AS_NODE` before launching Electron; this shell environment had that variable set globally, which otherwise caused Electron to behave like plain Node
+  - validated on 2026-03-08 with `docker compose build app` and `docker compose run --rm app npm run desktop:prototype:dir`; the Electron builder path completed in-container after rebuilding native dependencies for Electron
+  - host Windows validation completed on 2026-03-08 from a clean temp copy with official Node `v22.22.1`: `npm run type-check`, `npm run desktop:prototype:dir`, direct launch of `packaging/out/electron/win-unpacked/Text Game Prototype.exe`, packaged preflight check with a missing API key, and `powershell -ExecutionPolicy Bypass -File scripts/start-desktop-prototype.ps1`
+  - the unpacked Windows shell created `%APPDATA%\\text-game\\runtime\\data\\game.db` and `%APPDATA%\\text-game\\logs\\desktop-shell.log`, read `.env` beside the executable, kept save data out of the install directory, preserved the same DB across restart, and exercised fallback port selection to `3002` on this machine because lower ports were already busy
 
 ### T02 - Config Module With Schema Validation
 
@@ -759,11 +771,11 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 | ID | Decision | Needed By | Owner | Status |
 | --- | --- | --- | --- | --- |
-| D01 | Numeric budgets for latency, token use, cost, and DB growth | Phase 0 exit | Tech lead | Open |
+| D01 | Concrete default numeric budgets for latency, token use, cost, and DB growth in the configurable budget file | Phase 0 exit | Tech lead | Locked |
 | D02 | Director spec format: JSON or YAML | Before T16 starts | Gameplay systems lead | Open |
 | D03 | Sample MVP quest or story arc definition | Before Phase 1 exit | Product/UI lead | Open |
-| D04 | MVP packaging shell: launcher-only, Tauri, or Electron | Before Phase 0 exit | Release lead | Open |
-| D05 | Supported MVP AI setup for non-technical users: hosted, LiteLLM-managed, or guided local gateway | Before Phase 0 exit | Tech lead | Open |
+| D04 | MVP packaging shell: launcher-only, Tauri, or Electron | Before Phase 0 exit | Release lead | Locked |
+| D05 | Supported MVP AI setup for non-technical users: LiteLLM-managed gateway covering local AI and hosted providers | Before Phase 0 exit | Tech lead | Locked |
 
 ## Agent Execution Rules
 

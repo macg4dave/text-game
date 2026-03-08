@@ -39,10 +39,10 @@ The roadmap is successful if the project reaches all of the following:
 The MVP is the first release that proves the core product loop while feeling like a normal app to the player:
 
 - Windows-first double-click launch path or packaged shell that starts the app and opens the play surface automatically.
-- First-run setup path that validates required config and offers a clear supported AI path instead of silent failure.
+- First-run setup path that validates required config and offers a clear supported LiteLLM-managed AI path instead of silent failure.
 - Start a new game with basic onboarding and tutorial guidance.
 - Submit turns through the UI.
-- Generate structured responses through LiteLLM by default.
+- Generate structured responses through a LiteLLM-managed gateway by default, whether the upstream model is local AI or a hosted provider.
 - Persist turns, state, and replayable events in SQLite.
 - Enforce server-side validation and deterministic state updates.
 - Retrieve compact memory summaries during play.
@@ -239,7 +239,8 @@ Exit gate:
 | --- | --- | --- | --- | --- |
 | Node.js + TypeScript app with lightweight browser asset compilation and SQLite | Locked | Tech lead | Keeps local development on direct TypeScript, keeps player-facing runtime paths on compiled server output, and adds compile-time safety without changing the runtime boundary. | After MVP |
 | Internal runtime stays web and HTTP based, but player-facing delivery is Windows-first and double-click oriented | Locked | Tech lead | Preserves one gameplay stack while hiding implementation details from players. | End of Phase 3 |
-| LiteLLM as the default AI interface | Locked | AI systems lead | Minimizes provider lock-in and keeps switching costs out of gameplay code. | End of Phase 2 |
+| Electron is the Phase 0 packaging spike direction for Windows playtest builds | Locked | Release lead | Fits the current Node plus browser stack, reduces shell complexity versus Tauri, and provides a clearer bridge from launcher to portable build. | Start of T36 |
+| LiteLLM-managed gateway is the supported MVP AI path for both local AI and hosted providers | Locked | AI systems lead | Keeps the player-facing setup centered on one provider-neutral gateway while still allowing local AI and hosted providers behind the same boundary. | End of Phase 2 |
 | Provider-neutral internal adapter boundary | Locked | Tech lead | Prevents provider-specific logic from leaking across the app. | End of Phase 1 |
 | Server-side director enforcement is authoritative | Locked | Gameplay systems lead | Keeps story control and state integrity outside the client. | After first external playtest |
 | Windows is the primary supported end-user platform for MVP | Locked | Release lead | Reduces packaging surface area so launch quality can be solved properly before expanding platform support. | After first external playtest |

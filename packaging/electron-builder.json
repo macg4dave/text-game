@@ -1,0 +1,20 @@
+{
+  "appId": "com.githubcopilot.textgame.prototype",
+  "productName": "Text Game Prototype",
+  "asar": false,
+  "directories": {
+    "output": "packaging/out/electron"
+  },
+  "files": [
+    "dist/**/*",
+    "public/**/*",
+    "data/spec/**/*",
+    "packaging/electron/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": [
+      "portable"
+    ]
+  }
+}

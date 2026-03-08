@@ -2,7 +2,10 @@
   "name": "text-game",
   "version": "0.1.0",
   "private": true,
+  "description": "Windows-first text adventure prototype with a local server and desktop wrapper.",
+  "author": "GitHub Copilot prototype scaffold",
   "type": "module",
+  "main": "packaging/electron/main.cjs",
   "engines": {
     "node": "22.x"
   },
@@ -15,18 +18,23 @@
     "test:local-ai": "npm run type-check && powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1",
     "test": "npm run type-check && tsx --test src/**/*.test.ts",
     "dev": "npm run build:client && tsx src/server.ts",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "desktop:prototype:dev": "npm run build && electron .",
+    "desktop:prototype:dir": "npm run build && electron-builder --dir --config packaging/electron-builder.json",
+    "desktop:prototype:win": "npm run build && electron-builder --config packaging/electron-builder.json --win portable"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.0",
+    "better-sqlite3": "^12.6.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "openai": "^4.79.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.1",
     "@types/node": "^22.13.10",
+    "electron": "^36.0.0",
+    "electron-builder": "^26.0.12",
     "esbuild": "^0.25.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"

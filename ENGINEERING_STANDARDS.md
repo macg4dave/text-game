@@ -17,15 +17,22 @@ A phase or backlog item is complete only when all relevant conditions below are 
 
 ## Delivery Budget Register
 
-Numeric targets are required before Phase 0 closes. Until then, this register is intentionally incomplete.
+Numeric targets are required before Phase 0 closes. The source of truth for these defaults will be a server-side budget config file, and the same values should be adjustable from the web UI without code edits. The defaults below are now the Phase 0 baseline until later fixture data proves they should move.
 
 | Metric | Target | Owner | Must Be Set By | Notes |
 | --- | --- | --- | --- | --- |
-| p95 `/api/turn` latency in local dev | TBD | Tech lead | Phase 0 exit | Measured on the baseline fixture suite |
-| Max total tokens per turn | TBD | AI systems lead | Phase 0 exit | Input plus output |
-| Cost per 100 turns | TBD | AI systems lead | Phase 0 exit | Based on the default model aliases |
+| p95 `/api/turn` latency in local dev | 8 seconds | Tech lead | Phase 0 exit | Default comes from the budget config and is measured on the baseline fixture suite |
+| Max total tokens per turn | 4,000 tokens | AI systems lead | Phase 0 exit | Default comes from the budget config; input plus output |
+| Cost per 100 turns | $0.12 USD | AI systems lead | Phase 0 exit | Default comes from the budget config and is based on the LiteLLM-managed default aliases |
 | Schema validation pass rate in CI fixtures | 100% | Tech lead | Phase 0 exit | Any failure blocks release progression |
-| DB growth per 1,000 turns | TBD | Tech lead | Phase 0 exit | Event log plus memory storage |
+| DB growth per 1,000 turns | 40 MB | Tech lead | Phase 0 exit | Default comes from the budget config; event log plus memory storage |
+
+### Budget Baseline Assumptions
+
+- The default budget model path is LiteLLM alias `game-chat` -> `gpt-4o-mini` and LiteLLM alias `game-embedding` -> `text-embedding-3-small`.
+- The current turn shape includes up to 6 short-history entries, 6 retrieved memories, a rolling summary capped to the last 30 summary lines, up to 6 suggested player options, and up to 8 memory updates per turn.
+- The $0.12 per 100 turns budget assumes the prompt is kept comfortably under the 4,000-token ceiling on the default alias pair and leaves small headroom for embedding calls.
+- The 40 MB per 1,000 turns budget assumes SQLite growth is dominated by event text plus JSON-serialized embedding vectors stored with memories; this target should be revisited once replay fixtures and save-slot usage are measured.
 
 ## Schema and Migration Policy
 

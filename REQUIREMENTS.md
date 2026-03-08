@@ -2,7 +2,7 @@
 
 ## Brief
 
-A portable, text-based adventure game powered by a provider-neutral AI adapter that targets OpenAI-compatible APIs first. Players can attempt anything, while a director layer nudges the story toward a defined end goal. The system uses compact state, summaries, and selective memory retrieval to minimize token usage. A local, lightweight spellcheck/autocomplete helper improves text entry without consuming main-model tokens.
+A portable, text-based adventure game powered by a provider-neutral AI adapter with a LiteLLM-managed gateway as the supported MVP AI path. Players can attempt anything, while a director layer nudges the story toward a defined end goal. The system uses compact state, summaries, and selective memory retrieval to minimize token usage. A local, lightweight spellcheck/autocomplete helper improves text entry without consuming main-model tokens.
 
 ## Goals
 
@@ -23,9 +23,11 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter t
 - Event logging for player and narrator turns.
 - Director layer to track end goal, act, and remaining beats.
 - AI responses must be structured JSON with narrative + updates.
+- The supported MVP AI setup uses a LiteLLM-managed gateway that can route to local AI or hosted providers behind the same app-facing contract.
 - Memory system with summaries and embedding-based retrieval.
 - Web UI with text log, turn input, session controls, suggestion chips, and a local debug panel.
 - Local assist endpoint for spellcheck + autocomplete.
+- Delivery budgets for latency, token usage, cost, and storage must come from a config file with sane defaults and be adjustable through the web UI.
 
 ## Quality Attributes
 

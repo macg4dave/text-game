@@ -137,7 +137,7 @@ If your distro package is too old for current packages, use the official downloa
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and choose either hosted API credentials or the local AI settings you want.
-2. For local development, run:
+1. For local development, run:
 
 ```bash
 npm install
@@ -145,7 +145,7 @@ npm run type-check
 npm run dev
 ```
 
-3. Open `http://localhost:3000`.
+1. Open `http://localhost:3000`.
 
 For the compiled runtime smoke path, use:
 
@@ -199,6 +199,37 @@ Useful flags:
 - `-Rebuild` forces a Docker image rebuild before launch
 
 The launcher respects `PORT` from your PowerShell session or `.env`. If that port is already taken by another local service, the launcher now falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
+
+## Desktop Packaging Prototype
+
+The current packaging spike uses Electron as a thin Windows-first shell around the existing compiled server and browser UI.
+
+Prototype commands once Node.js and npm are available on the host:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-desktop-prototype.ps1
+```
+
+```bash
+npm run desktop:prototype:dev
+npm run desktop:prototype:dir
+```
+
+What the prototype does:
+
+- builds the existing TypeScript server and browser asset
+- stages `dist/`, `public/`, and `data/spec/` into Electron's writable user-data area
+- looks for `.env` beside the executable first, then in Electron user data, then in the repo root during development
+- starts the compiled local server with Electron's bundled runtime
+- waits for `/api/state` readiness and then opens the existing player UI in a native window
+
+Current prototype caveats:
+
+- this path is experimental and was added to de-risk packaging direction rather than replace the documented Docker launcher today
+- code signing, icons, installer polish, and first-run config repair UX are still follow-on work
+- containerized packaging verification passed in this session with `docker compose run --rm app npm run desktop:prototype:dir`, but the host Windows shell path still needs a real dry run because host `node` and `npm` were unavailable here
+
+See `packaging/decision-memo.md` for the option comparison, save or log implications, and the clean-machine smoke checklist.
 
 The browser UI includes:
 
@@ -278,6 +309,8 @@ If you want maximum provider portability, avoid provider-specific features in th
 ## LiteLLM
 
 LiteLLM is now a first-class setup path for this project.
+
+It is also the supported MVP AI path for both hosted providers and local AI setups. The app should talk to LiteLLM; LiteLLM can then route to OpenAI, local models, or other compatible upstreams behind the same interface.
 
 Recommended local setup:
 
