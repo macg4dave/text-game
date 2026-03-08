@@ -1,4 +1,11 @@
-import type { AiConfig, ConfigProfileSelection, EnvSource, LoggingConfig, PublicRuntimeConfig } from "../types.js";
+import type {
+  AiConfig,
+  ConfigProfileSelection,
+  EnvSource,
+  LoggingConfig,
+  PublicRuntimeConfig,
+  PublicRuntimeLocalGpuSelection
+} from "../types.js";
 import type {
   AiConfigField,
   ConfigEnvSource,
@@ -315,6 +322,7 @@ export function getSafeConfigDiagnostics(
 
 export function getPublicRuntimeConfig(configToSummarize: ConfigLike, env: EnvSource): PublicRuntimeConfig {
   const diagnostics = getSafeConfigDiagnostics(configToSummarize, env);
+  const localGpu = resolvePublicRuntimeLocalGpuSelection(env);
 
   return {
     port: configToSummarize.port,
@@ -331,6 +339,7 @@ export function getPublicRuntimeConfig(configToSummarize: ConfigLike, env: EnvSo
       recommended_ai_stack: configToSummarize.profile.recommendedAiStack,
       override_count: diagnostics.profile_overrides.length
     },
+    local_gpu: localGpu,
     validation: {
       ok: Boolean(configToSummarize.validation?.ok),
       errors: (configToSummarize.validation?.errors || []).map((error) => ({
@@ -459,6 +468,73 @@ function buildProfileOverrides({
   );
 
   return overrides;
+}
+
+function readOptionalNumber(env: EnvSource, key: string): number | null {
+  const raw = readFirstEnvValue(env, [key]).value;
+  if (!raw) {
+    return null;
+  }
+
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function readOptionalString(env: EnvSource, key: string): string | null {
+  const raw = readFirstEnvValue(env, [key]).value;
+  return raw ? raw : null;
+}
+
+function resolvePublicRuntimeLocalGpuSelection(env: EnvSource): PublicRuntimeLocalGpuSelection | null {
+  const requestedProfile = readOptionalString(env, "LOCAL_GPU_REQUESTED_PROFILE");
+  const status = readOptionalString(env, "LOCAL_GPU_SELECTION_STATUS");
+  const selectionSource = readOptionalString(env, "LOCAL_GPU_SELECTION_SOURCE");
+  const profileId = readOptionalString(env, "LOCAL_GPU_SELECTED_PROFILE_ID");
+  const profileLabel = readOptionalString(env, "LOCAL_GPU_SELECTED_PROFILE_LABEL");
+  const verificationStatus = readOptionalString(env, "LOCAL_GPU_SELECTED_VERIFICATION_STATUS");
+  const chatModel = readOptionalString(env, "LOCAL_GPU_SELECTED_CHAT_MODEL");
+  const embeddingMode = readOptionalString(env, "LOCAL_GPU_SELECTED_EMBEDDING_MODE");
+  const embeddingModel = readOptionalString(env, "LOCAL_GPU_SELECTED_EMBEDDING_MODEL");
+  const message = readOptionalString(env, "LOCAL_GPU_SELECTION_MESSAGE");
+  const notes = (readOptionalString(env, "LOCAL_GPU_SELECTION_NOTES") || "")
+    .split("||")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const detectedVramGb = readOptionalNumber(env, "LOCAL_GPU_DETECTED_VRAM_GB");
+  const manualVramGb = readOptionalNumber(env, "LOCAL_GPU_MANUAL_VRAM_GB");
+
+  if (
+    !requestedProfile &&
+    !status &&
+    !selectionSource &&
+    !profileId &&
+    !profileLabel &&
+    !message &&
+    detectedVramGb === null &&
+    manualVramGb === null
+  ) {
+    return null;
+  }
+
+  return {
+    requested: true,
+    requested_profile:
+      requestedProfile === "local-gpu-small" || requestedProfile === "local-gpu-large"
+        ? requestedProfile
+        : null,
+    status,
+    selection_source: selectionSource,
+    profile_id: profileId,
+    profile_label: profileLabel,
+    verification_status: verificationStatus,
+    detected_vram_gb: detectedVramGb,
+    manual_vram_gb: manualVramGb,
+    chat_model: chatModel,
+    embedding_mode: embeddingMode,
+    embedding_model: embeddingModel,
+    message,
+    notes
+  };
 }
 
 function pushProfileOverride(

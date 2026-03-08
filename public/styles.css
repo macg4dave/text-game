@@ -204,6 +204,34 @@ button {
   padding: 16px;
 }
 
+.fatal-error-panel {
+  margin-bottom: 18px;
+  border-color: rgba(163, 49, 43, 0.24);
+  background: rgba(255, 245, 244, 0.94);
+}
+
+.fatal-error-panel strong {
+  color: var(--error);
+}
+
+.fatal-error-panel p {
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.fatal-error-panel pre {
+  margin: 12px 0 0;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(163, 49, 43, 0.18);
+  background: rgba(255, 255, 255, 0.9);
+  color: #67211d;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 #preflight-issues {
   margin: 0;
   padding: 0;

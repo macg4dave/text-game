@@ -568,6 +568,16 @@ function Resolve-ProviderConfig {
   return $config
 }
 
+function Get-RequestedLocalGpuProfile {
+  param($Config)
+
+  if ($Config.profile -eq "local-gpu-large") {
+    return "local-gpu-large"
+  }
+
+  return "local-gpu-small"
+}
+
 function Convert-ToDockerReachableUrl {
   param([string]$Url)
 
@@ -683,15 +693,19 @@ function Confirm-DockerTooling {
 
 function Confirm-LocalGpuSupport {
   if ($AiStack -ne "local-gpu") {
-    return
+    return $null
   }
 
   Write-Step "Checking optional local GPU prerequisites"
 
-  $nvidiaSmi = Get-CommandPath -Name "nvidia-smi"
-  if ($nvidiaSmi) {
-    Write-Info ("nvidia-smi: {0}" -f $nvidiaSmi)
-    return
+  $gpuInfo = Get-NvidiaGpuVramInfo
+  if ($gpuInfo.available) {
+    $gpuLines = @($gpuInfo.gpus | ForEach-Object { "{0} ({1} GB)" -f $_.name, $_.memoryGb })
+    Write-Info ($gpuInfo.message)
+    foreach ($gpuLine in $gpuLines) {
+      Write-Info ("gpu: {0}" -f $gpuLine)
+    }
+    return $gpuInfo
   }
 
   Write-Info "No host nvidia-smi command was found on PATH. The Docker GPU override may still fail if NVIDIA drivers or the container runtime are not configured on this machine."
@@ -708,6 +722,87 @@ function Confirm-LocalGpuSupport {
         check = "nvidia-smi"
       })
   )
+
+  return $gpuInfo
+}
+
+function Confirm-LocalGpuProfileSelection {
+  param(
+    [hashtable]$DotEnv,
+    $Config,
+    $GpuInfo = $null
+  )
+
+  if ($AiStack -ne "local-gpu") {
+    return
+  }
+
+  Write-Step "Selecting a local GPU model profile"
+
+  $requestedProfile = Get-RequestedLocalGpuProfile -Config $Config
+  $manualProfileId = Get-ConfigValue -DotEnv $DotEnv -Keys @("LOCAL_GPU_PROFILE_ID") -Default ""
+  $manualVramGb = Get-ConfigValue -DotEnv $DotEnv -Keys @("LOCAL_GPU_VRAM_GB") -Default ""
+  $matrix = Get-LocalGpuProfileMatrix
+  $selection = Resolve-LocalGpuProfileSelection `
+    -Matrix $matrix `
+    -RequestedProfile $requestedProfile `
+    -ManualProfileId $manualProfileId `
+    -ManualVramGb $manualVramGb `
+    -DetectedVramGb $(if ($null -ne $GpuInfo) { $GpuInfo.detectedVramGb } else { $null })
+
+  $Config.localGpuRequestedProfile = $requestedProfile
+  $Config.localGpu = $selection
+
+  if ($selection.status -ne "selected") {
+    $details = @{
+      ai_stack = $AiStack
+      requested_profile = $requestedProfile
+      selection_source = $selection.selectionSource
+      detected_vram_gb = $selection.detectedVramGb
+      manual_vram_gb = $selection.manualVramGb
+      manual_profile_id = $selection.manualProfileId
+      supported_profile_ids = @(Get-LocalGpuSupportedProfileIds -Matrix $matrix)
+      notes = @($selection.notes)
+    }
+
+    Fail-PreflightIssue (New-PreflightIssue `
+      -Severity "blocker" `
+      -Area "host" `
+      -Code "local_gpu_profile_selection_required" `
+      -Title "Choose a supported local GPU profile" `
+      -Message $selection.message `
+      -Recovery @(
+        "Set LOCAL_GPU_PROFILE_ID to one of the supported matrix ids or set LOCAL_GPU_VRAM_GB to your GPU memory in GB.",
+        "If this machine does not meet the supported local GPU tiers, rerun the launcher without -AiStack local-gpu and use the hosted default path instead."
+      ) `
+      -EnvVars @("LOCAL_GPU_PROFILE_ID", "LOCAL_GPU_VRAM_GB") `
+      -Details $details)
+  }
+
+  Write-Info ("local GPU profile: {0} ({1})" -f $selection.profileLabel, $selection.selectionSource)
+  Write-Info ("chat model: {0}" -f $selection.chatModel)
+  Write-Info ("embedding route: {0} / {1}" -f $selection.embeddingMode, $selection.embeddingModel)
+
+  if ($selection.verificationStatus -eq "heuristic") {
+    Show-PreflightIssues -Issues @(
+      (New-PreflightIssue `
+        -Severity "warning" `
+        -Area "ai" `
+        -Code "local_gpu_profile_heuristic" `
+        -Title "The selected local GPU tier is still heuristic" `
+        -Message ("{0} is documented but not yet verified on matching hardware in this repo." -f $selection.profileLabel) `
+        -Recovery @(
+          "If startup reliability is poor, step down one profile tier or switch back to the hosted default path.",
+          "Pull the recommended model before retrying if Ollama reports it as missing."
+        ) `
+        -Details @{
+          requested_profile = $requestedProfile
+          selected_profile_id = $selection.profileId
+          detected_vram_gb = $selection.detectedVramGb
+          notes = @($selection.notes)
+        })
+    )
+  }
 }
 
 function Confirm-ProviderReady {
@@ -788,14 +883,45 @@ function Confirm-ProviderReady {
 }
 
 function Set-ComposeOverrides {
-  param($Config)
+  param(
+    $Config,
+    [hashtable]$DotEnv
+  )
 
   if ($Config.provider -eq "litellm" -and $AiStack -in @("hosted", "local-gpu")) {
+    $env:AI_PROFILE = $config.profile
     $env:COMPOSE_AI_PROVIDER = "litellm"
     $env:COMPOSE_LITELLM_PROXY_URL = "http://litellm:4000"
     if ($AiStack -eq "local-gpu") {
       $env:COMPOSE_OLLAMA_BASE_URL = "http://ollama:11434/v1"
       $env:LITELLM_OLLAMA_BASE_URL = "http://ollama:11434"
+      $env:LOCAL_GPU_REQUESTED_PROFILE = $Config.localGpuRequestedProfile
+      $env:LOCAL_GPU_SELECTION_STATUS = $Config.localGpu.status
+      $env:LOCAL_GPU_SELECTION_SOURCE = $Config.localGpu.selectionSource
+      $env:LOCAL_GPU_SELECTED_PROFILE_ID = $Config.localGpu.profileId
+      $env:LOCAL_GPU_SELECTED_PROFILE_LABEL = $Config.localGpu.profileLabel
+      $env:LOCAL_GPU_SELECTED_VERIFICATION_STATUS = $Config.localGpu.verificationStatus
+      $env:LOCAL_GPU_DETECTED_VRAM_GB = if ($null -ne $Config.localGpu.detectedVramGb) { [string]$Config.localGpu.detectedVramGb } else { "" }
+      $env:LOCAL_GPU_MANUAL_VRAM_GB = if ($null -ne $Config.localGpu.manualVramGb) { [string]$Config.localGpu.manualVramGb } else { "" }
+      $env:LOCAL_GPU_SELECTED_CHAT_MODEL = $Config.localGpu.chatModel
+      $env:LOCAL_GPU_SELECTED_EMBEDDING_MODE = $Config.localGpu.embeddingMode
+      $env:LOCAL_GPU_SELECTED_EMBEDDING_MODEL = $Config.localGpu.embeddingModel
+      $env:LOCAL_GPU_SELECTION_MESSAGE = $Config.localGpu.message
+      $env:LOCAL_GPU_SELECTION_NOTES = @($Config.localGpu.notes) -join "||"
+
+      $env:LITELLM_LOCAL_GPU_PROFILE_ID = $Config.localGpu.profileId
+      $env:LITELLM_LOCAL_GPU_CHAT_TARGET = "ollama_chat/$($Config.localGpu.chatModel)"
+      $env:LITELLM_LOCAL_GPU_CHAT_API_BASE = "http://ollama:11434"
+
+      if ($Config.localGpu.embeddingMode -eq "local") {
+        $env:LITELLM_LOCAL_GPU_EMBEDDING_TARGET = "ollama_embeddings/$($Config.localGpu.embeddingModel)"
+        $env:LITELLM_LOCAL_GPU_EMBEDDING_API_BASE = "http://ollama:11434"
+        $env:LITELLM_LOCAL_GPU_EMBEDDING_API_KEY = ""
+      } else {
+        $env:LITELLM_LOCAL_GPU_EMBEDDING_TARGET = "openai/$($Config.localGpu.embeddingModel)"
+        $env:LITELLM_LOCAL_GPU_EMBEDDING_API_BASE = ""
+        $env:LITELLM_LOCAL_GPU_EMBEDDING_API_KEY = Get-ConfigValue -DotEnv $DotEnv -Keys @("OPENAI_API_KEY") -Default "sk-placeholder"
+      }
     }
     return
   }
@@ -916,9 +1042,10 @@ if ($config.hasDotEnv) {
 
 Confirm-DockerTooling
 Confirm-HostPathPrerequisites
-Confirm-LocalGpuSupport
+$gpuInfo = Confirm-LocalGpuSupport
+Confirm-LocalGpuProfileSelection -DotEnv $dotEnv -Config $config -GpuInfo $gpuInfo
 Confirm-ProviderReady -Config $config
-Set-ComposeOverrides -Config $config
+Set-ComposeOverrides -Config $config -DotEnv $dotEnv
 Start-AppContainer -Config $config
 Show-AppPreflight -Config $config
 

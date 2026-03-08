@@ -12,22 +12,24 @@
 # active_profile_id: local-gpu-8gb
 #
 # The active block below is intentionally conservative:
-# - route `game-chat` to gemma3:4b for the 8 GB tier
-# - keep `game-embedding` on the hosted default for the 8 GB tier
-# - leave higher-tier manual swap blocks commented until T02h adds selection logic
+# - default env values still resolve to the 8 GB tier
+# - the launcher can now override the chat and embedding targets through
+#   LITELLM_LOCAL_GPU_* env vars after selecting a matrix profile
+# - keep the app-facing aliases stable while the selected upstream route changes
 
 model_list:
   # profile_id: local-gpu-8gb
   - model_name: game-chat
     litellm_params:
-      model: ollama_chat/gemma3:4b
-      api_base: os.environ/OLLAMA_BASE_URL
+      model: os.environ/LITELLM_LOCAL_GPU_CHAT_TARGET
+      api_base: os.environ/LITELLM_LOCAL_GPU_CHAT_API_BASE
 
   # profile_id: local-gpu-8gb
   - model_name: game-embedding
     litellm_params:
-      model: openai/text-embedding-3-small
-      api_key: os.environ/OPENAI_API_KEY
+      model: os.environ/LITELLM_LOCAL_GPU_EMBEDDING_TARGET
+      api_key: os.environ/LITELLM_LOCAL_GPU_EMBEDDING_API_KEY
+      api_base: os.environ/LITELLM_LOCAL_GPU_EMBEDDING_API_BASE
 
 litellm_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

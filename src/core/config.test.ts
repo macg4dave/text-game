@@ -278,6 +278,43 @@ test("public runtime config omits secrets but keeps actionable validation detail
   assert.match(runtime.validation.errors[0]?.message ?? "", /AI_API_KEY is required/i);
 });
 
+test("public runtime config exposes selected local GPU profile metadata when the launcher provides it", () => {
+  const env = {
+    AI_PROFILE: "local-gpu-small",
+    LOCAL_GPU_REQUESTED_PROFILE: "local-gpu-small",
+    LOCAL_GPU_SELECTION_STATUS: "selected",
+    LOCAL_GPU_SELECTION_SOURCE: "detected-vram",
+    LOCAL_GPU_SELECTED_PROFILE_ID: "local-gpu-12gb",
+    LOCAL_GPU_SELECTED_PROFILE_LABEL: "Local GPU 12 GB",
+    LOCAL_GPU_SELECTED_VERIFICATION_STATUS: "heuristic",
+    LOCAL_GPU_DETECTED_VRAM_GB: "12",
+    LOCAL_GPU_SELECTED_CHAT_MODEL: "gemma3:12b",
+    LOCAL_GPU_SELECTED_EMBEDDING_MODE: "hosted",
+    LOCAL_GPU_SELECTED_EMBEDDING_MODEL: "text-embedding-3-small",
+    LOCAL_GPU_SELECTION_MESSAGE: "Auto-selected Local GPU 12 GB from detected GPU memory.",
+    LOCAL_GPU_SELECTION_NOTES: "Use VRAM as the selector of record.||This tier is still heuristic."
+  };
+  const loaded = loadConfig(env);
+  const runtime = getPublicRuntimeConfig(loaded, env);
+
+  assert.deepEqual(runtime.local_gpu, {
+    requested: true,
+    requested_profile: "local-gpu-small",
+    status: "selected",
+    selection_source: "detected-vram",
+    profile_id: "local-gpu-12gb",
+    profile_label: "Local GPU 12 GB",
+    verification_status: "heuristic",
+    detected_vram_gb: 12,
+    manual_vram_gb: null,
+    chat_model: "gemma3:12b",
+    embedding_mode: "hosted",
+    embedding_model: "text-embedding-3-small",
+    message: "Auto-selected Local GPU 12 GB from detected GPU memory.",
+    notes: ["Use VRAM as the selector of record.", "This tier is still heuristic."]
+  });
+});
+
 test("buildConfigPreflightIssues turns config failures into player-facing recovery steps", () => {
   const loaded = loadConfig({
     AI_PROVIDER: "openai-compatible",

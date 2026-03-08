@@ -89,6 +89,23 @@ export interface RuntimePreflightReport {
   checked_at: string | null;
 }
 
+export interface PublicRuntimeLocalGpuSelection {
+  requested: boolean;
+  requested_profile: SupportedAiProfile | "local-gpu-small" | "local-gpu-large" | null;
+  status: string | null;
+  selection_source: string | null;
+  profile_id: string | null;
+  profile_label: string | null;
+  verification_status: string | null;
+  detected_vram_gb: number | null;
+  manual_vram_gb: number | null;
+  chat_model: string | null;
+  embedding_mode: string | null;
+  embedding_model: string | null;
+  message: string | null;
+  notes: string[];
+}
+
 export interface PublicRuntimeConfig {
   port: number;
   provider: string;
@@ -104,6 +121,7 @@ export interface PublicRuntimeConfig {
     recommended_ai_stack: RecommendedAiStack | null;
     override_count: number;
   };
+  local_gpu: PublicRuntimeLocalGpuSelection | null;
   validation: {
     ok: boolean;
     errors: PublicRuntimeValidationError[];
@@ -119,7 +137,7 @@ export interface AppConfig {
   runtime: PublicRuntimeConfig;
 }
 
-export type EnvSource = NodeJS.ProcessEnv | Record<string, string | undefined>;
+export type EnvSource = Record<string, string | undefined>;
 
 export interface QuestUpdate {
   id: string;

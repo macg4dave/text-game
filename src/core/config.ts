@@ -53,8 +53,8 @@ export function getSafeConfigDiagnostics(
   return getSafeConfigDiagnosticsInternal(configToSummarize, env);
 }
 
-export function getPublicRuntimeConfig(configToSummarize: ConfigLike) {
-  return getPublicRuntimeConfigInternal(configToSummarize, process.env);
+export function getPublicRuntimeConfig(configToSummarize: ConfigLike, env: EnvSource = process.env) {
+  return getPublicRuntimeConfigInternal(configToSummarize, env);
 }
 
 export function assertValidConfig(configToValidate: AppConfig = config): AppConfig {

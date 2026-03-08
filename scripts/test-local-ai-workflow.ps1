@@ -1,3 +1,7 @@
+param(
+  [switch]$SelectionOnly
+)
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
@@ -20,6 +24,21 @@ function Add-Pass {
   Write-Host "PASS: $Message" -ForegroundColor Green
 }
 
+function Assert-Equal {
+  param(
+    [string]$Name,
+    $Actual,
+    $Expected
+  )
+
+  if ($Actual -ne $Expected) {
+    Add-Failure ("{0} expected '{1}' but got '{2}'." -f $Name, $Expected, $Actual)
+    return
+  }
+
+  Add-Pass ("{0} matches {1}." -f $Name, $Expected)
+}
+
 function Invoke-ApiJson {
   param(
     [string]$Uri,
@@ -30,6 +49,16 @@ function Invoke-ApiJson {
   $headers = @{ Authorization = "Bearer $ApiKey" }
   $payload = $Body | ConvertTo-Json -Depth 20
   return Invoke-RestMethod -Uri $Uri -Method Post -Headers $headers -ContentType "application/json" -Body $payload
+}
+
+function Get-ReadinessProbeUrl {
+  param($Config)
+
+  if ($Config.provider -eq "ollama") {
+    return "http://127.0.0.1:11434/api/version"
+  }
+
+  return $Config.baseUrl
 }
 
 function Assert-ArrayLengthAtMost {
@@ -50,6 +79,41 @@ function Assert-ArrayLengthAtMost {
   }
 
   Add-Pass "$Name length is within limit."
+}
+
+function Test-LocalGpuProfileSelection {
+  $matrixPath = Join-Path $PSScriptRoot "local-gpu-profile-matrix.json"
+  $matrix = Get-LocalGpuProfileMatrix -MatrixPath $matrixPath
+
+  $autoSmall = Resolve-LocalGpuProfileSelection -Matrix $matrix -RequestedProfile "local-gpu-small" -DetectedVramGb 10
+  Assert-Equal -Name "autoSmall.status" -Actual $autoSmall.status -Expected "selected"
+  Assert-Equal -Name "autoSmall.profileId" -Actual $autoSmall.profileId -Expected "local-gpu-8gb"
+  Assert-Equal -Name "autoSmall.selectionSource" -Actual $autoSmall.selectionSource -Expected "detected-vram"
+
+  $autoLarge = Resolve-LocalGpuProfileSelection -Matrix $matrix -RequestedProfile "local-gpu-large" -DetectedVramGb 12
+  Assert-Equal -Name "autoLarge.status" -Actual $autoLarge.status -Expected "selected"
+  Assert-Equal -Name "autoLarge.profileId" -Actual $autoLarge.profileId -Expected "local-gpu-12gb"
+  Assert-Equal -Name "autoLarge.selectionSource" -Actual $autoLarge.selectionSource -Expected "detected-vram"
+
+  $manualProfile = Resolve-LocalGpuProfileSelection -Matrix $matrix -RequestedProfile "local-gpu-small" -ManualProfileId "local-gpu-20gb-plus" -DetectedVramGb 8
+  Assert-Equal -Name "manualProfile.status" -Actual $manualProfile.status -Expected "selected"
+  Assert-Equal -Name "manualProfile.profileId" -Actual $manualProfile.profileId -Expected "local-gpu-20gb-plus"
+  Assert-Equal -Name "manualProfile.selectionSource" -Actual $manualProfile.selectionSource -Expected "manual-profile"
+
+  $manualVram = Resolve-LocalGpuProfileSelection -Matrix $matrix -RequestedProfile "local-gpu-small" -ManualVramGb 21
+  Assert-Equal -Name "manualVram.status" -Actual $manualVram.status -Expected "selected"
+  Assert-Equal -Name "manualVram.profileId" -Actual $manualVram.profileId -Expected "local-gpu-20gb-plus"
+  Assert-Equal -Name "manualVram.selectionSource" -Actual $manualVram.selectionSource -Expected "manual-vram"
+
+  $unsupported = Resolve-LocalGpuProfileSelection -Matrix $matrix -RequestedProfile "local-gpu-small" -DetectedVramGb 6
+  Assert-Equal -Name "unsupported.status" -Actual $unsupported.status -Expected "manual-selection-required"
+  Assert-Equal -Name "unsupported.selectionSource" -Actual $unsupported.selectionSource -Expected "unsupported-vram"
+  Assert-Equal -Name "unsupported.profileId" -Actual $unsupported.profileId -Expected $null
+
+  $unknown = Resolve-LocalGpuProfileSelection -Matrix $matrix -RequestedProfile "local-gpu-large"
+  Assert-Equal -Name "unknown.status" -Actual $unknown.status -Expected "manual-selection-required"
+  Assert-Equal -Name "unknown.selectionSource" -Actual $unknown.selectionSource -Expected "detection-unavailable"
+  Assert-Equal -Name "unknown.profileId" -Actual $unknown.profileId -Expected $null
 }
 
 function Test-Embeddings {
@@ -230,12 +294,32 @@ Write-Host ("Base URL: {0}" -f $config.baseUrl)
 Write-Host ("Chat model: {0}" -f $config.chatModel)
 Write-Host ("Embedding model: {0}" -f $config.embeddingModel)
 
+try {
+  Test-LocalGpuProfileSelection
+} catch {
+  Add-Failure ("Local GPU profile selection test failed: {0}" -f $_.Exception.Message)
+}
+
+if ($SelectionOnly) {
+  if ($script:Failures.Count -gt 0) {
+    Write-Host ""
+    Write-Host "Local AI workflow regression harness failed." -ForegroundColor Red
+    $script:Failures | ForEach-Object { Write-Host (" - {0}" -f $_) -ForegroundColor Red }
+    exit 1
+  }
+
+  Write-Host ""
+  Write-Host "Local AI workflow regression harness passed." -ForegroundColor Green
+  exit 0
+}
+
 if ([string]::IsNullOrWhiteSpace($config.baseUrl)) {
   Add-Failure "This harness needs a reachable AI base URL from the current provider config."
 }
 
-if (-not (Wait-ForHttpReady -Uri $config.baseUrl -TimeoutSeconds 5)) {
-  Add-Failure ("Configured AI base URL did not respond before tests started: {0}" -f $config.baseUrl)
+$probeUrl = Get-ReadinessProbeUrl -Config $config
+if (-not (Wait-ForHttpReady -Uri $probeUrl -TimeoutSeconds 5)) {
+  Add-Failure ("Configured AI base URL did not respond before tests started: {0}" -f $probeUrl)
 }
 
 try {

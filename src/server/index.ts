@@ -1,5 +1,6 @@
 import "dotenv/config";
 import crypto from "node:crypto";
+import http, { type Server as HttpServer } from "node:http";
 import path from "node:path";
 import process from "node:process";
 import express, { type NextFunction, type Request, type Response } from "express";
@@ -29,6 +30,7 @@ import { normalizeDirectorState } from "./player-state.js";
 import { SYSTEM_PROMPT } from "./prompt.js";
 import { createRuntimePreflightService } from "./runtime-preflight.js";
 import { sanitizeTurnResult } from "./turn-result.js";
+import { createGlobalProcessHandler } from "./global-handler.js";
 
 type ServerTurnDebugParams = Omit<TurnDebugParams, "config" | "runtimePreflight">;
 
@@ -454,7 +456,18 @@ app.post("/api/turn", async (req: Request, res: Response) => {
   }
 });
 
-app.listen(port, () => {
+const server = http.createServer(app);
+createGlobalProcessHandler({
+  logger,
+  shutdown: async () => {
+    await closeServer(server);
+  },
+  exit: (code) => {
+    process.exit(code);
+  }
+}).register();
+
+server.listen(port, () => {
   logStartupConfigState();
   logger.info("server listening", { url: `http://localhost:${port}` });
 });
@@ -567,4 +580,17 @@ function ensureDatabaseReady(): RuntimePreflightIssue | null {
 
 function hasStorageBlocker(preflight: RuntimePreflightReport): boolean {
   return preflight.issues.some((issue) => issue.severity === "blocker" && issue.area === "storage");
+}
+
+function closeServer(serverToClose: HttpServer): Promise<void> {
+  return new Promise((resolve) => {
+    serverToClose.close((error) => {
+      if (error && error.message !== "Server is not running.") {
+        logger.error("http server close failed after fatal error", { error });
+      } else {
+        logger.info("http server closed after fatal error");
+      }
+      resolve();
+    });
+  });
 }

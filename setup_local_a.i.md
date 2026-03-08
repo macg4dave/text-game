@@ -64,14 +64,21 @@ What this does:
 - switches LiteLLM to `litellm.local-gpu.config.yaml`
 - starts an Ollama container with NVIDIA GPU reservation
 - keeps the app-facing aliases as `game-chat` and `game-embedding`
+- auto-selects the exact local GPU matrix tier from detected NVIDIA VRAM when possible
+- uses `LOCAL_GPU_PROFILE_ID` or `LOCAL_GPU_VRAM_GB` as manual overrides when auto-detection is unavailable or when you intentionally want a specific tier
 
 Notes:
 
 - GPU passthrough in this repo is officially targeted at **NVIDIA on Windows via Docker Desktop + WSL2** first.
 - The GPU reservation is attached only to the `ollama` container, not the app or LiteLLM containers.
-- `litellm.local-gpu.config.yaml` now tracks `local-gpu-8gb` as the active default profile.
+- `litellm.local-gpu.config.yaml` still defaults to `local-gpu-8gb`, but the launcher can now override the active chat and embedding targets by env var after it selects a matrix tier.
 - `game-embedding` stays hosted by default in the active `local-gpu-8gb` path, so keep `OPENAI_API_KEY` populated unless you intentionally switch to the `local-gpu-20gb-plus` manual swap guidance.
 - the plain `docker compose up --build` path now uses the repo-managed Docker `ollama` service for both stable aliases through `litellm.config.yaml`
+
+Optional manual selection env vars for the launcher path:
+
+- `LOCAL_GPU_PROFILE_ID=local-gpu-12gb` forces a specific matrix tier by id
+- `LOCAL_GPU_VRAM_GB=12` tells the launcher which VRAM tier to use when detection cannot run on the host
 
 ## Install Ollama On Windows
 
@@ -206,6 +213,7 @@ What the current startup checks will tell you on the local GPU path:
 - if LiteLLM is up but Ollama cannot be reached, startup now reports that the local model service is unavailable instead of a generic AI failure
 - if the selected Ollama model is missing, startup now reports that the local model must be pulled or that you should switch back to the hosted default path
 - if the launcher cannot find `nvidia-smi`, it now warns that the local path may fail or fall back to very slow CPU inference
+- if the launcher cannot detect VRAM and you did not set `LOCAL_GPU_PROFILE_ID` or `LOCAL_GPU_VRAM_GB`, it now stops with guided manual-selection instructions instead of guessing silently
 - if you manually swap to a larger heuristic profile and it proves unreliable, step back one tier instead of trying to force the biggest model to fit
 
 If you are using the direct `AI_PROVIDER=ollama` fallback instead of LiteLLM, the same app startup commands still work.

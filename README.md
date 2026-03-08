@@ -273,8 +273,10 @@ powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gp
 
 Current profile status:
 
-- `local-gpu-8gb` is the active default profile and is the only profile intended to be sanity-checked in this task
-- `local-gpu-12gb` and `local-gpu-20gb-plus` are documented for later selection work and should be treated as heuristic until they are exercised on matching hardware
+- `local-gpu-8gb` remains the default fallback tier for the optional local GPU path
+- `scripts/start-dev.ps1 -AiStack local-gpu` now auto-selects `local-gpu-8gb`, `local-gpu-12gb`, or `local-gpu-20gb-plus` from detected NVIDIA VRAM when possible
+- `local-gpu-12gb` and `local-gpu-20gb-plus` are still treated as heuristic until they are exercised on matching hardware
+- if auto-detection is unavailable, use `LOCAL_GPU_PROFILE_ID` or `LOCAL_GPU_VRAM_GB` in `.env` to choose a local GPU tier explicitly
 
 Or, if `npm` is already installed and on `PATH`:
 
@@ -292,6 +294,7 @@ The launcher:
 - uses the LiteLLM stack for the supported Docker launcher modes even if an older `.env` still contains a direct-provider experiment
 - starts the default LiteLLM sidecar for the supported Docker path
 - can opt into the local GPU override with `-AiStack local-gpu`
+- auto-selects a local GPU model tier from the repo matrix when `-AiStack local-gpu` is used, or stops with guided manual-override instructions when it cannot choose safely
 - checks that the repo `data/` path is writable and warns or blocks early when disk headroom is too low
 - checks for a default browser handler before auto-opening the play surface unless you use `-NoBrowser`
 - clears any previous `text-game` compose app container before starting the fresh app instance
@@ -310,6 +313,11 @@ Useful flags:
 - `-NoBrowser` skips opening the webpage
 - `-Rebuild` forces a Docker image rebuild before launch
 - `-AiStack local-gpu` enables the optional Docker GPU override for a local Ollama backend
+
+Optional local GPU override env vars:
+
+- `LOCAL_GPU_PROFILE_ID` - force one matrix tier by id (`local-gpu-8gb`, `local-gpu-12gb`, `local-gpu-20gb-plus`)
+- `LOCAL_GPU_VRAM_GB` - bypass host VRAM detection and select the tier that matches the provided GB value
 
 ## Script Layout
 
@@ -337,15 +345,16 @@ Keep those alias names in `.env`. When you want to change where requests go, cha
 Recommended baseline:
 
 1. Copy `.env.example` to `.env`.
-2. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding`.
-3. Pull the default Docker-Ollama models once:
+1. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding`.
+1. Pull the default Docker-Ollama models once:
 
 ```bash
 docker compose exec ollama ollama pull gemma3:4b
 docker compose exec ollama ollama pull embeddinggemma
 ```
-4. Start the Docker stack with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
-5. Start the app with `docker compose up --build`, `npm run dev`, or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+
+1. Start the Docker stack with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+1. Start the app with `docker compose up --build`, `npm run dev`, or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
 
 Current default Docker smoke guidance:
 
@@ -358,7 +367,7 @@ Optional larger local-model path through the same gateway UX:
 - keep the app on `AI_PROVIDER=litellm`
 - leave the app-facing aliases as `game-chat` and `game-embedding`
 - use `docker-compose.gpu.yml` or `-AiStack local-gpu` to start an Ollama backend with NVIDIA GPU passthrough
-- let LiteLLM switch to `litellm.local-gpu.config.yaml` for `game-chat` while `game-embedding` stays hosted by default on smaller tiers
+- let LiteLLM switch to `litellm.local-gpu.config.yaml`, with the launcher now selecting the exact matrix tier and wiring the matching upstream chat and embedding targets through env vars
 
 Current VRAM-tier matrix for the optional local GPU path:
 
@@ -367,6 +376,13 @@ Current VRAM-tier matrix for the optional local GPU path:
 - `local-gpu-20gb-plus` uses `gemma3:27b` for chat and can route `game-embedding` to local `embeddinggemma`; fall back to `local-gpu-12gb` or switch embeddings back to hosted if the local embedding route is unavailable or too slow
 
 VRAM remains the selector of record. GPU marketing names are only examples for documentation and must not override detected memory.
+
+Selection order for the optional local GPU path:
+
+1. `LOCAL_GPU_PROFILE_ID` if you set it explicitly
+2. `LOCAL_GPU_VRAM_GB` if you provide a manual VRAM value
+3. detected host NVIDIA VRAM via `nvidia-smi`
+4. guided manual selection instead of a silent guess if none of the above can choose a supported tier
 
 That keeps the player-facing and app-facing setup stable even when the upstream model stack changes.
 
@@ -469,6 +485,7 @@ The browser UI includes:
 - a text log for player and narrator turns
 - player naming plus a multiline turn input with local assist chips
 - a startup setup panel that uses one shared preflight contract with `blocker`, `warning`, and `info` issues before the first turn
+- a fatal-error panel that catches unexpected browser crashes and tells the player to refresh or restart instead of leaving a dead screen
 - `Refresh State` and `New Session` controls for quick local iteration
 - a debug panel showing the active provider/model config, current player state, and the last turn payload returned by the server
 
@@ -505,6 +522,7 @@ For local GPU matrix consistency checks, run `powershell -ExecutionPolicy Bypass
 ## Environment
 
 - `AI_PROVIDER` - optional label; defaults to `litellm`; supported repo presets are `openai-compatible`, `litellm`, and `ollama`
+- `AI_PROFILE` - optional starter profile; defaults to `hosted-default`; supported values are `hosted-default`, `local-gpu-small`, `local-gpu-large`, and `custom`
 - `AI_API_KEY` - primary key for generic OpenAI-compatible mode
 - `AI_BASE_URL` - optional; point this at any OpenAI-compatible provider endpoint
 - `AI_CHAT_MODEL` - defaults to `gpt-4o-mini`
@@ -517,6 +535,8 @@ For local GPU matrix consistency checks, run `powershell -ExecutionPolicy Bypass
 - `OLLAMA_API_KEY` - optional Ollama key placeholder; defaults to `ollama`
 - `OLLAMA_CHAT_MODEL` - Ollama chat model; defaults to `gemma3:4b`
 - `OLLAMA_EMBEDDING_MODEL` - Ollama embedding model; defaults to `embeddinggemma`
+- `LOCAL_GPU_PROFILE_ID` - optional manual local GPU matrix override used by the launcher when `-AiStack local-gpu` is selected
+- `LOCAL_GPU_VRAM_GB` - optional manual VRAM override in GB used by the launcher when auto-detection is unavailable
 - `LOG_LEVEL` - server log threshold; use `debug`, `info`, `warn`, or `error`; defaults to `info`
 - Legacy `OPENAI_*` env vars still work during migration, but new setup should prefer LiteLLM or an explicit `AI_PROVIDER`
 
@@ -638,6 +658,7 @@ Server logs now emit structured JSON lines with:
 - `time`, `level`, and `message`
 - request context such as `requestId`, `method`, and `route`
 - automatic redaction for common secret fields such as `authorization`, `apiKey`, `token`, `password`, `cookie`, and `secret`
+- one process-level fatal-error shutdown path for uncaught exceptions and unhandled promise rejections so unexpected crashes are logged before the server exits
 
 Set `LOG_LEVEL=debug` when you need request-start events and lower-signal debugging detail during local troubleshooting.
 
