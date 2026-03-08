@@ -79,3 +79,21 @@ test("createTurnResponsePayload preserves the full validated turn output alongsi
   assert.equal(response.player.schema_version, AUTHORITATIVE_STATE_SCHEMA_VERSION);
   assert.deepEqual(validateTurnResponse(response), { ok: true, errors: [] });
 });
+
+test("createTurnResponsePayload keeps proposal fields separate from the authoritative player snapshot", () => {
+  const authoritativePlayer = createAuthoritativePlayerState(createPlayer());
+  const response = createTurnResponsePayload(
+    {
+      ...createTurnOutput(),
+      state_updates: {
+        ...createTurnOutput().state_updates,
+        location: "Sky Bridge"
+      }
+    },
+    authoritativePlayer
+  );
+
+  assert.equal(response.state_updates.location, "Sky Bridge");
+  assert.equal(response.player.location, "Rooftop Market");
+  assert.deepEqual(validateTurnResponse(response), { ok: true, errors: [] });
+});

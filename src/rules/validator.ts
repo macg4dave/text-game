@@ -95,6 +95,13 @@ export function validateStateUpdates(updates: unknown): ValidationResult<string>
   }
 
   const typedUpdates = updates as Partial<StateUpdates> & Record<string, unknown>;
+  const allowedKeys = new Set(["location", "inventory_add", "inventory_remove", "flags_add", "flags_remove", "quests"]);
+  for (const key of Object.keys(typedUpdates)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`state_updates.${key} is not allowed in the compact turn schema.`);
+    }
+  }
+
   const listFields: Array<keyof Pick<StateUpdates, "inventory_add" | "inventory_remove" | "flags_add" | "flags_remove">> = [
     "inventory_add",
     "inventory_remove",
@@ -165,6 +172,20 @@ export function validateTurnOutput(payload: unknown): ValidationResult<string> {
   }
 
   const candidate = payload as Partial<TurnOutputPayload> & Record<string, unknown>;
+  const allowedTopLevelKeys = new Set([
+    "schema_version",
+    "narrative",
+    "player_options",
+    "state_updates",
+    "director_updates",
+    "memory_updates"
+  ]);
+  for (const key of Object.keys(candidate)) {
+    if (!allowedTopLevelKeys.has(key)) {
+      errors.push(`${key} is not allowed in the compact turn schema.`);
+    }
+  }
+
   if (candidate.schema_version !== TURN_OUTPUT_SCHEMA_VERSION) {
     errors.push(`schema_version must be ${TURN_OUTPUT_SCHEMA_VERSION}.`);
   }
@@ -184,12 +205,23 @@ export function validateTurnOutput(payload: unknown): ValidationResult<string> {
     }
   }
 
+  // `*_updates` remains the v1 field shape, but these slots are proposal-only.
   errors.push(...validateStateUpdates(candidate.state_updates).errors);
 
   if (!candidate.director_updates || typeof candidate.director_updates !== "object") {
     errors.push("director_updates must be an object.");
-  } else if (typeof candidate.director_updates.end_goal_progress !== "string") {
-    errors.push("director_updates.end_goal_progress must be a string.");
+  } else {
+    const allowedDirectorKeys = new Set(["end_goal_progress"]);
+    const typedDirectorUpdates = candidate.director_updates as unknown as Record<string, unknown>;
+    for (const key of Object.keys(typedDirectorUpdates)) {
+      if (!allowedDirectorKeys.has(key)) {
+        errors.push(`director_updates.${key} is not allowed in the compact turn schema.`);
+      }
+    }
+
+    if (typeof candidate.director_updates.end_goal_progress !== "string") {
+      errors.push("director_updates.end_goal_progress must be a string.");
+    }
   }
 
   if (!Array.isArray(candidate.memory_updates)) {
@@ -275,6 +307,7 @@ export function validateTurnResponse(payload: unknown): ValidationResult<string>
     return { ok: false, errors: ["turn response must be an object."] };
   }
 
+  // The turn payload may contain proposal fields, but `player` is the authoritative snapshot.
   const turnErrors = validateTurnOutput(payload).errors;
   const candidate = payload as Partial<TurnResponsePayload> & Record<string, unknown>;
 

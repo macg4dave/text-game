@@ -188,7 +188,9 @@ export interface QuestUpdate {
   summary: string;
 }
 
-export interface StateUpdates {
+// Transitional type name retained for compatibility with the v1 wire payload.
+// These fields are model proposals, not committed state.
+export interface StateUpdateProposal {
   location: string;
   inventory_add: string[];
   inventory_remove: string[];
@@ -197,15 +199,25 @@ export interface StateUpdates {
   quests: QuestUpdate[];
 }
 
-export interface DirectorUpdates {
+export type StateUpdates = StateUpdateProposal;
+
+// Transitional type name retained for compatibility with the v1 wire payload.
+// These fields are model proposals, not authoritative director truth.
+export interface DirectorUpdateProposal {
   end_goal_progress: string;
 }
 
+export type DirectorUpdates = DirectorUpdateProposal;
+
+// Transitional v1 turn-output contract. The `*_updates` fields are proposal slots only.
+// The contract stays compact and transport-oriented: no scene graph, world model,
+// beat-state object, or other hidden gameplay schema belongs here.
+// The authoritative truth returned to clients lives in the versioned `player` snapshot.
 export interface TurnResult {
   narrative: string;
   player_options: string[];
-  state_updates: StateUpdates;
-  director_updates: DirectorUpdates;
+  state_updates: StateUpdateProposal;
+  director_updates: DirectorUpdateProposal;
   memory_updates: string[];
 }
 

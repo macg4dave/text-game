@@ -8,6 +8,7 @@ import {
   type StateUpdates,
   type TurnResult
 } from "../core/types.js";
+import { SYSTEM_PROMPT } from "../ai/prompt.js";
 import { createTurnService } from "./turn.js";
 
 function createPlayer(): Player {
@@ -74,6 +75,11 @@ function createQuestSpec(): QuestSpec {
     ]
   };
 }
+
+test("system prompt frames model-emitted consequences as proposals instead of committed truth", () => {
+  assert.match(SYSTEM_PROMPT, /propos/i);
+  assert.match(SYSTEM_PROMPT, /do not present .* committed/i);
+});
 
 test("turn service executes the gameplay pipeline outside the server layer", async () => {
   const events: Array<{ playerId: string; role: string; content: string }> = [];

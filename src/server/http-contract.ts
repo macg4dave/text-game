@@ -24,6 +24,8 @@ export function createTurnResponsePayload(
   turnOutput: TurnOutputPayload,
   player: AuthoritativePlayerState
 ): TurnResponsePayload {
+  // `turnOutput` contains proposal fields from the model-facing contract.
+  // The committed truth sent back to clients is the authoritative `player` snapshot.
   return {
     ...turnOutput,
     player

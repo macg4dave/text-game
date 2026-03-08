@@ -25,6 +25,8 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - AI turn generation must use a structured JSON proposal contract. Model-supplied consequences are proposals only until the server validates and commits them.
 - The model-facing turn schema must stay compact and transport-oriented. Prefer narrative, candidate actions, structured intents, and proposed deltas over scene-shaped world models or schema fields that encode gameplay design logic.
 - Turn input, turn output, and authoritative player state must each expose an explicit schema version marker at the HTTP boundary.
+- In turn-output schema `v1`, transitional field names such as `state_updates`, `director_updates`, and `memory_updates` remain in the payload for compatibility, but they are proposal-only fields. The authoritative truth in `/api/turn` remains the versioned `player` snapshot until a later schema revision renames those fields.
+- The turn-output proposal contract must stay compact. It may carry narrative, player options, and narrowly scoped proposed deltas, but it must not grow scene graphs, world-state objects, beat-state mirrors, or other schema fields that encode game design logic.
 - Player-facing narrative, options, quest progress, and memory facts shown after a turn must align to committed authoritative state rather than uncommitted model prose.
 - Turn handling must separate freeform intent interpretation, world simulation resolution, and story pacing or framing.
 - The player may attempt almost anything; implausible or failed actions should be resolved by simulation rules, not by the director acting as a hidden refusal gate.

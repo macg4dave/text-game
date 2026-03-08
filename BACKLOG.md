@@ -170,8 +170,8 @@ Use one of the exact shapes below when adding new work.
 | T56 | Now | P1 | P2 | Future issue intake workflow | Done | None | Manual planning-doc consistency review |
 | T56a | Now | P1 | P2 | Backlog parent and child task pattern | Done | T56 | Manual backlog structure review |
 | T56b | Now | P1 | P2 | Cross-doc planning sync policy | Done | T56 | Manual roadmap, requirements, architecture, and standards consistency review |
-| T57 | Now | P1 | P1 | Authority-safe turn truth boundary | Ready | T06 | Manual planning-doc consistency review |
-| T57a | Now | P1 | P1 | Proposal-only turn contract and prompt boundary | Ready | T06, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T57 | Now | P1 | P1 | Authority-safe turn truth boundary | In Progress | T06 | Manual planning-doc consistency review |
+| T57a | Now | P1 | P1 | Proposal-only turn contract and prompt boundary | Done | T06, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T58 | Next | P1 | P1 | Player agency and pacing boundary | Ready | T06, T57 | Manual planning-doc consistency review |
 | T58a | Next | P1 | P1 | Intent, simulation, and pacing contract split | Ready | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59 | Now | P1 | P1 | Semantic event log and replay canon | Ready | T06, T57 | Manual planning-doc consistency review |
@@ -180,7 +180,7 @@ Use one of the exact shapes below when adding new work.
 | T60a | Next | P1 | P1 | Memory class contract and admission rules | Ready | T57a, T59a, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T60b | Later | P2 | P1 | Class-aware retrieval and summarization policy | Ready | T60a, T13, T62b, T63a | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
 | T61 | Now | P1 | P1 | Compact turn schema boundary | Ready | T06, T57 | Manual planning-doc consistency review |
-| T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Ready | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Done | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Ready | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T12 | Next | P1 | P1 | New game onboarding | Review | T06 | Manual new-game flow check |
 | T12b | Next | P1 | P1 | First-run setup wizard and connection test | Done | T02f, T11, T12 | Manual first-run flow check |
@@ -368,7 +368,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T57 - Authority-Safe Turn Truth Boundary
 
-- Status: Ready
+- Status: In Progress
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -410,10 +410,13 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - current code and docs still let the model emit `state_updates`, `director_updates`, and `memory_updates` in a way that reads like truth instead of proposals
   - the target contract is explicit: the model may propose consequences, but the server decides what becomes true, and the final narrative returned to the player must be downstream of committed state
   - use this parent item to gate `T07`, `T08`, `T09`, and `T10` so replay and save work do not harden the wrong truth boundary
+  - manual planning-doc consistency review on 2026-03-08 found the roadmap, requirements, architecture, and engineering standards already aligned on proposal-only model output, server-side adjudication, and committed-state-first narrative
+  - live code still hardens the wrong boundary in `src/core/types.ts`, `src/ai/prompt.ts`, `src/ai/service.ts`, `src/rules/validator.ts`, `src/state/turn-result.ts`, and `src/state/turn.ts`, where `state_updates`, `director_updates`, and `memory_updates` are still treated as direct turn output and are committed before any explicit server-owned adjudication layer
+  - no additional planning-doc edits were required in this session; the next concrete implementation slices remain `T61a` and `T57a`, followed by `T57b`
 
 ### T57a - Proposal-Only Turn Contract And Prompt Boundary
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -455,6 +458,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - this task should land before `T07`, `T08`, and `T10` expand the live turn path
   - prefer explicit names such as proposals, accepted consequences, or committed state over overloaded `update` wording when the contract changes
   - if the external payload cannot be safely renamed in one slice, document the transitional naming and lock the semantics first
+  - completed on 2026-03-08 by keeping the `turn-output/v1` field names for compatibility while explicitly documenting `state_updates`, `director_updates`, and `memory_updates` as proposal-only slots in the prompt, response schema, types, validator notes, HTTP contract, and planning docs
+  - focused coverage now includes prompt-boundary assertions in `src/state/turn.test.ts` plus response-contract assertions in `src/rules/validator.test.ts` and `src/server/http-contract.test.ts` that keep the authoritative `player` snapshot distinct from proposal fields
+  - this slice intentionally did not rename the external payload yet; `T61a` still owns the later compact-schema boundary work, while `T57b` should add the explicit server adjudication layer behind the proposal-only contract
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts`, and `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`
 
 ### T57b - Server Consequence Adjudication And Commit Policy
 
@@ -1021,7 +1028,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T61a - Compact Proposal Schema And Validator Contract
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -1063,6 +1070,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - prefer names such as `candidate_actions`, `structured_intents`, and `proposed_deltas` over field sets that imply the model owns the simulation
   - if legacy field names must survive temporarily for compatibility, lock the compact semantics first and document the migration path clearly
   - exact prose and scene nuance should stay in narrative or server-side specs, not in a growing response schema
+  - completed on 2026-03-08 by keeping the `turn-output/v1` payload compact in semantics and validation: proposal fields stay narrow, planning docs now explicitly reject scene graphs, world-state mirrors, and beat-state payload growth, and the runtime validator now rejects unknown top-level, `state_updates`, and `director_updates` keys instead of silently tolerating schema creep
+  - focused coverage now includes an over-modeled payload rejection case in `src/rules/validator.test.ts`, while existing `src/server/http-contract.test.ts` and `src/state/turn.test.ts` still lock the proposal-only boundary and authoritative `player` snapshot behavior
+  - a Docker build failure during validation exposed a stricter server compile path than host `type-check`; the fix was to cast `director_updates` through `unknown` before treating it as a key-inspected record in `src/rules/validator.ts`
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts`, and `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`
 
 ### T61b - Schema Evolution Guardrails And Fixture Policy
 

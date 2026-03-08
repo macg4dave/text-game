@@ -8,21 +8,27 @@ const client = new OpenAI({
 });
 
 const RESPONSE_SCHEMA = {
-  name: "game_turn",
+  name: "game_turn_proposal",
   strict: true,
   schema: {
     type: "object",
     additionalProperties: false,
     properties: {
-      narrative: { type: "string" },
+      narrative: {
+        type: "string",
+        description: "Narration that stays compatible with committed STATE_PACK facts and any still-uncommitted proposals."
+      },
       player_options: {
         type: "array",
         items: { type: "string" },
         minItems: 0,
-        maxItems: 6
+        maxItems: 6,
+        description: "Short player-facing options that fit the narrated situation."
       },
       state_updates: {
         type: "object",
+        description:
+          "Transitional legacy field name. These are candidate state consequences only; the server decides what becomes committed truth.",
         additionalProperties: false,
         properties: {
           location: { type: "string" },
@@ -48,6 +54,8 @@ const RESPONSE_SCHEMA = {
       },
       director_updates: {
         type: "object",
+        description:
+          "Transitional legacy field name. This contains compact candidate pacing or progress consequences, not authoritative director state.",
         additionalProperties: false,
         properties: {
           end_goal_progress: { type: "string" }
@@ -58,7 +66,9 @@ const RESPONSE_SCHEMA = {
         type: "array",
         items: { type: "string" },
         minItems: 0,
-        maxItems: 8
+        maxItems: 8,
+        description:
+          "Transitional legacy field name. These are candidate memory facts for the server to accept or reject. Do not encode scene or world structures here."
       }
     },
     required: ["narrative", "player_options", "state_updates", "director_updates", "memory_updates"]

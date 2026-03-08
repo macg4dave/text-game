@@ -57,6 +57,7 @@ Do not assume:
 - The server must validate and adjudicate proposed consequences before mutating player state, director state, quest progress, or persisted memory.
 - Player-facing narrative should be derived or reconciled after the authoritative commit so prose cannot smuggle in unearned world facts.
 - Event log, replay, and save behavior should treat committed state and accepted consequences as truth; raw model claims are debug data unless the server accepted them.
+- The current `turn-output/v1` wire shape still uses transitional names such as `state_updates`, `director_updates`, and `memory_updates`, but those fields are proposals only; the authoritative player snapshot is the truth-bearing response surface.
 
 ## Turn Layering
 
@@ -73,6 +74,7 @@ Do not assume:
 
 - The model-facing schema is a transport contract, not the game's design language.
 - Prefer a compact turn payload built around narrative, candidate actions, structured intents, and proposed deltas.
+- Reject schema growth that adds scene-state mirrors, world models, beat objects, or similar design-shaped payloads to the turn output.
 - Keep scene modeling, simulation rules, quest logic, beat policy, and other gameplay semantics in server-owned modules or content specs rather than encoding them as schema shape.
 - If a proposed schema field exists mainly to teach game rules to the model, treat that as a boundary smell and move the logic into validators, adjudication, reducer code, or authored specs instead.
 - Compact schemas should be translated into richer authoritative domain concepts server-side after validation, not by making the model output mirror the whole engine state machine.

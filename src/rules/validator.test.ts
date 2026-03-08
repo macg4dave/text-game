@@ -99,6 +99,39 @@ test("validateTurnOutput rejects invalid nested fields and option overflow", () 
   assert.match(result.errors.join(" "), /end_goal_progress/i);
 });
 
+test("validateTurnOutput rejects over-modeled scene and world fields outside the compact proposal contract", () => {
+  const result = validateTurnOutput({
+    schema_version: TURN_OUTPUT_SCHEMA_VERSION,
+    narrative: "You scan the market from the rooftop.",
+    player_options: ["Inspect the signal lantern"],
+    state_updates: {
+      location: "Rooftop Market",
+      inventory_add: [],
+      inventory_remove: [],
+      flags_add: [],
+      flags_remove: [],
+      quests: [],
+      world_state: {
+        weather: "storm"
+      }
+    },
+    director_updates: {
+      end_goal_progress: "The tower route is clearer.",
+      current_beat_id: "beat-2"
+    },
+    memory_updates: [],
+    scene: {
+      npcs: ["watcher"],
+      exits: ["tower"]
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /scene/i);
+  assert.match(result.errors.join(" "), /state_updates\.world_state/i);
+  assert.match(result.errors.join(" "), /director_updates\.current_beat_id/i);
+});
+
 test("validateAuthoritativePlayerState accepts a versioned player snapshot", () => {
   const state: AuthoritativePlayerState = {
     schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
@@ -225,6 +258,49 @@ test("validateTurnResponse accepts a full versioned turn payload plus authoritat
           summary: "You noticed the first signal marker."
         }
       ],
+      director_state: {
+        end_goal: "Reach the tower",
+        current_act_id: "act-1",
+        current_act: "Arrival",
+        current_beat_id: "beat-1",
+        current_beat_label: "Find the signal",
+        story_beats_remaining: 3,
+        end_goal_progress: "You have started the search.",
+        completed_beats: []
+      }
+    }
+  };
+
+  assert.deepEqual(validateTurnResponse(payload), { ok: true, errors: [] });
+});
+
+test("validateTurnResponse treats legacy *_updates fields as proposals while player remains authoritative", () => {
+  const payload: TurnResponsePayload = {
+    schema_version: TURN_OUTPUT_SCHEMA_VERSION,
+    narrative: "You picture the bridge ahead, but the move is not committed yet.",
+    player_options: ["Step toward the bridge", "Stay on the rooftop"],
+    state_updates: {
+      location: "Sky Bridge",
+      inventory_add: ["bridge pass"],
+      inventory_remove: [],
+      flags_add: ["bridge_seen"],
+      flags_remove: [],
+      quests: []
+    },
+    director_updates: {
+      end_goal_progress: "You can now see a route toward the tower."
+    },
+    memory_updates: ["The bridge looked reachable from the rooftop."],
+    player: {
+      schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      id: "player-123",
+      name: "Avery",
+      created_at: "2026-03-08T00:00:00.000Z",
+      location: "Rooftop Market",
+      summary: "You arrived at the market.",
+      inventory: ["signal shard"],
+      flags: ["market_seen"],
+      quests: [],
       director_state: {
         end_goal: "Reach the tower",
         current_act_id: "act-1",

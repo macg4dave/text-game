@@ -82,6 +82,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 ## Authority Boundary Policy
 
 - Treat model output as advisory until the server accepts it. Proposed state changes, quest progression, director progress, and memory facts must not become authoritative solely because the model emitted them.
+- Transitional `turn-output/v1` field names such as `state_updates`, `director_updates`, and `memory_updates` must be treated as proposal slots only until a later schema revision renames them.
 - Server-side validation and adjudication must run before any authoritative mutation, memory persistence, or player-facing turn finalization.
 - Player-facing narrative and suggested options must be reconciled against committed state; if prose contradicts the accepted outcome, rewrite, trim, or reject it before returning it to the player.
 - Turn-pipeline changes must include at least one deterministic rejection case where the model invents facts, implies unearned progress, or otherwise attempts authority drift.
@@ -121,6 +122,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 ## AI Schema Governance Policy
 
 - Keep the model-facing turn schema compact and transport-oriented. Narrative, candidate actions, structured intents, and proposed deltas are preferred over scene-shaped contracts.
+- Validators for turn-output payloads must reject extra scene, world, beat, pacing, or other design-shaped fields instead of silently tolerating schema creep.
 - Do not encode gameplay rules, beat policy, quest semantics, or world-simulation logic into model schema shape when those concepts can live in validators, adjudication, reducers, or content specs.
 - Treat new model-facing fields as requiring a transport justification. If the reason for a field is really game design or engine behavior, the change belongs outside the schema.
 - Schema or prompt changes should include at least one deterministic check that rejects mixed-authority or over-modeled payloads before they reach authoritative mutation.
