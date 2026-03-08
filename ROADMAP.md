@@ -152,6 +152,7 @@ Exit gate:
 - NPC continuity uses significance-scored structured encounter facts and tiered long-lived memory instead of replaying raw dialogue history.
 - Live model context is assembled from budgeted memory buckets rather than from one expanding prompt, and raw history remains cold unless explicitly retrieved.
 - Scene- and chapter-level summary artifacts are versioned so recap logic can be recomputed from canonical records when needed.
+- Context-entry accounting and retrieval traces make it possible to inspect what entered the turn context and why.
 - Director rules are loaded from versioned specs and can be reloaded without app reinstall.
 - Director enforcement runs server-side before authoritative state is committed.
 - Director enforcement frames accepted outcomes after simulation resolution instead of acting as the primary plausibility gate for player actions.
@@ -228,6 +229,7 @@ Exit gate:
 
 ## Planning Intake Rules
 
+- [BACKLOG.md](/g:/text-game/BACKLOG.md) is the execution source of truth. If roadmap sequencing or active work detail drifts from the backlog, update this file to match the backlog rather than treating the roadmap as the tie-breaker.
 - When a future issue changes phase sequencing, exit gates, near-term priorities, risks, or open decisions, update this roadmap in the same session as the matching [BACKLOG.md](/g:/text-game/BACKLOG.md) parent issue and child tasks.
 - Capture implementation detail in the backlog, not here. This roadmap should record phase placement, rationale, risks, and milestone effects only.
 - Future-looking issues that are not yet startable should still be reflected through roadmap sequencing or risk notes when they materially affect delivery order.
@@ -252,6 +254,7 @@ Exit gate:
 - Define memory classes and class-aware retrieval before Phase 2 memory work hardens one undifferentiated memory bucket.
 - Define NPC significance scoring, tier promotion, and partitioned recall before retrieval or summarization work hardens raw dialogue history into the memory design.
 - Define the memory storage hierarchy, per-bucket context budgets, and summary versioning before budget or telemetry work measures the wrong prompt shape.
+- Land context-entry accounting and retrieval traces before later telemetry and budget enforcement work depends on opaque prompt assembly.
 - Move delivery budgets from doc-only values into a shared server-side config contract and expose them through an advanced UI surface.
 - Add automatic local-model profile selection and setup guidance for common VRAM tiers.
 - Produce the first packaged Windows playtest build.

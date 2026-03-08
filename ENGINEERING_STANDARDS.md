@@ -1,6 +1,7 @@
 # Engineering Standards
 
 This document holds the cross-cutting delivery rules for the project. It is intentionally operational and should change less often than the backlog but more often than the roadmap.
+If an active standards-related task in [BACKLOG.md](/g:/text-game/BACKLOG.md) and this document disagree, treat the backlog as the execution source of truth and update this file to match.
 
 ## Definition of Done
 
@@ -30,7 +31,8 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 ### Budget Baseline Assumptions
 
 - The default budget model path is LiteLLM alias `game-chat` -> `gpt-4o-mini` and LiteLLM alias `game-embedding` -> `text-embedding-3-small`.
-- The current turn shape includes up to 6 short-history entries, 6 retrieved memories, a rolling summary capped to the last 30 summary lines, up to 6 suggested player options, and up to 8 memory updates per turn.
+- Until `T43` and `T63a` land, treat the hot-context baseline as intentionally small: current scene, current goal, nearby world state, a few high-priority recalled facts, and only explicitly budgeted recent-event slices.
+- The current implementation still uses fixed caps such as short-history entries, retrieved memories, summary lines, suggested options, and memory updates, but those are transitional guardrails rather than the long-term memory contract.
 - The $0.12 per 100 turns budget assumes the prompt is kept comfortably under the 4,000-token ceiling on the default alias pair and leaves small headroom for embedding calls.
 - The 40 MB per 1,000 turns budget assumes SQLite growth is dominated by event text plus JSON-serialized embedding vectors stored with memories; this target should be revisited once replay fixtures and save-slot usage are measured.
 
@@ -107,8 +109,10 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 
 ## Memory Storage Hierarchy Policy
 
+- Keep semantic classes and storage tiers distinct. Class answers what a record means; storage tier answers how hot, compressed, or durable it should be.
 - Treat live prompt context as a small hot layer, not as the primary storage surface. Everything not needed for the current turn should stay in durable storage.
 - Default live context should be budgeted by bucket, with explicit slices for scene state, current goal, nearby world state, recalled quest or canon facts, NPC or relationship memory, and any approved recent-event window.
+- Durable storage should stay legible as explicit buckets such as hard canon facts, quest or progression facts, relationship summaries, and cold history logs.
 - Raw history or transcript text must stay cold by default. If a turn needs transcript recovery, the retrieval mode, reason, and budget should be explicit and inspectable.
 - Run compression passes after scenes and larger recap merges after chapters or beats so hot memory sheds verbose dialogue quickly.
 - Version summary and recap artifacts so they can be recomputed later from canonical records when extraction or summarization logic changes.
@@ -147,6 +151,8 @@ Each `/api/turn` should record, at minimum:
 - timeout path
 - input tokens
 - output tokens
+- per-bucket context-entry accounting
+- retrieval-trace or selection metadata sufficient to explain why context items were included
 - latency
 - validation errors
 - state schema version

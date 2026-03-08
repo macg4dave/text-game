@@ -96,6 +96,9 @@ Do not assume:
   - relationship facts
   - world discoveries
   - soft flavor recollections
+- Treat semantic memory class and storage tier as separate axes:
+  - class explains what kind of fact or recollection a record represents
+  - tier explains whether that record belongs in hot context, warm summaries, or cold history
 - Authority-relevant classes should be admitted only from server-accepted outcomes or trusted derivation paths.
 - Retrieval policy should be class-aware so each turn pulls the smallest useful set instead of treating all memories as equivalent.
 - Soft flavor recollections may enrich narration, but they must not mutate or override authoritative state on their own.
@@ -107,6 +110,8 @@ Do not assume:
 - Durable memory should be split across distinct buckets such as hard canon facts, quest or progression facts, relationship summaries, and cold history logs rather than one monolithic prompt payload.
 - Raw history should remain out of the live prompt by default; if a transcript slice is needed, it should be requested as an explicit retrieval mode with its own budget.
 - Summary and recap artifacts should be versioned so later recomputation can rebuild them from canonical event data and committed facts when summarization logic changes.
+- Ranking inside bucket budgets should prefer relevance first, then recency and narrative importance, with strong boosts for later voluntary player re-engagement.
+- Compression should happen in layers: post-scene fact extraction and compact summaries first, then chapter- or beat-level recap merges later.
 - NPC continuity should flow through four layers:
   - transcript or event-log retention for replay and debugging
   - structured encounter facts extracted from committed scenes
@@ -167,6 +172,7 @@ Implications for follow-on work:
 
 ## Architecture Change Intake
 
+- [BACKLOG.md](/g:/text-game/BACKLOG.md) is the execution source of truth for in-flight work. If an active architecture task and this document diverge, update this document to mirror the backlog-backed decision.
 - Update this document when a future issue changes runtime boundaries, module ownership, provider boundaries, packaging shape, or other architecture-level contracts.
 - Mirror architecture-affecting issues in [BACKLOG.md](/g:/text-game/BACKLOG.md) as a parent item plus child tasks so boundary decisions and implementation work stay linked.
 - Keep purely strategic sequencing, validation policy, or user-copy updates out of this document unless they materially change the architecture boundary itself.

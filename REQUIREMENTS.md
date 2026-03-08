@@ -37,11 +37,14 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Each preflight issue must include one recommended next step for end users, while advanced diagnostics stay available behind an expandable details surface.
 - Memory system with summaries and embedding-based retrieval.
 - Memory must support explicit classes from the start, including hard canon facts, quest progression facts, relationship facts, world discoveries, and soft flavor recollections.
+- Memory design has two orthogonal dimensions: semantic class defines what a fact means, while storage tier defines how hot, compressed, or durable it is.
 - Retrieval policy must differ by memory class; only the classes that matter for the current turn should be retrieved, and always-on retrieval should be limited to the smallest authority-relevant set.
 - Memory classes may support narration and continuity, but memory retrieval itself must not become a second authority channel that overrides committed state.
 - Memory must behave as a storage hierarchy rather than one large prompt. The default live context should contain only the current scene, current goal, nearby world state, and a few high-priority recalled facts.
 - Durable memory should be split into at least hard canon facts, quest or progression facts, relationship summaries, and cold history logs. Raw history should remain outside the live context unless a retrieval rule explicitly requires it.
+- Per-turn live context assembly must use explicit bucket budgets, with recall ranked by relevance, recency, narrative importance, and strong boosts for voluntary player re-engagement.
 - Old interactions must be compressed into rolling summaries and structured facts, with summary formats versioned so they can be recomputed later from canonical data.
+- Compression passes should run after scenes, with higher-level recap merges after chapters or beats so verbose dialogue leaves hot memory quickly.
 - NPC continuity must use a significance pipeline, not a raw chat-log replay. The system must distinguish transcript or event-log data, structured encounter facts, thresholded long-lived NPC memory, and short-lived scene context.
 - NPC memory persistence must be tiered and significance-gated. Stable identity such as names should be cheap to persist, while richer relationship or history recall should require cumulative importance and player re-engagement.
 - NPC memory, world memory, and player journal memory must remain separate stores or classes of recall, and durable canon must be stored as structured facts or summaries rather than as raw dialogue prose.
@@ -105,6 +108,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 
 ## Update Process
 
+- [BACKLOG.md](/g:/text-game/BACKLOG.md) is the execution source of truth for active work. If this file drifts from the backlog on sequencing or in-flight detail, update this file to mirror the backlog rather than treating requirements text as the tie-breaker.
 - Keep this file current when features or priorities change.
 - Roadmap changes should be reflected here when requirements shift.
 - When a future issue changes user-visible scope, setup behavior, supported player flows, or configuration exposed to players, update this file in the same session that adds the matching backlog parent item and child tasks.
