@@ -1,6 +1,8 @@
 param(
   [switch]$NoBrowser,
-  [switch]$Rebuild
+  [switch]$Rebuild,
+  [ValidateSet("hosted", "local-gpu")]
+  [string]$AiStack = "hosted"
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,6 +10,10 @@ Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $dotEnvPath = Join-Path $repoRoot ".env"
+$composeFileArgs = @("-f", (Join-Path $repoRoot "docker-compose.yml"))
+if ($AiStack -eq "local-gpu") {
+  $composeFileArgs += @("-f", (Join-Path $repoRoot "docker-compose.gpu.yml"))
+}
 
 Set-Location -LiteralPath $repoRoot
 
@@ -65,6 +71,37 @@ function Invoke-NativeCapture {
       $PSNativeCommandUseErrorActionPreference = $restorePreference
     }
   }
+}
+
+function Invoke-DockerCompose {
+  param([string[]]$ArgList)
+
+  Invoke-Native -FilePath "docker" -ArgList (@("compose") + $composeFileArgs + $ArgList)
+}
+
+function Invoke-DockerComposeCapture {
+  param([string[]]$ArgList)
+
+  return Invoke-NativeCapture -FilePath "docker" -ArgList (@("compose") + $composeFileArgs + $ArgList)
+}
+
+function Show-DockerComposeStatus {
+  & docker @(@("compose") + $composeFileArgs + @("ps"))
+}
+
+function Show-DockerComposeLogs {
+  param([string[]]$Services)
+
+  & docker @(@("compose") + $composeFileArgs + @("logs", "--tail", "100") + $Services)
+}
+
+function Get-DebugLogServices {
+  $services = @("app", "litellm")
+  if ($AiStack -eq "local-gpu") {
+    $services += "ollama"
+  }
+
+  return $services
 }
 
 function Get-CommandPath {
@@ -340,12 +377,12 @@ function Resolve-LaunchPort {
 }
 
 function Get-AppContainerId {
-  $containerId = & docker compose ps -q app
-  if ($LASTEXITCODE -ne 0) {
+  $result = Invoke-DockerComposeCapture -ArgList @("ps", "-q", "app")
+  if ($result.ExitCode -ne 0) {
     Fail "Unable to determine the app container id from docker compose."
   }
 
-  return ($containerId | Out-String).Trim()
+  return (($result.Output -join "`n") | Out-String).Trim()
 }
 
 function Get-ContainerHealthStatus {
@@ -404,23 +441,27 @@ function Resolve-ProviderConfig {
     }
   }
   $provider = $provider.Trim().ToLowerInvariant()
+  if ($AiStack -in @("hosted", "local-gpu")) {
+    $provider = "litellm"
+  }
   $port = Get-PortValue (Get-ConfigValue -DotEnv $DotEnv -Keys @("PORT") -Default "3000")
 
   $baseUrl = switch ($provider) {
     "litellm" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "AI_BASE_URL") -Default "http://127.0.0.1:4000"
+      Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "AI_BASE_URL", "OPENAI_BASE_URL") -Default "http://127.0.0.1:4000"
     }
     "ollama" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_BASE_URL", "AI_BASE_URL") -Default "http://127.0.0.1:11434/v1"
+      Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_BASE_URL", "AI_BASE_URL", "OPENAI_BASE_URL") -Default "http://127.0.0.1:11434/v1"
     }
     default {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_BASE_URL") -Default ""
+      Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_BASE_URL", "OPENAI_BASE_URL") -Default ""
     }
   }
 
   return [ordered]@{
     hasDotEnv = $hasDotEnv
     provider = $provider
+    aiStack = $AiStack
     baseUrl = $baseUrl
     port = $port
     appUrl = "http://127.0.0.1:$port/"
@@ -476,10 +517,38 @@ function Confirm-DockerTooling {
   }
 }
 
+function Confirm-LocalGpuSupport {
+  if ($AiStack -ne "local-gpu") {
+    return
+  }
+
+  Write-Step "Checking optional local GPU prerequisites"
+
+  $nvidiaSmi = Get-CommandPath -Name "nvidia-smi"
+  if ($nvidiaSmi) {
+    Write-Info ("nvidia-smi: {0}" -f $nvidiaSmi)
+    return
+  }
+
+  Write-Info "No host nvidia-smi command was found on PATH. The Docker GPU override may still fail if NVIDIA drivers or the container runtime are not configured on this machine."
+}
+
 function Confirm-ProviderReady {
   param($Config)
 
+  if ($AiStack -eq "local-gpu" -and $Config.provider -ne "litellm") {
+    Fail "The local-gpu launcher mode expects AI_PROVIDER=litellm so the app can keep using the stable LiteLLM aliases. Change `.env` back to LiteLLM mode or rerun without -AiStack local-gpu."
+  }
+
   Write-Step ("Checking AI provider: {0}" -f $Config.provider)
+  if ($Config.provider -eq "litellm" -and $AiStack -in @("hosted", "local-gpu")) {
+    Write-Info "Docker Compose will start the LiteLLM sidecar for this run."
+    if ($AiStack -eq "local-gpu") {
+      Write-Info "The local GPU override will also start the optional Ollama backend container."
+    }
+    return
+  }
+
   if ([string]::IsNullOrWhiteSpace($Config.baseUrl)) {
     Write-Info "No local AI base URL to probe from the host."
     return
@@ -523,6 +592,16 @@ function Confirm-ProviderReady {
 function Set-ComposeOverrides {
   param($Config)
 
+  if ($Config.provider -eq "litellm" -and $AiStack -in @("hosted", "local-gpu")) {
+    $env:COMPOSE_AI_PROVIDER = "litellm"
+    $env:COMPOSE_LITELLM_PROXY_URL = "http://litellm:4000"
+    if ($AiStack -eq "local-gpu") {
+      $env:COMPOSE_OLLAMA_BASE_URL = "http://ollama:11434/v1"
+      $env:LITELLM_OLLAMA_BASE_URL = "http://ollama:11434"
+    }
+    return
+  }
+
   if ($Config.provider -eq "ollama") {
     $translated = Convert-ToDockerReachableUrl -Url $(if ($Config.baseUrl) { $Config.baseUrl } else { "http://127.0.0.1:11434/v1" })
     if ($translated -ne $Config.baseUrl) {
@@ -553,12 +632,8 @@ function Set-ComposeOverrides {
 function Start-AppContainer {
   param($Config)
 
-  $composeArgs = @("compose", "up", "-d")
-  $composeArgs += "--build"
-  $composeArgs += "app"
-
   Write-Step "Clearing any previous app container"
-  Invoke-Native -FilePath "docker" -ArgList @("compose", "down", "--remove-orphans")
+  Invoke-DockerCompose -ArgList @("down", "--remove-orphans")
 
   if (-not (Wait-ForPortReleased -Port $Config.port -TimeoutSeconds 15)) {
     Write-Info ("Port {0} still appears busy after docker compose down; checking again before launch." -f $Config.port)
@@ -568,11 +643,11 @@ function Start-AppContainer {
 
   if ($Rebuild) {
     Write-Step "Rebuilding app image without cache"
-    Invoke-Native -FilePath "docker" -ArgList @("compose", "build", "--no-cache", "app")
+    Invoke-DockerCompose -ArgList @("build", "--no-cache", "app")
   }
 
   Write-Step "Starting app container"
-  Invoke-Native -FilePath "docker" -ArgList $composeArgs
+  Invoke-DockerCompose -ArgList @("up", "-d", "--build", "app")
 
   $containerId = Get-AppContainerId
   if ([string]::IsNullOrWhiteSpace($containerId)) {
@@ -581,17 +656,17 @@ function Start-AppContainer {
 
   if (-not (Wait-ForContainerHealthy -ContainerId $containerId -TimeoutSeconds 90)) {
     Write-Host ""
-    & docker compose ps
+    Show-DockerComposeStatus
     Write-Host ""
-    & docker compose logs --tail 100 app
+    Show-DockerComposeLogs -Services (Get-DebugLogServices)
     Fail "App container did not become healthy."
   }
 
   if (-not (Wait-ForHttpReady -Uri $Config.readyUrl -TimeoutSeconds 20 -ExpectedContent '"player"')) {
     Write-Host ""
-    & docker compose ps
+    Show-DockerComposeStatus
     Write-Host ""
-    & docker compose logs --tail 100 app
+    Show-DockerComposeLogs -Services (Get-DebugLogServices)
     Fail ("App container became healthy, but the app API was not confirmed at {0}." -f $Config.readyUrl)
   }
 
@@ -603,6 +678,7 @@ $config = Resolve-ProviderConfig -DotEnv $dotEnv
 
 Write-Host "Text Game Docker startup" -ForegroundColor Green
 Write-Info ("repo: {0}" -f $repoRoot)
+Write-Info ("ai stack: {0}" -f $AiStack)
 Write-Info ("provider: {0}" -f $config.provider)
 if ($config.hasDotEnv) {
   Write-Info "configuration: using .env"
@@ -611,6 +687,7 @@ if ($config.hasDotEnv) {
 }
 
 Confirm-DockerTooling
+Confirm-LocalGpuSupport
 Confirm-ProviderReady -Config $config
 Set-ComposeOverrides -Config $config
 Start-AppContainer -Config $config

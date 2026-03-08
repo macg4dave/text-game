@@ -1,0 +1,11 @@
+ARG LITELLM_BASE_IMAGE=docker.litellm.ai/berriai/litellm:main-stable
+FROM ${LITELLM_BASE_IMAGE}
+
+WORKDIR /app
+
+COPY litellm.config.yaml /app/config.yaml
+COPY litellm.local-gpu.config.yaml /app/config.local-gpu.yaml
+
+EXPOSE 4000
+
+CMD ["--config", "/app/config.yaml", "--port", "4000"]

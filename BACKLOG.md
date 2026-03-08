@@ -82,8 +82,9 @@ Use this exact shape when adding new work:
 | T35 | Now | P0 | P1 | Packaging prototype and decision memo | Done | T01 | Prototype build verification |
 | T02 | Now | P0 | P1 | Config module with schema validation | Done | None | `npm test` |
 | T02a | Now | P0 | P1 | LiteLLM env contract and alias defaults | Done | T02 | Manual config verification |
-| T02b | Now | P0 | P1 | LiteLLM proxy template and startup docs | Ready | T02a | Manual LiteLLM startup verification |
+| T02b | Now | P0 | P1 | LiteLLM proxy template and startup docs | Review | T02a | Manual LiteLLM startup verification |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Review | T02 | Manual local provider startup verification |
+| T02f | Now | P0 | P1 | Docker-first LiteLLM sidecar and GPU override | Review | T02a, T02b | `docker compose up --build`; `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
 | T03 | Now | P0 | P1 | Logging with levels and redaction | Ready | None | `npm test` |
@@ -393,7 +394,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T02a - LiteLLM Env Contract And Alias Defaults
 
-- Status: Review
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -433,10 +434,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - updated `.env.example`, `README.md`, `REQUIREMENTS.md`, and `scripts/start-dev.ps1` so the default documented and launcher-adjacent path now matches the LiteLLM-first contract
   - validated on 2026-03-08 with `docker compose build app`, `docker compose run --rm app npm run test:config`, and `docker compose run --rm app npm test`
   - manual config verification on 2026-03-08 covered a no-env container on port `3312`, which defaulted to `litellm` with `game-chat`, `game-embedding`, and `http://127.0.0.1:4000`, plus a legacy `OPENAI_*`-only container on port `3313`, which inferred `openai-compatible` with legacy model values and surfaced `provider.source = inferred`
+  - closeout fix on 2026-03-08 aligned `scripts/start-dev.ps1` base-URL lookup with `src/config.ts` precedence so `OPENAI_BASE_URL` remains a functional transitional fallback for `openai-compatible`, `litellm`, and `ollama` launcher resolution
+  - final closeout validation on 2026-03-08 re-ran `docker compose run --rm app npm test` and a focused launcher regression check with session `AI_PROVIDER=openai-compatible` plus only `OPENAI_BASE_URL=http://127.0.0.1:4011`, which now fails fast at that configured URL instead of silently ignoring the legacy fallback
 
 ### T02b - LiteLLM Proxy Template And Startup Docs
 
-- Status: Ready
+- Status: Review
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -468,6 +471,60 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - user confirmed on 2026-03-08 that small AI helper tasks should prefer hosted providers
   - user confirmed on 2026-03-08 that larger optional generation can use a local model such as Ollama or an external AI agent
   - keep the player-facing explanation UI-first and avoid turning this into an API-first setup workflow yet
+  - updated `litellm.config.yaml` to make `game-chat` and `game-embedding` the explicit stable alias contract, with hosted-first guidance and notes for optional local upstream swaps behind the same aliases
+  - updated `.env.example` so the app-facing LiteLLM vars, the proxy-side template vars, and the optional direct-provider fallbacks are clearly separated
+  - refreshed `README.md` with a clearer LiteLLM startup path, explicit hosted-first guidance for helper tasks and embeddings, and a gateway-aligned optional local-model story
+  - refreshed `setup_local_a.i.md` so Windows local-model guidance now starts from the LiteLLM path first and keeps the older direct `AI_PROVIDER=ollama` route as a smoke-test fallback
+  - manual LiteLLM startup verification is still pending; this session focused on tightening the template and docs so the gateway path is easier to follow before the next runtime check
+
+  ### T02f - Docker-First LiteLLM Sidecar And GPU Override
+
+  - Status: Review
+  - Queue: Now
+  - Phase: P0
+  - Priority: P1
+  - Owner Role: Tech lead
+  - Goal: Make Docker the default LiteLLM startup path while keeping a clean developer override for optional local GPU-backed inference.
+  - Scope:
+    - add a LiteLLM sidecar service to the default Compose runtime so the app no longer expects a separately started host proxy by default
+    - add an optional Compose override for a local inference backend with NVIDIA GPU passthrough on Windows via Docker Desktop and WSL2
+    - update the Windows launcher so hosted-default remains simple while developers can opt into the local GPU override without editing multiple files
+    - refresh env templates and docs so the supported Docker-first path and the optional GPU path are both clear
+  - Files to Touch:
+    - BACKLOG.md
+    - Dockerfile.litellm
+    - docker-compose.yml
+    - docker-compose.gpu.yml
+    - .env.example
+    - README.md
+    - litellm.config.yaml
+    - litellm.local-gpu.config.yaml
+    - setup_local_a.i.md
+    - scripts/start-dev.ps1
+  - Do Not Touch:
+    - src/
+    - public/
+    - data/spec/
+  - Dependencies:
+    - T02a
+    - T02b
+  - Validation:
+    - `docker compose up --build`
+    - `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`
+    - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+  - Definition of Done:
+    - default Docker startup brings up both the app and LiteLLM without a separate manual proxy step
+    - developers can opt into a local GPU-backed model path through one extra Compose override or launcher option
+    - GPU passthrough is documented and wired only to the local inference container that needs it
+    - app-facing aliases remain `game-chat` and `game-embedding` across both modes
+  - Handoff Notes:
+    - user explicitly assigned implementation on 2026-03-08 after confirming a Docker-first default, easy developer overrides, and GPU passthrough support
+    - treat NVIDIA on Docker Desktop and WSL2 as the first officially supported GPU path for the optional local inference override
+    - implemented a repo-owned LiteLLM sidecar image in `Dockerfile.litellm` so startup no longer depends on fragile single-file bind mounts from the `G:` workspace drive
+    - default `docker-compose.yml` now starts the app plus LiteLLM sidecar, and `docker-compose.gpu.yml` adds an optional Ollama backend with Docker GPU reservations
+    - `scripts/start-dev.ps1` now supports `-AiStack hosted` and `-AiStack local-gpu`; both launcher modes force the supported LiteLLM stack instead of inheriting stale direct-provider `.env` experiments
+    - validated on 2026-03-08 with `docker compose config`, `docker compose -f docker-compose.yml -f docker-compose.gpu.yml config`, `$env:PORT='3300'; docker compose up --build -d`, `Invoke-WebRequest http://127.0.0.1:3300/api/state?name=ComposeSmoke`, `$env:PORT='3301'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, `$env:PORT='3302'; docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`, `Invoke-WebRequest http://127.0.0.1:3302/api/state?name=GpuSmoke`, and `$env:PORT='3303'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu -NoBrowser`
+    - current limitation: without a real hosted provider key, runtime preflight still reports the AI service as blocked before the first turn because LiteLLM returns HTTP 400 during the app's startup connectivity probe; container startup and launcher orchestration are verified, but real turn-generation validation still needs a valid upstream credential
 
 ### T03 - Logging With Levels And Redaction
 

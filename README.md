@@ -44,6 +44,13 @@ Current limitation of the browser asset path:
 
 Use Docker and the Windows launcher to exercise the compiled runtime path that later packaging work will depend on.
 
+The default Docker stack is now:
+
+- app
+- LiteLLM sidecar
+
+An optional developer override adds a local Ollama backend with NVIDIA GPU passthrough.
+
 Required host tool:
 
 - Docker Desktop on Windows or macOS, or Docker Engine with Compose on Linux
@@ -60,6 +67,8 @@ What this gives you:
 
 - Node 22 is pinned inside the container
 - `better-sqlite3` builds inside the container instead of on the host
+- LiteLLM starts inside the same Compose project by default, so you no longer need to launch it separately for the supported Docker path
+- the LiteLLM sidecar now bakes the repo-owned config files into its image so startup does not depend on fragile single-file bind mounts from secondary Windows drives
 - the Docker image builds the browser asset and compiled server output up front, then runs `dist/server.js`
 - the app source is baked into the image so startup works even when Docker bind mounts from a Windows secondary drive are flaky
 - the SQLite database lives in a Docker volume so app state can survive container restarts without hiding the built-in spec files
@@ -67,6 +76,14 @@ What this gives you:
 Current limitation of the Docker runtime path:
 
 - source edits require a rebuild because the app is not bind-mounted into the container
+
+Optional developer GPU override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+```
+
+This adds an Ollama container and reserves NVIDIA GPU access for that local inference service only. The app and LiteLLM containers themselves do not need GPU access.
 
 On Windows, the launcher wraps the same compiled Docker path and opens the browser for you:
 
@@ -139,6 +156,7 @@ If your distro package is too old for current packages, use the official downloa
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and start with the LiteLLM gateway settings unless you intentionally need a different provider mode.
+1. Put the hosted-provider key used by the included `litellm.config.yaml` template into `.env`, for example `OPENAI_API_KEY` for the default hosted route.
 1. For local development, run:
 
 ```bash
@@ -155,12 +173,15 @@ For the compiled runtime smoke path, use:
 docker compose up --build
 ```
 
+That one command now starts both the app and the default LiteLLM proxy sidecar.
+
 Useful Docker commands:
 
 ```bash
 docker compose up --build
 docker compose up -d
 docker compose logs -f app
+docker compose logs -f litellm
 docker compose down
 ```
 
@@ -177,6 +198,12 @@ On Windows, the repo now has a one-command launcher:
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
 
+Optional developer GPU-backed local model path:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu
+```
+
 Or, if `npm` is already installed and on `PATH`:
 
 ```bash
@@ -188,19 +215,54 @@ The launcher:
 - checks Docker and Compose
 - reads `.env` when present
 - falls back to the LiteLLM defaults when `.env` is missing
-- checks the configured AI path and starts local Ollama when possible
+- uses the LiteLLM stack for the supported Docker launcher modes even if an older `.env` still contains a direct-provider experiment
+- starts the default LiteLLM sidecar for the supported Docker path
+- can opt into the local GPU override with `-AiStack local-gpu`
 - clears any previous `text-game` compose app container before starting the fresh app instance
 - automatically picks a free local port for that run if the configured port is already occupied by another service
-- starts the app container through `docker compose`
+- starts the app and any required Compose dependencies through `docker compose`
 - waits for the app container to become healthy, confirms the player surface is actually being served, then opens the browser automatically
-- stops early with a plain error when a configured local AI URL is unreachable
+- stops early with a plain error when an explicitly configured external local AI URL is unreachable
 
 Useful flags:
 
 - `-NoBrowser` skips opening the webpage
 - `-Rebuild` forces a Docker image rebuild before launch
+- `-AiStack local-gpu` enables the optional Docker GPU override for a local Ollama backend
 
 The launcher respects `PORT` from your PowerShell session or `.env`. If that port is already taken by another local service, the launcher now falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
+
+## Default LiteLLM Gateway Path
+
+The app only needs one stable AI contract:
+
+- `game-chat`
+- `game-embedding`
+
+Keep those alias names in `.env`. When you want to change where requests go, change the LiteLLM proxy config instead of teaching the app new provider-specific names.
+
+Recommended baseline:
+
+1. Copy `.env.example` to `.env`.
+2. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding`.
+3. For the included template, set `OPENAI_API_KEY` in `.env`.
+4. Start the Docker stack with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+5. Start the app with `docker compose up --build`, `npm run dev`, or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+
+Hosted-first guidance for the current MVP path:
+
+- keep smaller helper work such as spellcheck and autocomplete on fast hosted routes behind LiteLLM
+- keep `game-embedding` on a small hosted embedding model by default for compatibility, speed, and cost
+- start with the hosted `game-chat` route too, then only move it to a larger optional local model when you intentionally want that trade-off
+
+Optional larger local-model path through the same gateway UX:
+
+- keep the app on `AI_PROVIDER=litellm`
+- leave the app-facing aliases as `game-chat` and `game-embedding`
+- use `docker-compose.gpu.yml` or `-AiStack local-gpu` to start an Ollama backend with NVIDIA GPU passthrough
+- let LiteLLM switch to `litellm.local-gpu.config.yaml` for `game-chat` while `game-embedding` stays hosted by default
+
+That keeps the player-facing and app-facing setup stable even when the upstream model stack changes.
 
 ## Config Precedence
 
@@ -320,8 +382,9 @@ If Docker Desktop cannot mount the drive that contains this repo, the container 
 
 - Default setup goes through LiteLLM.
 - Use LiteLLM to route hosted providers for the main turn path and smaller helper tasks.
+- Keep the app configured against `game-chat` and `game-embedding`; swap proxy upstreams instead of app-facing alias names.
 - If you need direct OpenAI-compatible mode, set `AI_PROVIDER=openai-compatible`, then provide `AI_API_KEY` and any model or base URL overrides.
-- For an optional larger local-model path, set `AI_PROVIDER=ollama` and follow [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md).
+- For an optional larger local-model path, prefer keeping `AI_PROVIDER=litellm` and routing the local model behind LiteLLM; if you need a direct smoke-test-only route, set `AI_PROVIDER=ollama` and follow [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md).
 - Best compatibility comes from providers that support:
   - `POST /v1/chat/completions` or an equivalent compatible generation endpoint
   - JSON schema response formatting
@@ -338,27 +401,33 @@ The app should talk to LiteLLM first. LiteLLM can then route hosted providers fo
 
 Recommended local setup:
 
-1. Run a LiteLLM proxy and point it at your upstream model providers.
-2. Use the included [litellm.config.yaml](./litellm.config.yaml) as a starting point.
-3. Set `AI_PROVIDER=litellm` in `.env`.
-4. Set `LITELLM_PROXY_URL=http://127.0.0.1:4000`.
-5. Set `LITELLM_CHAT_MODEL=game-chat` and `LITELLM_EMBEDDING_MODEL=game-embedding`.
+1. Use the included [litellm.config.yaml](./litellm.config.yaml) as the default hosted-first template.
+2. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding` in `.env`.
+3. Put `OPENAI_API_KEY` in `.env` for the default hosted route.
+4. Start the supported Docker path with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+5. If you enable `LITELLM_MASTER_KEY`, set `LITELLM_API_KEY` in `.env` to the same value.
 
 The runtime automatically prefers LiteLLM-specific env vars when `AI_PROVIDER=litellm`, and now falls back to LiteLLM as the blank-slate default when no provider-specific env is configured.
 
+The included template keeps both aliases on hosted providers first. When you want an optional larger local-model route, use the included `litellm.local-gpu.config.yaml` path through the Docker GPU override or mirror that pattern in your own LiteLLM config while leaving the alias names alone so the app contract stays stable.
+
 ## Windows Local AI
 
-The repo includes an `ollama` preset intended for optional local smoke tests or larger local-model experiments on Windows dev machines. It keeps the same OpenAI-compatible adapter boundary and only swaps config defaults:
+The repo includes an optional Docker GPU override intended for larger local-model experiments on Windows dev machines. The recommended gateway-aligned route is to keep the app on LiteLLM and place the local model behind the `game-chat` alias. A direct `AI_PROVIDER=ollama` path still exists for smoke tests when you want the thinnest possible local loop.
+
+The direct preset keeps the same OpenAI-compatible adapter boundary and only swaps config defaults:
 
 - chat model default: `gemma3:4b`
 - embedding model default: `embeddinggemma`
 - base URL default: `http://127.0.0.1:11434/v1`
 
-Setup steps and download links live in [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md). Treat this path as an optional large-model route, not as the default small-task or end-user setup.
+Setup steps and GPU notes live in [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md). Treat the local-model path as optional, not as the default small-task or end-user setup.
 
-Once Ollama and the models are installed, the quickest Windows startup path is `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+For the Docker-backed GPU path, the quickest Windows startup path is:
 
-If you use raw Docker commands instead of the launcher, prefer `OLLAMA_BASE_URL=http://host.docker.internal:11434/v1` in `.env`.
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu
+```
 
 ## AI Workflow Test Loop
 

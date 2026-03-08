@@ -1,13 +1,19 @@
 # Windows Local AI Setup
 
-This is the recommended local smoke-test path for this repo as of 2026-03-07.
+The default app-facing setup for this repo is still LiteLLM.
 
-It uses Ollama on Windows because Ollama officially supports:
+Use this guide when you want an optional larger local model on Windows without changing the app-facing contract. The preferred shape is now:
 
-- native Windows installs
-- an OpenAI-compatible API on `http://localhost:11434/v1`
-- structured outputs through `response_format`
-- local embeddings for retrieval
+- the app stays on `AI_PROVIDER=litellm`
+- the default Docker stack still starts the app plus LiteLLM
+- an optional Docker override adds a local Ollama backend
+- LiteLLM keeps the stable aliases `game-chat` and `game-embedding`
+- LiteLLM routes `game-chat` to the local model only when you intentionally opt into that path
+- helper tasks and embeddings stay on fast hosted routes unless you are explicitly testing a different setup
+
+If you only want the thinnest local smoke-test loop and do not want the Docker override, a direct `AI_PROVIDER=ollama` fallback is still documented below.
+
+This guide uses Ollama because it has an official Docker image, works well with LiteLLM routing, and supports local NVIDIA GPU acceleration when Docker is configured for GPU passthrough.
 
 ## Recommended Model Pair
 
@@ -16,12 +22,52 @@ It uses Ollama on Windows because Ollama officially supports:
 
 This keeps the download small enough for dev use while still giving the game loop a better chance of returning valid JSON than the tiniest models.
 
+Recommended gateway split:
+
+- keep `game-chat` eligible for a local route such as `gemma3:4b` when you want a larger optional generation path
+- keep `game-embedding` on a hosted embedding model unless you are intentionally testing local embeddings
+
 If your machine is tight on RAM or download space, you can try `gemma3:1b` instead. Expect lower structured-output reliability.
+
+## Recommended Docker GPU Path
+
+This is the first-class developer override path for Windows:
+
+1. Install Docker Desktop and keep it on the Linux container backend.
+2. Make sure WSL2 is enabled for Docker Desktop.
+3. Install NVIDIA drivers on the host and confirm `nvidia-smi` works in PowerShell.
+4. Copy `.env.example` to `.env` if you have not already.
+5. Put your hosted embedding key in `.env`, for example `OPENAI_API_KEY`.
+6. Start the stack with the GPU override:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu
+```
+
+Raw Docker equivalent:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+```
+
+What this does:
+
+- starts the normal app container
+- starts the LiteLLM sidecar
+- switches LiteLLM to `litellm.local-gpu.config.yaml`
+- starts an Ollama container with NVIDIA GPU reservation
+- keeps the app-facing aliases as `game-chat` and `game-embedding`
+
+Notes:
+
+- GPU passthrough in this repo is officially targeted at **NVIDIA on Windows via Docker Desktop + WSL2** first.
+- The GPU reservation is attached only to the `ollama` container, not the app or LiteLLM containers.
+- `game-embedding` stays hosted by default in this path, so keep `OPENAI_API_KEY` populated unless you intentionally build a local embedding variant too.
 
 ## Install Ollama On Windows
 
 1. Install Ollama from the official Windows docs:
-   - https://docs.ollama.com/windows
+   - <https://docs.ollama.com/windows>
 2. After install, confirm the CLI is available:
 
 ```powershell
@@ -45,9 +91,38 @@ Optional smaller chat model:
 ollama pull gemma3:1b
 ```
 
-## Repo Configuration
+## Gateway-Aligned Repo Configuration
 
-Set your `.env` file like this:
+Keep the app on LiteLLM in `.env`:
+
+```env
+AI_PROVIDER=litellm
+LITELLM_PROXY_URL=http://127.0.0.1:4000
+LITELLM_API_KEY=anything
+LITELLM_CHAT_MODEL=game-chat
+LITELLM_EMBEDDING_MODEL=game-embedding
+PORT=3000
+```
+
+If you use the default Docker stack from this repo, you do not need to change the app-facing LiteLLM URL for containers manually; the Compose runtime now points the app container at the internal LiteLLM sidecar automatically.
+
+Then choose one of these LiteLLM configs:
+
+- `litellm.config.yaml` for the default hosted-first path
+- `litellm.local-gpu.config.yaml` for the Docker-backed Ollama GPU override
+
+If you build your own equivalent config, keep these rules:
+
+- keep `model_name: game-chat`
+- keep `model_name: game-embedding`
+- leave `game-embedding` on a small hosted embedding model unless you are explicitly validating a local embedding path
+- repoint only the upstream target behind `game-chat` to the provider string supported by your LiteLLM install for the local model you want to test
+
+That way the app, launcher, and future setup UI keep talking about one stable contract even when the upstream model changes.
+
+## Direct Ollama Fallback Configuration
+
+If you do not want to run LiteLLM for a quick smoke test, set your `.env` file like this:
 
 ```env
 AI_PROVIDER=ollama
@@ -64,8 +139,15 @@ Notes:
 - If you switch to `gemma3:1b`, change only `OLLAMA_CHAT_MODEL`.
 - If you use a non-default Ollama host, update `OLLAMA_BASE_URL`.
 - `host.docker.internal` is the right default when the app runs in Docker and Ollama runs on the host machine.
+- This direct path is for smoke tests and local experimentation; the repo's default setup story stays LiteLLM-first.
 
 ## Start The App
+
+Recommended gateway-first flow:
+
+1. Keep the app on the LiteLLM `.env` values shown above.
+2. Use the default Docker stack for hosted-first runs.
+3. Use the GPU override only when you intentionally want the local model path.
 
 For normal local development after installing Node.js, use the direct TypeScript workflow:
 
@@ -77,10 +159,16 @@ npm run dev
 
 That path runs the server from TypeScript source and rebuilds the browser asset before startup.
 
-For launcher and Docker runtime smoke checks, use the compiled container path:
+For the default hosted-first Docker path:
 
 ```powershell
 docker compose up --build
+```
+
+For the optional local GPU override path:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
 Then open `http://localhost:3000`.
@@ -90,6 +178,14 @@ On Windows, you can use the launcher instead:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
+
+Or the launcher with the local GPU override:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu
+```
+
+If you are using the direct `AI_PROVIDER=ollama` fallback instead of LiteLLM, the same app startup commands still work.
 
 ## Default Test Workflow
 
@@ -124,6 +220,8 @@ Recommended loop:
 
 ## Known Limits
 
+- The gateway-aligned local-model path is optional and is not the default end-user setup.
+- The Docker GPU override currently treats NVIDIA on Windows via Docker Desktop and WSL2 as the first officially supported GPU path.
 - This path is for local smoke tests, not quality or balance validation.
 - Small local models may drift from the JSON schema more often than the default hosted path.
 - Turn quality, pacing, and quest progression will likely be worse than the default LiteLLM or hosted OpenAI-compatible setup.

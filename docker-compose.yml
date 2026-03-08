@@ -1,24 +1,50 @@
 services:
+  litellm:
+    build:
+      context: .
+      dockerfile: Dockerfile.litellm
+      args:
+        LITELLM_BASE_IMAGE: "${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:main-stable}"
+    image: text-game-litellm:latest
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    environment:
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-sk-placeholder}"
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-}"
+      OLLAMA_BASE_URL: "${LITELLM_OLLAMA_BASE_URL:-http://ollama:11434}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 4000), 3); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
+    depends_on:
+      litellm:
+        condition: service_healthy
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     volumes:
       - game_data:/data
     environment:
       PORT: "${PORT:-3000}"
-      AI_PROVIDER: "${AI_PROVIDER:-ollama}"
+      AI_PROVIDER: "${COMPOSE_AI_PROVIDER:-litellm}"
       AI_API_KEY: "${AI_API_KEY:-}"
       AI_BASE_URL: "${AI_BASE_URL:-}"
       AI_CHAT_MODEL: "${AI_CHAT_MODEL:-gpt-4o-mini}"
       AI_EMBEDDING_MODEL: "${AI_EMBEDDING_MODEL:-text-embedding-3-small}"
-      LITELLM_PROXY_URL: "${LITELLM_PROXY_URL:-http://host.docker.internal:4000}"
+      LITELLM_PROXY_URL: "${COMPOSE_LITELLM_PROXY_URL:-http://litellm:4000}"
       LITELLM_API_KEY: "${LITELLM_API_KEY:-anything}"
       LITELLM_CHAT_MODEL: "${LITELLM_CHAT_MODEL:-game-chat}"
       LITELLM_EMBEDDING_MODEL: "${LITELLM_EMBEDDING_MODEL:-game-embedding}"
-      OLLAMA_BASE_URL: "${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}"
+      OLLAMA_BASE_URL: "${COMPOSE_OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}"
       OLLAMA_API_KEY: "${OLLAMA_API_KEY:-ollama}"
       OLLAMA_CHAT_MODEL: "${OLLAMA_CHAT_MODEL:-gemma3:4b}"
       OLLAMA_EMBEDDING_MODEL: "${OLLAMA_EMBEDDING_MODEL:-embeddinggemma}"
