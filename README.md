@@ -11,6 +11,7 @@ The application source is TypeScript-first and module-oriented: server, state, A
 Current authoring layout:
 
 - `src/core/` - shared config, DB, types, and config tests
+- `src/core/config/` - internal config helpers for env resolution, validation, and preflight issue mapping
 - `src/server/` - server entrypoint plus server-only helpers for preflight, prompt shaping, turn sanitization, and debug payloads
 - `src/state/` - game state mutation and retrieval
 - `src/story/` - director and quest specs plus progression helpers
@@ -267,6 +268,7 @@ Script organization is now split between small entry scripts and shared helpers:
 - `scripts/test-local-ai-workflow.ps1` - local AI contract harness
 - `scripts/start-desktop-prototype.ps1` - Electron prototype wrapper
 - `scripts/lib/shared.ps1` - shared PowerShell helpers for dotenv parsing, config lookup, URI handling, and HTTP readiness checks
+- `scripts/lib/shared.ps1` now also owns the shared AI config-resolution logic used by both the launcher and the local AI harness
 
 When you add script behavior, prefer extending `scripts/lib/` if another script could reuse the same logic later. This keeps debugging centralized instead of scattering slightly different copies across multiple launchers.
 
@@ -401,6 +403,9 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 - `src/server/turn-result.ts` - model output sanitization defaults
 - `src/server/player-state.ts` - player director-state normalization helpers
 - `src/core/config.ts` - runtime config and provider-neutral AI settings
+- `src/core/config/env.ts` - env resolution, defaults, diagnostics, and public runtime config shaping
+- `src/core/config/validation.ts` - config validation and human-readable error formatting
+- `src/core/config/preflight.ts` - player-facing config preflight issue mapping and report helpers
 - `src/ai/service.ts` - OpenAI-compatible chat completions + JSON schema
 - `src/state/game.ts` - State, memory, director updates + retrieval scoring
 - `src/utils/assist.ts` - Local spellcheck + autocomplete

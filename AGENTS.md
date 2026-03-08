@@ -76,6 +76,7 @@ Before starting substantial work, read:
 
 - Organize new code by owning domain first. Prefer the existing module folders under `src/` over creating ad hoc top-level files.
 - Keep `src/core/` for shared primitives and infrastructure only: config, DB, shared contracts, and truly cross-cutting types. Do not turn `core` into a fallback bucket for unrelated feature logic.
+- Prefer a thin public module plus internal helper files when a shared infrastructure area grows large. `src/core/config.ts` plus `src/core/config/*.ts` is the model to follow rather than one oversized infrastructure file.
 - Treat `src/server/` as the composition root. Keep HTTP routing, request parsing, response shaping, and startup wiring there. Move reusable gameplay, AI, validation, and preflight logic into non-server modules.
 - Do not import from `src/server/` or `src/ui/` into `src/state/`, `src/story/`, `src/rules/`, `src/ai/`, or `src/utils/`.
 - Keep `src/ui/` browser-only. It should talk to the server through the HTTP contract rather than importing server, DB, or gameplay implementation modules directly.

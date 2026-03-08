@@ -373,11 +373,13 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - favor small compatibility-preserving moves inside the implementation, but the final authoring layout should read as module-first rather than flat
   - first implementation pass moved authoring files into `src/core`, `src/state`, `src/story`, `src/rules`, `src/utils`, `src/ai`, `src/server`, and `src/ui`
   - follow-up structural pass split the oversized server entrypoint into focused helpers under `src/server/` for runtime preflight, turn-result sanitization, player-state normalization, prompt text, and debug payload shaping
+  - follow-up structural pass also split `src/core/config.ts` into internal config modules for env resolution, validation, and preflight issue mapping while keeping the public import path stable
   - browser build input now points at `src/ui/app.ts`, while `public/app.ts` remains only as a legacy placeholder and is no longer the source of truth
-  - startup and local AI scripts now share dotenv/config/HTTP helper functions through `scripts/lib/shared.ps1`
+  - startup and local AI scripts now share dotenv/config/HTTP helper functions through `scripts/lib/shared.ps1`, including one shared AI config-resolution path
   - validation on 2026-03-08 passed with `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, `docker compose build app`, `docker compose run --rm app npm run build`, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
   - closeout validation on 2026-03-08 also passed after the server split with `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, `docker compose run --rm app npm run build`, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
   - the launcher-driven Docker image build exposed one extra compatibility issue that the direct container checks did not surface: `src/core/types.ts` now uses `NodeJS.ProcessEnv` instead of importing `ProcessEnv` from `node:process`
+  - reran the local AI harness after the shared script refactor to confirm the shared config-resolution path still behaved correctly; it failed for the expected environmental reason because the current `.env` still points at an unreachable local Ollama endpoint
   - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` was executed after the script refactor but failed in the current shell because the active local AI config still resolved to an unreachable Ollama endpoint at `http://127.0.0.1:11434/v1`; the script now reports that failure earlier and more clearly
 
 ### T01b - Preflight Blocker Contract And Advanced Diagnostics

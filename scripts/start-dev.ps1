@@ -429,46 +429,18 @@ function Wait-ForContainerHealthy {
 function Resolve-ProviderConfig {
   param([hashtable]$DotEnv)
 
-  $hasDotEnv = Test-Path -LiteralPath $dotEnvPath
-  $provider = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROVIDER") -Default ""
-  if ([string]::IsNullOrWhiteSpace($provider)) {
-    if (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "LITELLM_API_KEY", "LITELLM_CHAT_MODEL", "LITELLM_EMBEDDING_MODEL")) {
-      $provider = "litellm"
-    } elseif (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("OLLAMA_BASE_URL", "OLLAMA_API_KEY", "OLLAMA_CHAT_MODEL", "OLLAMA_EMBEDDING_MODEL")) {
-      $provider = "ollama"
-    } elseif (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("AI_API_KEY", "AI_BASE_URL", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL", "OPENAI_EMBEDDING_MODEL")) {
-      $provider = "openai-compatible"
-    } else {
-      $provider = "litellm"
-    }
-  }
-  $provider = $provider.Trim().ToLowerInvariant()
+  $config = Resolve-RepoAiConfig -DotEnv $DotEnv -HasDotEnv (Test-Path -LiteralPath $dotEnvPath) -IncludePort
+  $provider = $config.provider
   if ($AiStack -in @("hosted", "local-gpu")) {
     $provider = "litellm"
   }
-  $port = Get-PortValue (Get-ConfigValue -DotEnv $DotEnv -Keys @("PORT") -Default "3000")
+  $config.provider = $provider
+  $port = $config.port
 
-  $baseUrl = switch ($provider) {
-    "litellm" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "AI_BASE_URL", "OPENAI_BASE_URL") -Default "http://127.0.0.1:4000"
-    }
-    "ollama" {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("OLLAMA_BASE_URL", "AI_BASE_URL", "OPENAI_BASE_URL") -Default "http://127.0.0.1:11434/v1"
-    }
-    default {
-      Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_BASE_URL", "OPENAI_BASE_URL") -Default ""
-    }
-  }
-
-  return [ordered]@{
-    hasDotEnv = $hasDotEnv
-    provider = $provider
-    aiStack = $AiStack
-    baseUrl = $baseUrl
-    port = $port
-    appUrl = "http://127.0.0.1:$port/"
-    readyUrl = "http://127.0.0.1:$port/api/state?name=LauncherCheck"
-  }
+  $config.aiStack = $AiStack
+  $config.appUrl = "http://127.0.0.1:$port/"
+  $config.readyUrl = "http://127.0.0.1:$port/api/state?name=LauncherCheck"
+  return $config
 }
 
 function Convert-ToDockerReachableUrl {

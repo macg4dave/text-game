@@ -87,7 +87,8 @@ Before making substantial changes, read:
 - `src/state/game.ts`: core game loop and state mutation logic
 - `src/ai/service.ts`: AI integration and structured response handling
 - `src/core/db.ts`: SQLite access and schema-related logic
-- `src/core/config.ts`: runtime configuration parsing and validation
+- `src/core/config.ts`: public runtime configuration API and compatibility wrapper
+- `src/core/config/*.ts`: internal config env resolution, validation, and preflight helpers
 - `src/utils/assist.ts`: local text assistance features
 - `src/story/director.ts`: director spec loading and beat progression logic
 - `src/story/quest.ts`: quest spec loading
