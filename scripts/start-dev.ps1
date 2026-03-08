@@ -1,8 +1,6 @@
 param(
   [switch]$NoBrowser,
-  [switch]$Rebuild,
-  [ValidateSet("hosted", "local-gpu")]
-  [string]$AiStack = "hosted"
+  [switch]$Rebuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,12 +10,12 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $sharedScriptPath = Join-Path $PSScriptRoot "lib\shared.ps1"
 . $sharedScriptPath
 $dotEnvPath = Join-Path $repoRoot ".env"
-$composeFileArgs = @("-f", (Join-Path $repoRoot "docker-compose.yml"))
+$composeFileArgs = @(
+  "-f", (Join-Path $repoRoot "docker-compose.yml"),
+  "-f", (Join-Path $repoRoot "docker-compose.gpu.yml")
+)
 $launcherDiskWarningBytes = [double](2GB)
 $launcherDiskBlockerBytes = [double](512MB)
-if ($AiStack -eq "local-gpu") {
-  $composeFileArgs += @("-f", (Join-Path $repoRoot "docker-compose.gpu.yml"))
-}
 
 Set-Location -LiteralPath $repoRoot
 
@@ -190,12 +188,7 @@ function Show-DockerComposeLogs {
 }
 
 function Get-DebugLogServices {
-  $services = @("app", "litellm")
-  if ($AiStack -eq "local-gpu") {
-    $services += "ollama"
-  }
-
-  return $services
+  return @("app", "litellm", "ollama")
 }
 
 function Get-CommandPath {
@@ -555,42 +548,15 @@ function Resolve-ProviderConfig {
   param([hashtable]$DotEnv)
 
   $config = Resolve-RepoAiConfig -DotEnv $DotEnv -HasDotEnv (Test-Path -LiteralPath $dotEnvPath) -IncludePort
-  $provider = $config.provider
-  if ($AiStack -in @("hosted", "local-gpu")) {
-    $provider = "litellm"
+  if ($config.profile -notin @("local-gpu-small", "local-gpu-large")) {
+    $config.profile = "local-gpu-small"
   }
-  $config.provider = $provider
+  $config.provider = "litellm"
   $port = $config.port
 
-  $config.aiStack = $AiStack
   $config.appUrl = "http://127.0.0.1:$port/"
   $config.readyUrl = "http://127.0.0.1:$port/api/state?name=LauncherCheck"
   return $config
-}
-
-function Get-RequestedLocalGpuProfile {
-  param($Config)
-
-  if ($Config.profile -eq "local-gpu-large") {
-    return "local-gpu-large"
-  }
-
-  return "local-gpu-small"
-}
-
-function Convert-ToDockerReachableUrl {
-  param([string]$Url)
-
-  $uri = Get-UriObject -Text $Url
-  if ($null -eq $uri) {
-    return $Url
-  }
-
-  if ($uri.Host -notin @("127.0.0.1", "localhost")) {
-    return $Url
-  }
-
-  return $Url.Replace($uri.Host, "host.docker.internal")
 }
 
 function Confirm-DockerTooling {
@@ -692,11 +658,7 @@ function Confirm-DockerTooling {
 }
 
 function Confirm-LocalGpuSupport {
-  if ($AiStack -ne "local-gpu") {
-    return $null
-  }
-
-  Write-Step "Checking optional local GPU prerequisites"
+  Write-Step "Checking NVIDIA GPU prerequisites"
 
   $gpuInfo = Get-NvidiaGpuVramInfo
   if ($gpuInfo.available) {
@@ -705,252 +667,74 @@ function Confirm-LocalGpuSupport {
     foreach ($gpuLine in $gpuLines) {
       Write-Info ("gpu: {0}" -f $gpuLine)
     }
+    $runtimeInfo = Invoke-NativeCapture -FilePath "docker" -ArgList @("info", "--format", "{{json .Runtimes}}")
+    if ($runtimeInfo.ExitCode -eq 0) {
+      $runtimeJson = ($runtimeInfo.Output -join "").Trim()
+      if (-not [string]::IsNullOrWhiteSpace($runtimeJson) -and $runtimeJson -notmatch '"nvidia"') {
+        Fail-PreflightIssue (New-PreflightIssue `
+          -Severity "blocker" `
+          -Area "host" `
+          -Code "docker_nvidia_runtime_missing" `
+          -Title "Enable Docker NVIDIA GPU support before launching the game" `
+          -Message "Docker is running, but it did not report an NVIDIA runtime for the GPU-backed Ollama path." `
+          -Recovery @(
+            "Enable NVIDIA GPU support in Docker Desktop and WSL2, then confirm `docker info` shows an `nvidia` runtime.",
+            "Rerun the launcher after Docker Desktop reports the Linux engine as ready."
+          ) `
+          -Details @{
+            check = "docker info"
+            resolved_value = $runtimeJson
+          })
+      }
+    }
+
     return $gpuInfo
   }
 
-  Write-Info "No host nvidia-smi command was found on PATH. The Docker GPU override may still fail if NVIDIA drivers or the container runtime are not configured on this machine."
-  Show-PreflightIssues -Issues @(
-    (New-PreflightIssue `
-      -Severity "warning" `
-      -Area "host" `
-      -Code "gpu_tooling_not_detected" `
-      -Title "GPU tooling was not detected on the host" `
-      -Message "The optional local GPU path may fail or fall back to very slow CPU inference because `nvidia-smi` is not available on PATH." `
-      -Recovery @("If the GPU path feels slow or fails, switch back to the hosted default path or install the required NVIDIA tooling first.") `
-      -Details @{
-        ai_stack = $AiStack
-        check = "nvidia-smi"
-      })
-  )
-
-  return $gpuInfo
-}
-
-function Confirm-LocalGpuProfileSelection {
-  param(
-    [hashtable]$DotEnv,
-    $Config,
-    $GpuInfo = $null
-  )
-
-  if ($AiStack -ne "local-gpu") {
-    return
-  }
-
-  Write-Step "Selecting a local GPU model profile"
-
-  $requestedProfile = Get-RequestedLocalGpuProfile -Config $Config
-  $manualProfileId = Get-ConfigValue -DotEnv $DotEnv -Keys @("LOCAL_GPU_PROFILE_ID") -Default ""
-  $manualVramGb = Get-ConfigValue -DotEnv $DotEnv -Keys @("LOCAL_GPU_VRAM_GB") -Default ""
-  $matrix = Get-LocalGpuProfileMatrix
-  $selection = Resolve-LocalGpuProfileSelection `
-    -Matrix $matrix `
-    -RequestedProfile $requestedProfile `
-    -ManualProfileId $manualProfileId `
-    -ManualVramGb $manualVramGb `
-    -DetectedVramGb $(if ($null -ne $GpuInfo) { $GpuInfo.detectedVramGb } else { $null })
-
-  $Config.localGpuRequestedProfile = $requestedProfile
-  $Config.localGpu = $selection
-
-  if ($selection.status -ne "selected") {
-    $details = @{
-      ai_stack = $AiStack
-      requested_profile = $requestedProfile
-      selection_source = $selection.selectionSource
-      detected_vram_gb = $selection.detectedVramGb
-      manual_vram_gb = $selection.manualVramGb
-      manual_profile_id = $selection.manualProfileId
-      supported_profile_ids = @(Get-LocalGpuSupportedProfileIds -Matrix $matrix)
-      notes = @($selection.notes)
-    }
-
-    Fail-PreflightIssue (New-PreflightIssue `
-      -Severity "blocker" `
-      -Area "host" `
-      -Code "local_gpu_profile_selection_required" `
-      -Title "Choose a supported local GPU profile" `
-      -Message $selection.message `
-      -Recovery @(
-        "Set LOCAL_GPU_PROFILE_ID to one of the supported matrix ids or set LOCAL_GPU_VRAM_GB to your GPU memory in GB.",
-        "If this machine does not meet the supported local GPU tiers, rerun the launcher without -AiStack local-gpu and use the hosted default path instead."
-      ) `
-      -EnvVars @("LOCAL_GPU_PROFILE_ID", "LOCAL_GPU_VRAM_GB") `
-      -Details $details)
-  }
-
-  Write-Info ("local GPU profile: {0} ({1})" -f $selection.profileLabel, $selection.selectionSource)
-  Write-Info ("chat model: {0}" -f $selection.chatModel)
-  Write-Info ("embedding route: {0} / {1}" -f $selection.embeddingMode, $selection.embeddingModel)
-
-  if ($selection.verificationStatus -eq "heuristic") {
-    Show-PreflightIssues -Issues @(
-      (New-PreflightIssue `
-        -Severity "warning" `
-        -Area "ai" `
-        -Code "local_gpu_profile_heuristic" `
-        -Title "The selected local GPU tier is still heuristic" `
-        -Message ("{0} is documented but not yet verified on matching hardware in this repo." -f $selection.profileLabel) `
-        -Recovery @(
-          "If startup reliability is poor, step down one profile tier or switch back to the hosted default path.",
-          "Pull the recommended model before retrying if Ollama reports it as missing."
-        ) `
-        -Details @{
-          requested_profile = $requestedProfile
-          selected_profile_id = $selection.profileId
-          detected_vram_gb = $selection.detectedVramGb
-          notes = @($selection.notes)
-        })
-    )
-  }
+  Fail-PreflightIssue (New-PreflightIssue `
+    -Severity "blocker" `
+    -Area "host" `
+    -Code "gpu_tooling_not_detected" `
+    -Title "Install NVIDIA GPU tooling before launching the game" `
+    -Message "This launcher only supports the GPU-backed Docker Ollama path, and `nvidia-smi` was not available on the host." `
+    -Recovery @(
+      "Install or repair the NVIDIA driver stack until `nvidia-smi` works in PowerShell.",
+      "Open a new PowerShell window and rerun this launcher after `nvidia-smi` reports your GPU."
+    ) `
+    -Details @{
+      check = "nvidia-smi"
+    })
 }
 
 function Confirm-ProviderReady {
   param($Config)
 
-  if ($AiStack -eq "local-gpu" -and $Config.provider -ne "litellm") {
+  if ($Config.provider -ne "litellm") {
     Fail-PreflightIssue (New-PreflightIssue `
       -Severity "blocker" `
       -Area "config" `
-      -Code "local_gpu_requires_litellm" `
-      -Title "Use LiteLLM mode for the local GPU override" `
-      -Message "The local-gpu launcher mode expects AI_PROVIDER=litellm so the app can keep using the stable LiteLLM aliases." `
-      -Recovery @("Change `.env` back to AI_PROVIDER=litellm, or rerun the launcher without `-AiStack local-gpu`.") `
+      -Code "launcher_requires_litellm" `
+      -Title "Use LiteLLM mode for the GPU-backed launcher" `
+      -Message "The Windows launcher now always uses the GPU-backed Docker LiteLLM stack so the app can keep using the stable gateway aliases." `
+      -Recovery @("Remove custom direct-provider launcher overrides and rerun the launcher so it can start the repo-managed LiteLLM and Ollama containers.") `
       -EnvVars @("AI_PROVIDER") `
       -Details @{
-        ai_stack = $AiStack
         provider = $Config.provider
       })
   }
 
   Write-Step ("Checking AI provider: {0}" -f $Config.provider)
-  if ($Config.provider -eq "litellm" -and $AiStack -in @("hosted", "local-gpu")) {
-    Write-Info "Docker Compose will start the LiteLLM sidecar for this run."
-    if ($AiStack -eq "local-gpu") {
-      Write-Info "The local GPU override will also start the optional Ollama backend container."
-    }
-    return
-  }
-
-  if ([string]::IsNullOrWhiteSpace($Config.baseUrl)) {
-    Write-Info "No local AI base URL to probe from the host."
-    return
-  }
-
-  $uri = Get-UriObject -Text $Config.baseUrl
-  if ($null -eq $uri) {
-    Write-Info ("Skipping AI reachability check because base URL is not a valid URI: {0}" -f $Config.baseUrl)
-    return
-  }
-
-  if ($uri.Host -notin @("127.0.0.1", "localhost")) {
-    Write-Info ("Using remote/non-local AI endpoint: {0}" -f $Config.baseUrl)
-    return
-  }
-
-  $probeUrl = switch ($Config.provider) {
-    "ollama" { "http://127.0.0.1:11434/api/version" }
-    default { "{0}://{1}:{2}/" -f $uri.Scheme, $uri.Host, $uri.Port }
-  }
-
-  if (-not (Wait-ForHttpReady -Uri $probeUrl -TimeoutSeconds 10)) {
-    if ($Config.provider -eq "ollama") {
-      $ollamaPath = Get-CommandPath -Name "ollama"
-      if ($ollamaPath) {
-        Write-Step "Starting Ollama background server"
-        Start-Process -FilePath $ollamaPath -ArgumentList "serve" -WindowStyle Hidden | Out-Null
-        if (Wait-ForHttpReady -Uri $probeUrl -TimeoutSeconds 20) {
-          Write-Info "Ollama API is reachable."
-          return
-        }
-      }
-    }
-
-    Fail-PreflightIssue (New-PreflightIssue `
-      -Severity "blocker" `
-      -Area "ai" `
-      -Code "local_ai_endpoint_unreachable" `
-      -Title "Start or fix the local AI service" `
-      -Message ("The configured local AI endpoint did not respond at {0}." -f $probeUrl) `
-      -Recovery @("Start the local AI service and confirm the configured base URL points at the running API.") `
-      -Details @{
-        provider = $Config.provider
-        probe_target = $probeUrl
-      })
-  }
-
-  Write-Info ("AI endpoint is reachable: {0}" -f $probeUrl)
+  Write-Info "Docker Compose will start the LiteLLM sidecar and the GPU-backed Ollama container for this run."
 }
 
 function Set-ComposeOverrides {
-  param(
-    $Config,
-    [hashtable]$DotEnv
-  )
+  param($Config)
 
-  if ($Config.provider -eq "litellm" -and $AiStack -in @("hosted", "local-gpu")) {
-    $env:AI_PROFILE = $config.profile
-    $env:COMPOSE_AI_PROVIDER = "litellm"
-    $env:COMPOSE_LITELLM_PROXY_URL = "http://litellm:4000"
-    if ($AiStack -eq "local-gpu") {
-      $env:COMPOSE_OLLAMA_BASE_URL = "http://ollama:11434/v1"
-      $env:LITELLM_OLLAMA_BASE_URL = "http://ollama:11434"
-      $env:LOCAL_GPU_REQUESTED_PROFILE = $Config.localGpuRequestedProfile
-      $env:LOCAL_GPU_SELECTION_STATUS = $Config.localGpu.status
-      $env:LOCAL_GPU_SELECTION_SOURCE = $Config.localGpu.selectionSource
-      $env:LOCAL_GPU_SELECTED_PROFILE_ID = $Config.localGpu.profileId
-      $env:LOCAL_GPU_SELECTED_PROFILE_LABEL = $Config.localGpu.profileLabel
-      $env:LOCAL_GPU_SELECTED_VERIFICATION_STATUS = $Config.localGpu.verificationStatus
-      $env:LOCAL_GPU_DETECTED_VRAM_GB = if ($null -ne $Config.localGpu.detectedVramGb) { [string]$Config.localGpu.detectedVramGb } else { "" }
-      $env:LOCAL_GPU_MANUAL_VRAM_GB = if ($null -ne $Config.localGpu.manualVramGb) { [string]$Config.localGpu.manualVramGb } else { "" }
-      $env:LOCAL_GPU_SELECTED_CHAT_MODEL = $Config.localGpu.chatModel
-      $env:LOCAL_GPU_SELECTED_EMBEDDING_MODE = $Config.localGpu.embeddingMode
-      $env:LOCAL_GPU_SELECTED_EMBEDDING_MODEL = $Config.localGpu.embeddingModel
-      $env:LOCAL_GPU_SELECTION_MESSAGE = $Config.localGpu.message
-      $env:LOCAL_GPU_SELECTION_NOTES = @($Config.localGpu.notes) -join "||"
-
-      $env:LITELLM_LOCAL_GPU_PROFILE_ID = $Config.localGpu.profileId
-      $env:LITELLM_LOCAL_GPU_CHAT_TARGET = "ollama_chat/$($Config.localGpu.chatModel)"
-      $env:LITELLM_LOCAL_GPU_CHAT_API_BASE = "http://ollama:11434"
-
-      if ($Config.localGpu.embeddingMode -eq "local") {
-        $env:LITELLM_LOCAL_GPU_EMBEDDING_TARGET = "ollama_embeddings/$($Config.localGpu.embeddingModel)"
-        $env:LITELLM_LOCAL_GPU_EMBEDDING_API_BASE = "http://ollama:11434"
-        $env:LITELLM_LOCAL_GPU_EMBEDDING_API_KEY = ""
-      } else {
-        $env:LITELLM_LOCAL_GPU_EMBEDDING_TARGET = "openai/$($Config.localGpu.embeddingModel)"
-        $env:LITELLM_LOCAL_GPU_EMBEDDING_API_BASE = ""
-        $env:LITELLM_LOCAL_GPU_EMBEDDING_API_KEY = Get-ConfigValue -DotEnv $DotEnv -Keys @("OPENAI_API_KEY") -Default "sk-placeholder"
-      }
-    }
-    return
-  }
-
-  if ($Config.provider -eq "ollama") {
-    $translated = Convert-ToDockerReachableUrl -Url $(if ($Config.baseUrl) { $Config.baseUrl } else { "http://127.0.0.1:11434/v1" })
-    if ($translated -ne $Config.baseUrl) {
-      Write-Info ("Container AI URL override: {0}" -f $translated)
-    }
-    $env:OLLAMA_BASE_URL = $translated
-    return
-  }
-
-  if ($Config.provider -eq "litellm") {
-    $translated = Convert-ToDockerReachableUrl -Url $(if ($Config.baseUrl) { $Config.baseUrl } else { "http://127.0.0.1:4000" })
-    if ($translated -ne $Config.baseUrl) {
-      Write-Info ("Container LiteLLM URL override: {0}" -f $translated)
-    }
-    $env:LITELLM_PROXY_URL = $translated
-    return
-  }
-
-  if (-not [string]::IsNullOrWhiteSpace($Config.baseUrl)) {
-    $translated = Convert-ToDockerReachableUrl -Url $Config.baseUrl
-    if ($translated -ne $Config.baseUrl) {
-      Write-Info ("Container AI URL override: {0}" -f $translated)
-    }
-    $env:AI_BASE_URL = $translated
-  }
+  $env:AI_PROFILE = $Config.profile
+  $env:COMPOSE_AI_PROVIDER = "litellm"
+  $env:COMPOSE_LITELLM_PROXY_URL = "http://litellm:4000"
+  $env:COMPOSE_OLLAMA_BASE_URL = "http://ollama:11434/v1"
+  $env:LITELLM_OLLAMA_BASE_URL = "http://ollama:11434"
 }
 
 function Start-AppContainer {
@@ -1031,21 +815,20 @@ $config = Resolve-ProviderConfig -DotEnv $dotEnv
 
 Write-Host "Text Game Docker startup" -ForegroundColor Green
 Write-Info ("repo: {0}" -f $repoRoot)
-Write-Info ("ai stack: {0}" -f $AiStack)
+Write-Info "ai stack: gpu-backed docker"
 Write-Info ("profile: {0}" -f $config.profile)
 Write-Info ("provider: {0}" -f $config.provider)
 if ($config.hasDotEnv) {
   Write-Info "configuration: using .env"
 } else {
-  Write-Info "configuration: no .env found, using LiteLLM-first defaults for this run"
+  Write-Info "configuration: no .env found, using GPU-backed LiteLLM defaults for this run"
 }
 
 Confirm-DockerTooling
 Confirm-HostPathPrerequisites
-$gpuInfo = Confirm-LocalGpuSupport
-Confirm-LocalGpuProfileSelection -DotEnv $dotEnv -Config $config -GpuInfo $gpuInfo
+Confirm-LocalGpuSupport
 Confirm-ProviderReady -Config $config
-Set-ComposeOverrides -Config $config -DotEnv $dotEnv
+Set-ComposeOverrides -Config $config
 Start-AppContainer -Config $config
 Show-AppPreflight -Config $config
 

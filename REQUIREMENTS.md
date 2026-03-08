@@ -32,7 +32,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Memory system with summaries and embedding-based retrieval.
 - Web UI with text log, turn input, session controls, suggestion chips, and a local debug panel.
 - The setup flow must offer a small set of safe end-user profiles plus validated advanced overrides for developer-oriented configuration changes.
-- The optional local GPU path must support VRAM-tier-based model recommendations or auto-selection, with a manual override when detection is unavailable or ambiguous.
+- The default launcher path must use the GPU-backed Docker Ollama service and support VRAM-tier-based model recommendations or manual tier selection when detection is unavailable.
 - Recovery actions should let users retry setup and switch supported profiles without deleting saves or reopening a terminal for normal fixes.
 - Local assist endpoint for spellcheck + autocomplete, with small helper tasks intended to prefer hosted providers through the default gateway path.
 - Delivery budgets for latency, token usage, cost, and storage must come from a config file with sane defaults and be adjustable through the web UI.
@@ -61,7 +61,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 
 ## Configuration
 
-- `AI_PROFILE` (optional; default `hosted-default`; supported values: `hosted-default`, `local-gpu-small`, `local-gpu-large`, `custom`)
+- `AI_PROFILE` (optional; default `local-gpu-small`; supported values: `local-gpu-small`, `local-gpu-large`, `custom`)
 - `AI_PROVIDER` (optional; default `litellm`)
 - `AI_API_KEY` (primary key in generic provider mode)
 - `AI_BASE_URL` (optional; for OpenAI-compatible providers)

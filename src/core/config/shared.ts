@@ -12,7 +12,7 @@ import type {
 export const DEFAULT_PORT = 3000;
 
 export const SUPPORTED_AI_PROVIDERS = ["openai-compatible", "litellm", "ollama"] as const;
-export const SUPPORTED_AI_PROFILES = ["hosted-default", "local-gpu-small", "local-gpu-large", "custom"] as const;
+export const SUPPORTED_AI_PROFILES = ["local-gpu-small", "local-gpu-large", "custom"] as const;
 
 export type SupportedAiProvider = (typeof SUPPORTED_AI_PROVIDERS)[number];
 export type AiConfigField = "apiKey" | "baseUrl" | "chatModel" | "embeddingModel";
@@ -93,23 +93,10 @@ export interface SafeConfigDiagnostics {
 }
 
 export const CONFIG_PROFILE_DEFINITIONS: Record<SupportedAiProfile, ConfigProfileDefinition> = {
-  "hosted-default": {
-    id: "hosted-default",
-    label: "Hosted default",
-    description: "Use the supported LiteLLM Docker sidecar with the hosted-first repo defaults.",
-    recommendedAiStack: "hosted",
-    defaults: {
-      provider: "litellm",
-      apiKey: "anything",
-      baseUrl: "http://127.0.0.1:4000",
-      chatModel: "game-chat",
-      embeddingModel: "game-embedding"
-    }
-  },
   "local-gpu-small": {
     id: "local-gpu-small",
     label: "Local GPU small",
-    description: "Use the LiteLLM local-GPU path with the conservative 8 GB tier guidance.",
+    description: "Use the supported LiteLLM Docker path with the conservative 8 GB GPU tier guidance.",
     recommendedAiStack: "local-gpu",
     defaults: {
       provider: "litellm",
@@ -261,10 +248,10 @@ export function normalizeProvider(value: string | undefined): string {
 
 export function normalizeProfile(value: string | undefined): string {
   if (!value || typeof value !== "string") {
-    return "hosted-default";
+    return "local-gpu-small";
   }
 
-  return value.trim().toLowerCase() || "hosted-default";
+  return value.trim().toLowerCase() || "local-gpu-small";
 }
 
 export function normalizeBaseUrl(value: string | undefined): string {
@@ -313,7 +300,7 @@ export function getProviderDefaults(provider: string): ProviderDefaults {
 }
 
 export function getConfigProfileDefinition(profile: SupportedAiProfile): ConfigProfileDefinition {
-  return CONFIG_PROFILE_DEFINITIONS[profile] || CONFIG_PROFILE_DEFINITIONS["hosted-default"];
+  return CONFIG_PROFILE_DEFINITIONS[profile] || CONFIG_PROFILE_DEFINITIONS["local-gpu-small"];
 }
 
 export function buildConfigError({

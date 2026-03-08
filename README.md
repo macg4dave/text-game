@@ -92,7 +92,7 @@ Required host tool:
 Primary compiled-runtime command:
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
 Then open `http://localhost:3000`.
@@ -113,15 +113,15 @@ Current limitation of the Docker runtime path:
 
 - source edits require a rebuild because the app is not bind-mounted into the container
 
-Optional developer GPU override:
+GPU-backed Docker command:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
-This adds an Ollama container and reserves NVIDIA GPU access for that local inference service only. The app and LiteLLM containers themselves do not need GPU access.
+This starts the normal app, LiteLLM, and Ollama stack and reserves NVIDIA GPU access for the Ollama service. The app and LiteLLM containers themselves do not need GPU access.
 
-The authoritative local-GPU profile matrix for this override now lives in [scripts/local-gpu-profile-matrix.json](/g:/text-game/scripts/local-gpu-profile-matrix.json). T02g defines three VRAM tiers keyed by detected memory first: `local-gpu-8gb`, `local-gpu-12gb`, and `local-gpu-20gb-plus`.
+The authoritative local-GPU profile matrix for manual larger-model tuning still lives in [scripts/local-gpu-profile-matrix.json](/g:/text-game/scripts/local-gpu-profile-matrix.json). T02g defines three VRAM tiers keyed by detected memory first: `local-gpu-8gb`, `local-gpu-12gb`, and `local-gpu-20gb-plus`.
 
 On Windows, the launcher wraps the same compiled Docker path and opens the browser for you:
 
@@ -154,7 +154,7 @@ What those do:
 
 After a reset, restart the app with your normal path:
 
-- `docker compose up --build`
+- `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`
 - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`
 - `npm run dev`
 
@@ -237,7 +237,7 @@ npm run dev
 For the compiled runtime smoke path, use:
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
 That one command now starts both the app and the default LiteLLM proxy sidecar.
@@ -245,18 +245,18 @@ That one command now starts both the app and the default LiteLLM proxy sidecar.
 Useful Docker commands:
 
 ```bash
-docker compose up --build
-docker compose up -d
-docker compose logs -f app
-docker compose logs -f litellm
-docker compose down
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml logs -f app
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml logs -f litellm
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml down
 ```
 
 If port `3000` is already in use on your machine, you can still set `PORT` for that shell session before starting:
 
 ```powershell
 $env:PORT = "3300"
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
 On Windows, the repo now has a one-command launcher:
@@ -265,18 +265,7 @@ On Windows, the repo now has a one-command launcher:
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
 
-Optional developer GPU-backed local model path:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu
-```
-
-Current profile status:
-
-- `local-gpu-8gb` remains the default fallback tier for the optional local GPU path
-- `scripts/start-dev.ps1 -AiStack local-gpu` now auto-selects `local-gpu-8gb`, `local-gpu-12gb`, or `local-gpu-20gb-plus` from detected NVIDIA VRAM when possible
-- `local-gpu-12gb` and `local-gpu-20gb-plus` are still treated as heuristic until they are exercised on matching hardware
-- if auto-detection is unavailable, use `LOCAL_GPU_PROFILE_ID` or `LOCAL_GPU_VRAM_GB` in `.env` to choose a local GPU tier explicitly
+The launcher now always uses the GPU-backed Docker path and blocks early if `nvidia-smi` or the Docker NVIDIA runtime is unavailable on the host.
 
 Or, if `npm` is already installed and on `PATH`:
 
@@ -290,11 +279,10 @@ The launcher:
 - confirms Docker is using the Linux container runtime required by the supported path
 - reuses shared PowerShell helper functions from `scripts/lib/shared.ps1` for dotenv parsing and HTTP readiness checks
 - reads `.env` when present
-- falls back to the LiteLLM defaults when `.env` is missing
+- falls back to the GPU-backed LiteLLM defaults when `.env` is missing
 - uses the LiteLLM stack for the supported Docker launcher modes even if an older `.env` still contains a direct-provider experiment
-- starts the default LiteLLM sidecar for the supported Docker path
-- can opt into the local GPU override with `-AiStack local-gpu`
-- auto-selects a local GPU model tier from the repo matrix when `-AiStack local-gpu` is used, or stops with guided manual-override instructions when it cannot choose safely
+- starts the default LiteLLM sidecar and GPU-backed Ollama service for the supported Docker path
+- blocks early if host NVIDIA tooling or the Docker NVIDIA runtime is missing
 - checks that the repo `data/` path is writable and warns or blocks early when disk headroom is too low
 - checks for a default browser handler before auto-opening the play surface unless you use `-NoBrowser`
 - clears any previous `text-game` compose app container before starting the fresh app instance
@@ -312,12 +300,6 @@ Useful flags:
 
 - `-NoBrowser` skips opening the webpage
 - `-Rebuild` forces a Docker image rebuild before launch
-- `-AiStack local-gpu` enables the optional Docker GPU override for a local Ollama backend
-
-Optional local GPU override env vars:
-
-- `LOCAL_GPU_PROFILE_ID` - force one matrix tier by id (`local-gpu-8gb`, `local-gpu-12gb`, `local-gpu-20gb-plus`)
-- `LOCAL_GPU_VRAM_GB` - bypass host VRAM detection and select the tier that matches the provided GB value
 
 ## Script Layout
 
@@ -353,8 +335,8 @@ docker compose exec ollama ollama pull gemma3:4b
 docker compose exec ollama ollama pull embeddinggemma
 ```
 
-1. Start the Docker stack with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
-1. Start the app with `docker compose up --build`, `npm run dev`, or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+1. Start the Docker stack with `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+1. Start the app with `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`, `npm run dev`, or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
 
 Current default Docker smoke guidance:
 
@@ -366,10 +348,10 @@ Optional larger local-model path through the same gateway UX:
 
 - keep the app on `AI_PROVIDER=litellm`
 - leave the app-facing aliases as `game-chat` and `game-embedding`
-- use `docker-compose.gpu.yml` or `-AiStack local-gpu` to start an Ollama backend with NVIDIA GPU passthrough
-- let LiteLLM switch to `litellm.local-gpu.config.yaml`, with the launcher now selecting the exact matrix tier and wiring the matching upstream chat and embedding targets through env vars
+- use `docker-compose.gpu.yml` whenever you need the Docker NVIDIA reservation on a raw Compose run
+- use `litellm.local-gpu.config.yaml` only for manual larger-model experiments; the default launcher now keeps the normal LiteLLM config and only adds the GPU reservation
 
-Current VRAM-tier matrix for the optional local GPU path:
+Current VRAM-tier matrix for manual larger-model tuning:
 
 - `local-gpu-8gb` uses `gemma3:4b` for chat and keeps `game-embedding` on hosted `text-embedding-3-small`; if that route is still too heavy, `gemma3:1b` is only a smoke-test fallback, not a supported matrix tier
 - `local-gpu-12gb` uses `gemma3:12b` for chat and keeps `game-embedding` on hosted `text-embedding-3-small`; fall back to `local-gpu-8gb` if startup reliability is worse than the smaller tier
@@ -377,7 +359,7 @@ Current VRAM-tier matrix for the optional local GPU path:
 
 VRAM remains the selector of record. GPU marketing names are only examples for documentation and must not override detected memory.
 
-Selection order for the optional local GPU path:
+Manual selection order for the larger-model GPU matrix:
 
 1. `LOCAL_GPU_PROFILE_ID` if you set it explicitly
 2. `LOCAL_GPU_VRAM_GB` if you provide a manual VRAM value
@@ -390,7 +372,7 @@ That keeps the player-facing and app-facing setup stable even when the upstream 
 
 The runtime config module now applies one consistent precedence order instead of making each caller guess:
 
-- `AI_PROFILE` picks a small supported startup profile first: `hosted-default`, `local-gpu-small`, `local-gpu-large`, or `custom`
+- `AI_PROFILE` picks a small supported startup profile first: `local-gpu-small`, `local-gpu-large`, or `custom`
 - when the selected profile is not `custom`, its defaults seed the AI provider and model contract before plain runtime defaults apply
 - provider-specific env vars win when `AI_PROVIDER` is `litellm` or `ollama`
 - generic `AI_*` vars are the next fallback
@@ -405,9 +387,8 @@ The intended setup flow is now:
 
 Current profiles:
 
-- `hosted-default` - the normal supported Docker LiteLLM path
-- `local-gpu-small` - the optional local GPU path aligned with the conservative 8 GB tier guidance
-- `local-gpu-large` - the optional local GPU path aligned with the documented 12 GB+ guidance
+- `local-gpu-small` - the normal supported Docker LiteLLM path aligned with the conservative 8 GB GPU tier guidance
+- `local-gpu-large` - the larger documented GPU tier guidance for manual tuning
 - `custom` - skip starter defaults and drive setup with validated explicit env vars instead
 
 Provider selection now behaves like this:
@@ -435,8 +416,7 @@ For the MVP playtest path, the packaged app and the AI runtime are intentionally
 - the Electron shell bundles the app window and compiled local game server
 - Docker Desktop remains a required Windows prerequisite for AI startup
 - LiteLLM continues to run as the repo-managed Docker sidecar instead of being embedded into the packaged shell
-- hosted-first LiteLLM routing remains the default supported packaged setup
-- the optional `local-gpu` path stays an explicit opt-in for compatible Windows machines instead of becoming the baseline requirement
+- the GPU-backed Docker Ollama path is the default supported packaged setup contract
 
 Why keep that split for now:
 
@@ -448,7 +428,7 @@ What the packaged path should tell the player in plain language:
 
 - if Docker Desktop is missing or not running: install or start Docker Desktop, then retry the game
 - if the LiteLLM sidecar did not become ready: the game app opened, but the AI service is still starting or failed to start; retry after Docker is healthy
-- if the player selects the optional local GPU route on unsupported hardware: switch back to the hosted default path or install the required NVIDIA/WSL2 prerequisites first
+- if the player machine cannot satisfy the GPU-backed path: install the required NVIDIA/WSL2 prerequisites first before retrying
 
 The packaged MVP does **not** bundle LiteLLM or Ollama yet. That may change later, but T36 should assume the supported AI startup contract is still Docker Desktop plus the repo-managed LiteLLM stack.
 
@@ -522,7 +502,7 @@ For local GPU matrix consistency checks, run `powershell -ExecutionPolicy Bypass
 ## Environment
 
 - `AI_PROVIDER` - optional label; defaults to `litellm`; supported repo presets are `openai-compatible`, `litellm`, and `ollama`
-- `AI_PROFILE` - optional starter profile; defaults to `hosted-default`; supported values are `hosted-default`, `local-gpu-small`, `local-gpu-large`, and `custom`
+- `AI_PROFILE` - optional starter profile; defaults to `local-gpu-small`; supported values are `local-gpu-small`, `local-gpu-large`, and `custom`
 - `AI_API_KEY` - primary key for generic OpenAI-compatible mode
 - `AI_BASE_URL` - optional; point this at any OpenAI-compatible provider endpoint
 - `AI_CHAT_MODEL` - defaults to `gpt-4o-mini`
@@ -535,8 +515,6 @@ For local GPU matrix consistency checks, run `powershell -ExecutionPolicy Bypass
 - `OLLAMA_API_KEY` - optional Ollama key placeholder; defaults to `ollama`
 - `OLLAMA_CHAT_MODEL` - Ollama chat model; defaults to `gemma3:4b`
 - `OLLAMA_EMBEDDING_MODEL` - Ollama embedding model; defaults to `embeddinggemma`
-- `LOCAL_GPU_PROFILE_ID` - optional manual local GPU matrix override used by the launcher when `-AiStack local-gpu` is selected
-- `LOCAL_GPU_VRAM_GB` - optional manual VRAM override in GB used by the launcher when auto-detection is unavailable
 - `LOG_LEVEL` - server log threshold; use `debug`, `info`, `warn`, or `error`; defaults to `info`
 - Legacy `OPENAI_*` env vars still work during migration, but new setup should prefer LiteLLM or an explicit `AI_PROVIDER`
 
@@ -554,7 +532,7 @@ The Windows launcher auto-translates local host URLs to Docker-reachable URLs fo
 
 If Docker Desktop cannot mount the drive that contains this repo, the container now falls back to the copy baked into the image.
 
-- startup still works through `docker compose up --build` or `scripts/start-dev.ps1`
+- startup still works through `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` or `scripts/start-dev.ps1`
 - live source edits are not reflected until you rebuild
 - this fallback is meant to keep launch reliable while later tasks improve the packaged path
 
@@ -584,7 +562,7 @@ Recommended local setup:
 1. Use the included [litellm.config.yaml](./litellm.config.yaml) as the default Docker-Ollama template.
 2. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding` in `.env`.
 3. Pull `gemma3:4b` and `embeddinggemma` into the repo-managed Docker `ollama` service.
-4. Start the supported Docker path with `docker compose up --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+4. Start the supported Docker path with `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
 5. Keep `LITELLM_MASTER_KEY` equal to `LITELLM_API_KEY` in `.env`. The default Docker smoke path now uses `anything` for both unless you override them together.
 
 The runtime automatically prefers LiteLLM-specific env vars when `AI_PROVIDER=litellm`, and now falls back to LiteLLM as the blank-slate default when no provider-specific env is configured.
@@ -619,7 +597,7 @@ Artifact-size references for those recommendations come from the official Ollama
 For the Docker-backed GPU path, the quickest Windows startup path is:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu
+powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
 
 ## AI Workflow Test Loop
@@ -687,10 +665,10 @@ Common fixes:
 - use a full AI base URL such as `https://api.openai.com/v1`, `http://127.0.0.1:4000`, or `http://127.0.0.1:11434/v1`
 - when the app runs in Docker against a host-local AI service, use `host.docker.internal` instead of `localhost`
 - if LiteLLM reports a proxy-auth setup mismatch, set `LITELLM_MASTER_KEY` to the same value as `LITELLM_API_KEY`, or clear both if you do not want proxy auth enabled
-- if LiteLLM reports upstream credential failure, fix the provider key behind LiteLLM; on the default hosted path in this repo that usually means `OPENAI_API_KEY`
+- if LiteLLM reports upstream credential failure, fix the provider key behind LiteLLM or repoint the upstream route to a reachable local model
 - if LiteLLM or Ollama reports different model names than the ones in `.env`, update the configured chat and embedding model vars to match
-- if the local GPU route reports a missing local model, pull the selected Ollama model or switch back to the hosted default path
-- if the launcher warns that GPU tooling was not detected, expect the optional local path to fail or fall back to very slow CPU inference
+- if the GPU-backed Docker path reports a missing local model, pull the required Ollama model and retry the launcher
+- if the launcher reports missing GPU tooling, install or repair the NVIDIA driver stack until `nvidia-smi` works in PowerShell
 - if the launcher or runtime reports low disk space, free up space on the drive that contains the app `data/` folder before starting another session
 - if the launcher or runtime reports an unwritable app-data path, fix the folder permissions or move the repo to a writable location before retrying
 - if the launcher or runtime reports an unreadable or corrupted saved-game database, restore the latest copy from `data/backups/` or move the damaged DB out of `data/` before retrying

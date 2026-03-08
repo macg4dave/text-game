@@ -7,8 +7,3 @@ services:
             - driver: nvidia
               count: ${OLLAMA_GPU_COUNT:-all}
               capabilities: [gpu]
-
-  litellm:
-    command: ["--config", "/app/config.local-gpu.yaml", "--port", "4000", "--drop_params"]
-    environment:
-      OLLAMA_BASE_URL: "${LITELLM_OLLAMA_BASE_URL:-http://ollama:11434}"

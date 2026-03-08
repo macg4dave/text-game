@@ -112,7 +112,7 @@ Implications for T36:
 
 - the packaged build must check for Docker Desktop availability before claiming the app is ready to play
 - first-run messaging must distinguish Docker missing, Docker not running, LiteLLM not ready, and optional GPU-prerequisite failures
-- the packaged build should prefer steering the user back to the hosted-default path when local GPU prerequisites are missing instead of failing the whole app launch
+- the packaged build should prefer steering the user through GPU prerequisite repair when local GPU prerequisites are missing instead of failing the whole app launch
 
 ## Clean-Machine Windows Smoke Checklist
 
@@ -126,7 +126,7 @@ Use this checklist for a dry run before T36 starts:
 6. Confirm the packaged path clearly reports that Docker Desktop is required for AI startup when Docker is missing or not running.
 7. Confirm the packaged path distinguishes “Docker is available but LiteLLM is not ready yet” from a plain app-server startup failure.
 8. Confirm the browser UI preflight still reports missing API keys or unreachable AI endpoints in player language after the shell starts.
-9. Confirm the optional local GPU path explains unsupported NVIDIA/WSL2 prerequisites in plain language and offers the hosted-default fallback.
+9. Confirm the GPU-backed launcher path explains unsupported NVIDIA/WSL2 prerequisites in plain language and offers a clear repair path.
 10. Confirm an existing save database survives closing and reopening the packaged shell.
 11. Confirm the fallback local port behavior still works when the default port is busy.
 12. Confirm the shell log captures server startup and shutdown lines.
@@ -138,7 +138,7 @@ Use this checklist for a dry run before T36 starts:
 - The packaged MVP still needs a non-terminal config repair flow; `.env` discovery is only a bridge.
 - Docker Desktop remains a prerequisite for MVP AI startup, so T36 needs a clean way to detect, explain, and recover from missing Docker without making the player reverse-engineer the runtime.
 - The packaged path still needs a companion approach for starting or attaching to the repo-managed LiteLLM sidecar; that contract is now explicit, but the UX implementation is still follow-on work.
-- The optional local GPU route needs user-facing prerequisite copy that clearly separates supported hosted-default startup from NVIDIA/WSL2-only local inference.
+- The GPU-backed local inference route needs user-facing prerequisite copy that clearly explains the required NVIDIA/WSL2 setup.
 - Antivirus and SmartScreen behavior on unsigned Windows builds remains unknown.
 - The current prototype packages the existing local server stack, but future telemetry and crash-reporting paths need explicit desktop ownership.
 

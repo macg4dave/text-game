@@ -14,12 +14,12 @@ const SUPPORTED_LOG_LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
 
 export function parseAiProfile(value: string | undefined): { value: SupportedAiProfile; errors: ConfigError[] } {
   if (value === undefined) {
-    return { value: "hosted-default", errors: [] };
+    return { value: "local-gpu-small", errors: [] };
   }
 
   const normalized = normalizeProfile(value);
   if (!String(value).trim()) {
-    return { value: "hosted-default", errors: [] };
+    return { value: "local-gpu-small", errors: [] };
   }
 
   if (isSupportedAiProfile(normalized)) {
@@ -27,7 +27,7 @@ export function parseAiProfile(value: string | undefined): { value: SupportedAiP
   }
 
   return {
-    value: "hosted-default",
+    value: "local-gpu-small",
     errors: [
       buildConfigError({
         path: "profile",

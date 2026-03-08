@@ -1,6 +1,6 @@
 export type SupportedAiProvider = "openai-compatible" | "litellm" | "ollama";
-export type SupportedAiProfile = "hosted-default" | "local-gpu-small" | "local-gpu-large" | "custom";
-export type RecommendedAiStack = "hosted" | "local-gpu";
+export type SupportedAiProfile = "local-gpu-small" | "local-gpu-large" | "custom";
+export type RecommendedAiStack = "local-gpu";
 
 export interface ConfigError {
   path: string;

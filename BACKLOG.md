@@ -102,6 +102,7 @@ Use this exact shape when adding new work:
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Done | T02 | `docker compose run --rm --no-deps app npm run test:config` + manual Docker Ollama smoke |
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
+| T02h | Now | P0 | P1 | GPU-first Docker launcher default | Done | T02g | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/core/config.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T05 | Next | P0 | P2 | Error boundary and global handler | Done | None | `npm test` |
 | T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Done | T02f | Matrix review |
 | T06 | Next | P1 | P1 | Turn input, output, and state schemas | Review | T02 | `npm test` |
@@ -211,6 +212,59 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - validation on 2026-03-08 ran `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1` and a manual repo consistency review across `README.md`, `setup_local_a.i.md`, `.env.example`, `litellm.local-gpu.config.yaml`, `docker-compose.yml`, `ROADMAP.md`, and this task card
   - the matrix validator now checks the uncommented env-driven alias block in `litellm.local-gpu.config.yaml` plus the matching default `LITELLM_LOCAL_GPU_*` values in `docker-compose.yml`, so it no longer passes or fails based on commented manual-swap examples
   - no matching local GPU hardware runtime smoke was available in this session; that does not block `T02g` because the `12 GB` and `20 GB+` tiers are intentionally documented as `heuristic` until later hardware-specific follow-up work
+
+### T02h - GPU-First Docker Launcher Default
+
+- Status: Done
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Make the Windows launcher and documented Docker startup path use the GPU-backed Ollama stack by default instead of keeping a hosted or CPU-first fallback path.
+- Scope:
+  - remove the hosted-versus-local-gpu launcher switch from `scripts/start-dev.ps1`
+  - make the launcher always include the NVIDIA-enabled Docker overlay and fail early when host GPU prerequisites are missing
+  - align runtime config defaults and setup docs around `local-gpu-small` as the default profile
+  - keep manual larger-model experiment artifacts documented separately from the default launcher path
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - README.md
+  - REQUIREMENTS.md
+  - TOOLS.md
+  - .env.example
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+  - litellm.local-gpu.config.yaml
+  - packaging/decision-memo.md
+  - scripts/start-dev.ps1
+  - scripts/lib/shared.ps1
+  - setup_local_a.i.md
+  - src/core/types.ts
+  - src/core/config/
+  - src/core/config.test.ts
+- Do Not Touch:
+  - public/
+  - data/spec/
+- Dependencies:
+  - T02g
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/core/config.test.ts`
+  - `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+- Definition of Done:
+  - `scripts/start-dev.ps1` no longer exposes a hosted-versus-local-gpu switch
+  - the launcher defaults to the GPU-backed Docker path and blocks when NVIDIA prerequisites are missing
+  - config defaults and docs no longer describe `hosted-default` as the normal supported profile
+  - launcher, README, and requirements describe the same GPU-first startup contract
+- Handoff Notes:
+  - user requested on 2026-03-08 that the launcher stop treating GPU support as an opt-in path and remove the old default split
+  - keep manual larger-model tuning artifacts such as the VRAM matrix and `litellm.local-gpu.config.yaml` available for advanced use, but do not let the default launcher depend on them at startup
+  - completed on 2026-03-08 by removing the `-AiStack` launcher switch, forcing `scripts/start-dev.ps1` onto the GPU-backed Docker LiteLLM plus Ollama path, and making missing `nvidia-smi` or Docker `nvidia` runtime support a launcher blocker instead of a warning
+  - `docker-compose.gpu.yml` now only contributes the NVIDIA device reservation; the default launcher keeps the normal `litellm.config.yaml` route instead of swapping LiteLLM configs at startup
+  - runtime and script defaults now use `local-gpu-small` as the default `AI_PROFILE`; `hosted-default` was removed from the supported runtime profile list and from current docs
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/core/config.test.ts src/server/runtime-preflight.test.ts`, `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+  - launcher smoke on 2026-03-08 confirmed `docker inspect --format "{{json .HostConfig.DeviceRequests}}" text-game-ollama-1` returned an NVIDIA device request and `docker logs text-game-ollama-1` reported CUDA on `NVIDIA GeForce RTX 5060`
 
 ### T05 - Error Boundary And Global Handler
 
@@ -381,7 +435,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Scope:
   - add guided checks for the supported Docker-backed LiteLLM provider path and config before the first turn
   - expose a safe connection test and plain-language error states
-  - explain missing Docker, missing LiteLLM readiness, and optional GPU override prerequisites without requiring terminal knowledge
+  - explain missing Docker, missing LiteLLM readiness, and GPU-backed launcher prerequisites without requiring terminal knowledge
   - allow retrying setup without deleting saves or reopening the terminal
   - document the supported MVP AI path in the UI and README
 - Files to Touch:
@@ -423,7 +477,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Goal: Turn setup blockers and warnings into a guided recovery flow with retry actions for end users and expandable advanced details for developers.
 - Scope:
   - present blockers, warnings, and info in the setup UI with short summaries and one recommended action each
-  - add retry flows and the smallest safe auto-fix actions for common issues such as restarting checks, choosing a smaller local profile, or switching back to hosted default
+  - add retry flows and the smallest safe auto-fix actions for common issues such as restarting checks, choosing a smaller local profile, or repairing the GPU-backed path
   - expose advanced setup details on demand so developers can inspect resolved config, probe targets, and failing subsystems without overwhelming end users
   - keep save data intact while users retry setup or switch profiles
 - Files to Touch:
@@ -928,7 +982,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - detect whether Docker Desktop is missing, installed but not running, or running without a ready AI sidecar
   - distinguish LiteLLM-not-ready failures from app-server startup failures inside the packaged path
   - surface one recommended repair step per failure mode, with retry support that does not require deleting saves
-  - explain when the optional local GPU path is unsupported and steer the user back to the hosted-default path cleanly
+  - explain when the GPU-backed launcher path is unsupported and steer the user toward the documented prerequisite repair flow cleanly
 - Files to Touch:
   - BACKLOG.md
   - README.md
@@ -1032,7 +1086,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 | D02 | Director spec format: JSON or YAML | Before T16 starts | Gameplay systems lead | Open |
 | D03 | Sample MVP quest or story arc definition | Before Phase 1 exit | Product/UI lead | Open |
 | D04 | MVP packaging shell: launcher-only, Tauri, or Electron | Before Phase 0 exit | Release lead | Locked |
-| D05 | Default end-user AI setup: repo-managed LiteLLM Docker sidecar as the default control plane, with hosted small-task routing and an optional GPU-backed local-model path | Before Phase 0 exit | Tech lead | Locked |
+| D05 | Default end-user AI setup: repo-managed LiteLLM Docker sidecar as the default control plane, with the GPU-backed Ollama launcher path as the normal local runtime contract | Before Phase 0 exit | Tech lead | Locked |
 | D06 | MVP packaged AI runtime: require Docker Desktop for the LiteLLM sidecar, or stage the gateway another way while preserving the same app-facing contract | Before T36 starts | Release lead | Locked |
 | D07 | Initial local GPU tier matrix: which VRAM tiers are officially supported first, and which model profiles map to them | Before T02h starts | AI systems lead | Locked |
 | D08 | Preflight policy: which startup failures are blockers versus warnings versus info in end-user mode, and which actions can auto-fix safely | Before T01b starts | Tech lead | Locked |

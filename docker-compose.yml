@@ -60,7 +60,7 @@ services:
     environment:
       PORT: "${PORT:-3000}"
       GAME_DATA_DIR: "${GAME_DATA_DIR:-/data}"
-      AI_PROFILE: "${AI_PROFILE:-hosted-default}"
+      AI_PROFILE: "${AI_PROFILE:-local-gpu-small}"
       AI_PROVIDER: "${COMPOSE_AI_PROVIDER:-litellm}"
       AI_API_KEY: "${AI_API_KEY:-}"
       AI_BASE_URL: "${AI_BASE_URL:-}"

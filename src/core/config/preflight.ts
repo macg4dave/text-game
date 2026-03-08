@@ -71,7 +71,7 @@ function buildIssueFromConfigError(
         title: "Choose a supported setup profile",
         message: "AI_PROFILE is set to a value this build does not recognize.",
         recovery: [
-          "Use one of these values: hosted-default, local-gpu-small, local-gpu-large, custom.",
+          "Use one of these values: local-gpu-small, local-gpu-large, custom.",
           "Save .env and start the app again."
         ],
         envVars: error.envVars,

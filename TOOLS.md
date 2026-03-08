@@ -19,4 +19,4 @@
 
 - Shared launcher and harness helper functions live in `scripts/lib/shared.ps1`.
 - Prefer updating shared helpers there instead of duplicating script plumbing in multiple entry scripts.
-- Local GPU tier selection for `scripts/start-dev.ps1 -AiStack local-gpu` also lives there; use `LOCAL_GPU_PROFILE_ID` or `LOCAL_GPU_VRAM_GB` for manual overrides instead of forking launcher logic.
+- Local GPU tier selection for manual larger-model experiments also lives there; use `LOCAL_GPU_PROFILE_ID` or `LOCAL_GPU_VRAM_GB` for manual overrides instead of forking launcher logic.

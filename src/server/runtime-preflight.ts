@@ -567,7 +567,7 @@ export function createRuntimePreflightService(
         message: "LiteLLM reached the upstream AI provider, but that provider rejected the configured credentials.",
         recovery: [
           "Update the upstream provider credentials used by LiteLLM, then rerun startup checks.",
-          "If you are using the default hosted path in this repo, confirm OPENAI_API_KEY is set to a real provider key."
+          "If this LiteLLM route depends on a hosted provider, confirm OPENAI_API_KEY is set to a real provider key."
         ],
         recommended_fix:
           "Update the upstream provider credentials used by LiteLLM, then rerun startup checks.",
@@ -612,14 +612,14 @@ export function createRuntimePreflightService(
         message: "The selected local model is not installed on the local inference service yet.",
         recovery: [
           endpointModel
-            ? `Pull ${endpointModel} into the local inference service, or switch back to the hosted default path.`
-            : "Pull the selected local model into the local inference service, or switch back to the hosted default path.",
+            ? `Pull ${endpointModel} into the local inference service, or repoint the LiteLLM route to an available model.`
+            : "Pull the selected local model into the local inference service, or repoint the LiteLLM route to an available model.",
           "Retry startup after the model is available."
         ],
         recommended_fix:
           endpointModel
-            ? `Pull ${endpointModel} into the local inference service, or switch back to the hosted default path.`
-            : "Pull the selected local model into the local inference service, or switch back to the hosted default path.",
+            ? `Pull ${endpointModel} into the local inference service, or repoint the LiteLLM route to an available model.`
+            : "Pull the selected local model into the local inference service, or repoint the LiteLLM route to an available model.",
         env_vars: ["OLLAMA_CHAT_MODEL", "OLLAMA_EMBEDDING_MODEL"],
         details: buildIssueDetails({
           check: "litellm-health",
@@ -642,12 +642,12 @@ export function createRuntimePreflightService(
           : "LiteLLM is up, but it could not reach one of the configured upstream AI services.",
         recovery: [
           isLocalModelBackend
-            ? "Start the local model service or switch back to the hosted default path."
+            ? "Start the local model service, then retry the GPU-backed launcher path."
             : "Check the upstream AI service URL, network path, and provider status behind LiteLLM.",
           "Retry startup after the upstream service is reachable."
         ],
         recommended_fix: isLocalModelBackend
-          ? "Start the local model service or switch back to the hosted default path."
+          ? "Start the local model service, then retry the GPU-backed launcher path."
           : "Check the upstream AI service URL, network path, and provider status behind LiteLLM.",
         env_vars: isLocalModelBackend ? ["OLLAMA_BASE_URL"] : ["LITELLM_PROXY_URL"],
         details: buildIssueDetails({
@@ -711,7 +711,7 @@ export function createRuntimePreflightService(
       message: "LiteLLM is running, but one or more upstream AI routes failed their health checks.",
       recovery: [
         "Inspect the LiteLLM health details, fix the failing upstream route, and retry startup.",
-        "If you only need the hosted default path, switch away from the failing optional override."
+        "If this route points at an unavailable manual override, repoint it to a healthy supported model and retry."
       ],
       recommended_fix: "Inspect the LiteLLM health details, fix the failing upstream route, and retry startup.",
       env_vars: ["LITELLM_PROXY_URL"],

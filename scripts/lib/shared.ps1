@@ -421,7 +421,7 @@ function Resolve-LocalGpuProfileSelection {
       -ManualVramGb $resolvedManualVram `
       -RequestedProfile $RequestedProfile `
       -Message ("The manual LOCAL_GPU_VRAM_GB override ({0} GB) is below the supported minimum tier of {1} GB." -f $resolvedManualVram, $minimumVramGb) `
-      -Notes @("Choose the hosted-default path or set LOCAL_GPU_PROFILE_ID to an intentionally smaller manual test profile if you know what you are doing.")
+      -Notes @("Choose a supported GPU profile id with LOCAL_GPU_PROFILE_ID only if you intentionally want a smaller unsupported smoke-test setup.")
   }
 
   $resolvedDetectedVram = $null
@@ -450,7 +450,7 @@ function Resolve-LocalGpuProfileSelection {
       -DetectedVramGb $resolvedDetectedVram `
       -RequestedProfile $RequestedProfile `
       -Message ("Detected GPU memory ({0} GB) is below the supported minimum tier of {1} GB for this local GPU path." -f $resolvedDetectedVram, $minimumVramGb) `
-      -Notes @("Switch back to the hosted-default path or set a manual local GPU override only if you intentionally want an unsupported smoke-test setup.")
+      -Notes @("Set a manual local GPU override only if you intentionally want an unsupported smoke-test setup.")
   }
 
   return New-LocalGpuSelectionResult `
@@ -523,14 +523,14 @@ function Resolve-RepoAiConfig {
     [switch]$IncludePort
   )
 
-  $profile = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROFILE") -Default "hosted-default"
+  $profile = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROFILE") -Default "local-gpu-small"
   if ([string]::IsNullOrWhiteSpace($profile)) {
-    $profile = "hosted-default"
+    $profile = "local-gpu-small"
   }
   $profile = $profile.Trim().ToLowerInvariant()
 
-  if ($profile -notin @("hosted-default", "local-gpu-small", "local-gpu-large", "custom")) {
-    $profile = "hosted-default"
+  if ($profile -notin @("local-gpu-small", "local-gpu-large", "custom")) {
+    $profile = "local-gpu-small"
   }
 
   $provider = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROVIDER") -Default ""

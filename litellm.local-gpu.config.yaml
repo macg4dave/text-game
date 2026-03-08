@@ -3,8 +3,9 @@
 # - game-chat
 # - game-embedding
 #
-# This file is mounted by the default Compose stack and activated by
-# `docker-compose.gpu.yml` or `scripts/start-dev.ps1 -AiStack local-gpu`.
+# This file is mounted by the default Compose stack and can be activated
+# manually when you want larger-model Docker GPU experiments beyond the
+# default launcher path.
 #
 # The authoritative tier matrix lives in:
 # - scripts/local-gpu-profile-matrix.json
