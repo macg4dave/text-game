@@ -86,6 +86,7 @@ Do not assume:
   - the player attempt or interpreted intent
   - the server-resolved accepted or rejected outcome
   - the authoritative state or director transitions committed under the active ruleset or schema version
+- The current canonical event contract should be treated as versioned `committed-event/v1`, with replay-critical semantic fields separated from optional transcript, prompt, or presentation artifacts.
 - Raw prompts, raw model responses, and final prose are useful diagnostics or presentation artifacts, but they are not sufficient as the replay source of truth.
 - Save migration, replay fixtures, and debugging surfaces should treat semantic event records as canonical and any raw transcript data as supplementary.
 

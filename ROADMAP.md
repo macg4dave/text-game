@@ -54,6 +54,12 @@ The MVP is the first release that proves the core product loop while feeling lik
 
 Browser-first development remains supported, but the MVP is judged on the player-facing launch path, not only on developer ergonomics.
 
+### Baseline Content Slice
+
+- The baseline MVP story arc should be treated as `story_sample`.
+- Story-specific labels, locations, NPC names, and branch names should stay placeholder-shaped until content implementation begins, using names such as `story_sample_name`, `story_sample_location`, and `story_sample_npc`.
+- The baseline sample remains intentionally small enough for the first end-to-end playable slice while still exercising onboarding, dialogue, movement, item use, consequence adjudication, save or load, and deterministic replay.
+
 ### MVP Exit Criteria
 
 The MVP is complete only when all of the following are true:
@@ -134,7 +140,7 @@ Exit gate:
 - The setup flow offers safe end-user profiles plus validated advanced overrides for developer-oriented configuration changes.
 - When a user opts into local GPU inference, the launcher or setup flow can recommend or auto-select a compatible model profile based on detected hardware or a manual override.
 - Common setup blockers can be retried or repaired from the player flow without reopening a terminal or deleting saves.
-- A golden replay test passes in CI for the baseline quest fixture.
+- A golden replay test passes in CI for the baseline `story_sample` fixture.
 
 ### Phase 2 - Memory, Director, and Session Continuity (Weeks 6-8)
 
@@ -193,7 +199,7 @@ Exit gate:
 - Quest specs validate against a versioned schema.
 - Quest progression is visible in an admin surface or equivalent inspection tool.
 - World state changes are diffable and replayable.
-- A non-engineer can modify the sample quest content using documented tooling.
+- A non-engineer can modify the sample story-arc content using documented tooling.
 - Unit, integration, replay, and fuzz tests run in CI on every push.
 - Telemetry captures latency, token usage, validation failures, retries, and model costs.
 - The baseline fixture suite enforces configured latency, token, cost, and DB-growth budgets with clear breach reporting.
@@ -245,6 +251,7 @@ Exit gate:
 - Make the first-run player path understandable without README reading by landing onboarding, setup, retry, and recovery flow work.
 - Add save and load to the main player flow so session continuity is part of the supported slice, not a later add-on.
 - Keep the supported Windows launcher and browser path aligned while Phase 1 replaces developer-facing gaps with player-facing guidance.
+- Author the locked `story_sample` baseline arc so the tutorial, replay, and save or load path are proven against one concrete story slice.
 
 ### Next
 
@@ -299,11 +306,13 @@ Exit gate:
 | Model is a narrator plus proposal engine only; the server adjudicates which consequences become truth and player-facing narrative must align to committed state | Locked | Gameplay systems lead | Prevents authority drift, keeps replay and save contracts deterministic, and stops prose from becoming an unreviewed state-mutation path. | End of Phase 1 |
 | Model-facing turn schema stays compact and transport-oriented rather than becoming the game's design language | Locked | AI systems lead | Keeps validation and schema evolution manageable while preserving server ownership of simulation, pacing, and quest semantics. | Start of T10 |
 | Turn handling separates freeform intent interpretation, world simulation resolution, and story pacing or framing | Locked | Gameplay systems lead | Preserves player agency while keeping authored beats useful as pacing tools instead of hidden refusal logic. | Start of T16 |
+| Director spec format stays JSON at `data/spec/director.json` for MVP | Locked | Gameplay systems lead | Matches the current runtime, tooling, and requirements contract while keeping `T16` focused on versioning and validation instead of relitigating file format. | Start of T16 |
 | Event log canon is committed semantic outcome data, while prompts and prose are supplemental diagnostics or presentation artifacts | Locked | Tech lead | Keeps replay stable across model or prompt changes and makes state transitions, not transcript text, the durable record. | Start of T09 |
 | Memory is classed and narration-supporting, with authority-sensitive retrieval rules and no independent truth power | Locked | AI systems lead | Prevents flavor recall from becoming a hidden authority channel and keeps canon, quest, and relationship memory usable without flattening all recall into one bucket. | Start of T13 |
 | NPC memory is significance-scored, tiered, and fact-based, while transcript retention remains replay or debug data only | Locked | AI systems lead | Keeps long-session continuity sparse, deterministic, and believable without turning chat history into the canonical memory store. | Start of T14 |
 | Memory is a storage hierarchy with budgeted hot context, versioned summaries, and cold history outside the default prompt | Locked | AI systems lead | Keeps token usage, retrieval quality, and context explainability under control while preserving recomputation from canonical records. | Start of T43 |
 | Server-side director enforcement is authoritative | Locked | Gameplay systems lead | Keeps story control and state integrity outside the client. | After first external playtest |
+| MVP sample story arc uses the placeholder `story_sample` until content implementation begins | Locked | Product/UI lead | Gives Phase 1 one concrete, tutorial-friendly end-to-end content target without hard-coding story lore that will drift before authored content work starts. | End of Phase 1 |
 | Windows is the primary supported end-user platform for MVP | Locked | Release lead | Reduces packaging surface area so launch quality can be solved properly before expanding platform support. | After first external playtest |
 
 ## References

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  COMMITTED_EVENT_SCHEMA_VERSION,
   type SetupStatusPayload,
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
+  type CanonicalTurnEventPayload,
   type AuthoritativePlayerState,
   type StateResponsePayload,
   type TurnResponsePayload,
@@ -12,6 +14,7 @@ import {
 } from "../core/types.js";
 import {
   parseTurnInput,
+  validateCanonicalTurnEvent,
   validateAuthoritativePlayerState,
   validateSetupStatusResponse,
   validateStateResponse,
@@ -359,6 +362,123 @@ test("validateTurnResponse rejects missing full turn fields and invalid authorit
   assert.equal(result.ok, false);
   assert.match(result.errors.join(" "), /memory_updates/i);
   assert.match(result.errors.join(" "), /player\.id/i);
+});
+
+test("validateCanonicalTurnEvent accepts a versioned replay event with canonical and supplementary sections", () => {
+  const payload: CanonicalTurnEventPayload = {
+    schema_version: COMMITTED_EVENT_SCHEMA_VERSION,
+    event_kind: "turn-resolution",
+    event_id: "event-123",
+    player_id: "player-123",
+    occurred_at: "2026-03-08T00:00:00.000Z",
+    attempt: {
+      input: "touch the lantern"
+    },
+    outcome: {
+      status: "accepted",
+      summary: "The player inspected the lantern and revealed the signal.",
+      rejection_reason: null
+    },
+    committed: {
+      state_updates: {
+        location: "Rooftop Market",
+        inventory_add: [],
+        inventory_remove: [],
+        flags_add: ["signal_seen"],
+        flags_remove: [],
+        quests: []
+      },
+      director_updates: {
+        end_goal_progress: "The signal now points toward the tower."
+      },
+      memory_updates: ["The signal lantern hummed when touched."]
+    },
+    contract_versions: {
+      turn_output: TURN_OUTPUT_SCHEMA_VERSION,
+      authoritative_state: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      ruleset: "story-rules/v1"
+    },
+    supplemental: {
+      transcript: {
+        player_text: "touch the lantern",
+        narrator_text: "The signal lantern hummed when touched."
+      },
+      presentation: {
+        narrative: "The signal lantern hummed when touched.",
+        player_options: ["Inspect the lantern"]
+      },
+      prompt: {
+        model: "game-chat"
+      }
+    }
+  };
+
+  assert.deepEqual(validateCanonicalTurnEvent(payload), { ok: true, errors: [] });
+});
+
+test("validateCanonicalTurnEvent rejects malformed canonical fields while allowing supplementary data to stay optional", () => {
+  const result = validateCanonicalTurnEvent({
+    schema_version: COMMITTED_EVENT_SCHEMA_VERSION,
+    event_kind: "chat-log",
+    event_id: 123,
+    player_id: "player-123",
+    occurred_at: "2026-03-08T00:00:00.000Z",
+    attempt: {
+      input: ""
+    },
+    outcome: {
+      status: "maybe",
+      summary: 42,
+      rejection_reason: []
+    },
+    committed: {
+      state_updates: {
+        location: "Rooftop Market",
+        inventory_add: [],
+        inventory_remove: [],
+        flags_add: [],
+        flags_remove: [],
+        quests: [],
+        world_state: {
+          weather: "storm"
+        }
+      },
+      director_updates: {
+        end_goal_progress: "The signal now points toward the tower.",
+        current_beat_id: "beat-2"
+      },
+      memory_updates: "not-an-array"
+    },
+    contract_versions: {
+      turn_output: "turn-output/v9",
+      authoritative_state: "authoritative-state/v9",
+      ruleset: ""
+    },
+    supplemental: {
+      transcript: {
+        player_text: 99
+      },
+      presentation: {
+        narrative: [],
+        player_options: ["Inspect the lantern", 7]
+      }
+    },
+    raw_response: "not allowed"
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /event_kind/i);
+  assert.match(result.errors.join(" "), /event_id/i);
+  assert.match(result.errors.join(" "), /attempt\.input/i);
+  assert.match(result.errors.join(" "), /outcome\.status/i);
+  assert.match(result.errors.join(" "), /committed\.state_updates\.world_state/i);
+  assert.match(result.errors.join(" "), /committed\.director_updates\.current_beat_id/i);
+  assert.match(result.errors.join(" "), /committed\.memory_updates/i);
+  assert.match(result.errors.join(" "), /contract_versions\.turn_output/i);
+  assert.match(result.errors.join(" "), /contract_versions\.authoritative_state/i);
+  assert.match(result.errors.join(" "), /supplemental\.transcript\.player_text/i);
+  assert.match(result.errors.join(" "), /supplemental\.presentation\.narrative/i);
+  assert.match(result.errors.join(" "), /raw_response/i);
 });
 
 test("validateSetupStatusResponse accepts a guided setup envelope", () => {

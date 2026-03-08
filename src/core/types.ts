@@ -17,6 +17,7 @@ export interface ValidationResult<TError = string> {
 export const TURN_INPUT_SCHEMA_VERSION = "turn-input/v1";
 export const TURN_OUTPUT_SCHEMA_VERSION = "turn-output/v1";
 export const AUTHORITATIVE_STATE_SCHEMA_VERSION = "authoritative-state/v1";
+export const COMMITTED_EVENT_SCHEMA_VERSION = "committed-event/v1";
 
 export interface TurnInputPayload {
   schema_version: typeof TURN_INPUT_SCHEMA_VERSION;
@@ -296,6 +297,60 @@ export interface StateResponsePayload {
 
 export interface TurnResponsePayload extends TurnOutputPayload {
   player: AuthoritativePlayerState;
+}
+
+export type CanonicalEventKind = "turn-resolution";
+export type CanonicalOutcomeStatus = "accepted" | "rejected";
+
+export interface CanonicalEventAttempt {
+  input: string;
+}
+
+export interface CanonicalEventOutcome {
+  status: CanonicalOutcomeStatus;
+  summary: string;
+  rejection_reason: string | null;
+}
+
+export interface CanonicalEventCommittedChanges {
+  state_updates: StateUpdateProposal | null;
+  director_updates: DirectorUpdateProposal | null;
+  memory_updates: string[];
+}
+
+export interface CanonicalEventContractVersions {
+  turn_output: typeof TURN_OUTPUT_SCHEMA_VERSION;
+  authoritative_state: typeof AUTHORITATIVE_STATE_SCHEMA_VERSION;
+  ruleset: string;
+}
+
+export interface CanonicalEventTranscript {
+  player_text: string | null;
+  narrator_text: string | null;
+}
+
+export interface CanonicalEventPresentation {
+  narrative: string | null;
+  player_options: string[];
+}
+
+export interface CanonicalEventSupplemental {
+  transcript?: CanonicalEventTranscript;
+  presentation?: CanonicalEventPresentation;
+  prompt?: unknown;
+}
+
+export interface CanonicalTurnEventPayload {
+  schema_version: typeof COMMITTED_EVENT_SCHEMA_VERSION;
+  event_kind: CanonicalEventKind;
+  event_id: string;
+  player_id: string;
+  occurred_at: string;
+  attempt: CanonicalEventAttempt;
+  outcome: CanonicalEventOutcome;
+  committed: CanonicalEventCommittedChanges;
+  contract_versions: CanonicalEventContractVersions;
+  supplemental?: CanonicalEventSupplemental;
 }
 
 export interface PlayerRow {

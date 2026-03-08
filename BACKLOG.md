@@ -2,7 +2,7 @@
 
 This document is the AI-facing execution board for the project. It is optimized for coding agents and humans working through small, verifiable tasks while removing friction from the supported player path.
 
-If this file and [ROADMAP.md](/g:/text-game/ROADMAP.md) disagree, the roadmap wins on product scope and phase order. If this file and implementation disagree, update this file before starting new work.
+If this file and [ROADMAP.md](/g:/text-game/ROADMAP.md) disagree on active sequencing or execution detail, this file is the execution source of truth and the roadmap should be updated to match. The roadmap remains the source for higher-level product scope and milestone framing. If this file and implementation disagree, update this file before starting new work.
 
 TypeScript source is authoritative in this repo: authoring code now lives under `src/**`, including browser UI source under `src/ui/`, and `public/app.js` is an emitted asset rather than an authoring surface.
 
@@ -25,7 +25,7 @@ Treat older task cards as historical notes where needed, but use the module-firs
 ## How Agents Must Use This File
 
 1. Read [ROADMAP.md](/g:/text-game/ROADMAP.md), this file, and [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md) before starting substantial work.
-2. Choose work from `## Ready Queue` unless the user explicitly assigns a different task.
+2. Choose work from the queue table below by selecting a row with `Status` = `Ready` unless the user explicitly assigns a different task.
 3. Within the current phase, bias toward the task that removes the most player friction, especially terminal use, manual config editing, and startup ambiguity.
 4. Claim exactly one task card by changing its `Status` from `Ready` to `In Progress`.
 5. Do only the work described in that task card unless a blocking dependency forces a documented expansion.
@@ -39,7 +39,7 @@ Treat older task cards as historical notes where needed, but use the module-firs
 
 ## Status Model
 
-- `Ready`: fully specified and safe for an agent to start
+- `Ready`: fully specified and safe for an agent to start once listed dependencies are satisfied
 - `In Progress`: currently being worked by one agent
 - `Blocked`: cannot proceed because a dependency, decision, or missing context prevents safe execution
 - `Review`: implementation is done and awaits human or follow-up agent review
@@ -148,6 +148,8 @@ Use one of the exact shapes below when adding new work.
 
 ## Ready Queue
 
+This table is the full execution board. Only rows with `Status` = `Ready` are startable without additional backlog work.
+
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Done | T02 | `docker compose run --rm --no-deps app npm run test:config` + manual Docker Ollama smoke |
@@ -170,16 +172,16 @@ Use one of the exact shapes below when adding new work.
 | T56 | Now | P1 | P2 | Future issue intake workflow | Done | None | Manual planning-doc consistency review |
 | T56a | Now | P1 | P2 | Backlog parent and child task pattern | Done | T56 | Manual backlog structure review |
 | T56b | Now | P1 | P2 | Cross-doc planning sync policy | Done | T56 | Manual roadmap, requirements, architecture, and standards consistency review |
-| T57 | Now | P1 | P1 | Authority-safe turn truth boundary | In Progress | T06 | Manual planning-doc consistency review |
+| T57 | Now | P1 | P1 | Authority-safe turn truth boundary | Done | T06 | Manual planning-doc consistency review |
 | T57a | Now | P1 | P1 | Proposal-only turn contract and prompt boundary | Done | T06, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T58 | Next | P1 | P1 | Player agency and pacing boundary | Ready | T06, T57 | Manual planning-doc consistency review |
+| T58 | Next | P1 | P1 | Player agency and pacing boundary | Done | T06, T57 | Manual planning-doc consistency review |
 | T58a | Next | P1 | P1 | Intent, simulation, and pacing contract split | Ready | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T59 | Now | P1 | P1 | Semantic event log and replay canon | Ready | T06, T57 | Manual planning-doc consistency review |
-| T59a | Now | P1 | P1 | Canonical event schema and replay contract | Ready | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/server/http-contract.test.ts src/rules/validator.test.ts` |
-| T60 | Next | P1 | P1 | Memory classes and authority policy | Ready | T06, T57, T59 | Manual planning-doc consistency review |
+| T59 | Now | P1 | P1 | Semantic event log and replay canon | Done | T06, T57 | Manual planning-doc consistency review |
+| T59a | Now | P1 | P1 | Canonical event schema and replay contract | Done | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/server/http-contract.test.ts src/rules/validator.test.ts` |
+| T60 | Next | P1 | P1 | Memory classes and authority policy | Done | T06, T57, T59 | Manual planning-doc consistency review |
 | T60a | Next | P1 | P1 | Memory class contract and admission rules | Ready | T57a, T59a, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T60b | Later | P2 | P1 | Class-aware retrieval and summarization policy | Ready | T60a, T13, T62b, T63a | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
-| T61 | Now | P1 | P1 | Compact turn schema boundary | Ready | T06, T57 | Manual planning-doc consistency review |
+| T61 | Now | P1 | P1 | Compact turn schema boundary | Done | T06, T57 | Manual planning-doc consistency review |
 | T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Done | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Ready | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T12 | Next | P1 | P1 | New game onboarding | Review | T06 | Manual new-game flow check |
@@ -189,17 +191,22 @@ Use one of the exact shapes below when adding new work.
 | T12c | Next | P1 | P1 | Guided recovery actions and advanced setup details | Done | T12b, T01c, T02i, T04a, T02j | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/setup-status.test.ts src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
 | T29 | Next | P1 | P1 | Save slots UI | Ready | T08, T09 | Manual save/load check |
 | T34 | Next | P1 | P1 | Tutorial and first-run guidance | Ready | T11, T12 | Manual onboarding smoke test |
+| T64 | Now | P1 | P1 | MVP sample story arc definition and delivery slices | Done | None | Manual planning-doc consistency review |
+| T64a | Now | P1 | P1 | story_sample brief and acceptance criteria | Done | None | Manual planning-doc consistency review |
+| T64b | Next | P1 | P1 | story_sample authored content slice | Ready | T34, T57c | Manual story-arc smoke test |
+| T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Ready | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
 | T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Ready | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Ready | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Ready | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T58b | Later | P2 | P1 | Simulation-first consequence resolution | Ready | T58a, T57b, T07, T08 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
+| T58c | Later | P2 | P1 | Director framing and beat pacing policy | Ready | T16, T58b | Schema validation check + integration test + replay fixture execution |
 | T51 | Next | P1 | P1 | Database storage and migration boundary split | Ready | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
 | T52 | Next | P1 | P1 | Validator contract module split | Ready | T06, T12c, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T53 | Next | P1 | P1 | Launcher entrypoint and script library split | Ready | T02h, T12c | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T54 | Next | P1 | P2 | Setup view model and recovery policy split | Ready | T11a, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
-| T62 | Next | P2 | P1 | NPC memory significance pipeline | Ready | T59, T60 | Manual planning-doc consistency review |
+| T62 | Next | P2 | P1 | NPC memory significance pipeline | Done | T59, T60 | Manual planning-doc consistency review |
 | T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Ready | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T63 | Next | P2 | P1 | Memory storage hierarchy and context-budget policy | Ready | T59, T60, T61, T62 | Manual planning-doc consistency review |
+| T63 | Next | P2 | P1 | Memory storage hierarchy and context-budget policy | Done | T59, T60, T61, T62 | Manual planning-doc consistency review |
 | T63a | Next | P2 | P1 | Live context hierarchy and retrieval budget contract | Ready | T60a, T61a, T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T63b | Next | P2 | P1 | Summary compression and versioned memory artifacts | Ready | T63a, T59b, T62b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T63c | Next | P2 | P1 | Memory context observability and replay tooling | Ready | T63a, T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
@@ -212,7 +219,7 @@ Use one of the exact shapes below when adding new work.
 | T15 | Later | P2 | P1 | Memory summarizer job | Ready | T09, T60b, T62c, T63b | `npm test` |
 | T62b | Later | P2 | P1 | NPC importance tiers and long-lived memory admission | Ready | T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T62c | Later | P2 | P1 | Partitioned retrieval for NPC, world, journal, and scene context | Ready | T62b, T60b, T13 | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
-| T16 | Later | P2 | P1 | Director spec format and versioning | Ready | T06, D02, T58a | Schema validation check |
+| T16 | Later | P2 | P1 | Director spec format and versioning | Ready | T06, T58a | Schema validation check |
 | T17 | Later | P2 | P1 | Director enforcement in turn pipeline | Ready | T16, T58b | Integration test |
 | T18 | Later | P2 | P2 | Director reload endpoint | Ready | T16 | Manual reload verification |
 | T43 | Later | P2 | P1 | Budget config file and API contract | Ready | D01, T07a, T09, T13a, T63a | `npm test` + manual budget API round-trip |
@@ -368,7 +375,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T57 - Authority-Safe Turn Truth Boundary
 
-- Status: In Progress
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -402,17 +409,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - manual planning-doc consistency review
   - child task validation listed on each child card
 - Definition of Done:
-  - the model no longer acts as an implicit game engine or truth source
-  - committed state, replay data, and player-facing narrative follow one authority boundary
-  - Phase 1 turn, validator, and replay work can continue without hardening drift later as an afterthought
+  - the authority boundary is locked in planning docs and decomposed into implementation-ready child tasks
+  - dependent Phase 1 work can proceed against explicit child slices instead of re-litigating where truth lives
+  - remaining implementation work is tracked in `T57a`, `T57b`, and `T57c`
 - Handoff Notes:
   - user assigned this issue on 2026-03-08 after identifying authority drift as the main architectural risk in the turn pipeline
-  - current code and docs still let the model emit `state_updates`, `director_updates`, and `memory_updates` in a way that reads like truth instead of proposals
-  - the target contract is explicit: the model may propose consequences, but the server decides what becomes true, and the final narrative returned to the player must be downstream of committed state
-  - use this parent item to gate `T07`, `T08`, `T09`, and `T10` so replay and save work do not harden the wrong truth boundary
-  - manual planning-doc consistency review on 2026-03-08 found the roadmap, requirements, architecture, and engineering standards already aligned on proposal-only model output, server-side adjudication, and committed-state-first narrative
-  - live code still hardens the wrong boundary in `src/core/types.ts`, `src/ai/prompt.ts`, `src/ai/service.ts`, `src/rules/validator.ts`, `src/state/turn-result.ts`, and `src/state/turn.ts`, where `state_updates`, `director_updates`, and `memory_updates` are still treated as direct turn output and are committed before any explicit server-owned adjudication layer
-  - no additional planning-doc edits were required in this session; the next concrete implementation slices remain `T61a` and `T57a`, followed by `T57b`
+  - parent issue closeout on 2026-03-08 confirmed the roadmap, requirements, architecture, and engineering standards align on proposal-only model output, server-side adjudication, and committed-state-first narrative
+  - the remaining implementation surface is explicit: `T57a` locked the proposal boundary, `T57b` owns server adjudication and commit policy, and `T57c` owns post-commit narration and drift fixtures
+  - use the child tasks, not this parent card, as the execution gate for later turn, replay, and save work
 
 ### T57a - Proposal-Only Turn Contract And Prompt Boundary
 
@@ -548,9 +552,150 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - prefer deterministic fixtures over ad hoc manual examples so later agents can rerun the same drift cases
   - keep the player surface simple; if proposed-versus-accepted details need to be exposed, confine them to debug tooling rather than normal gameplay text
 
-### T58 - Player Agency And Pacing Boundary
+### T64 - MVP Sample Story Arc Definition And Delivery Slices
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: Product/UI lead
+- Goal: Lock the MVP sample story arc and decompose its delivery into implementation-ready slices before Phase 1 content work drifts into generic placeholder quest planning.
+- Scope:
+  - resolve the open MVP story-arc decision in planning docs
+  - define one concrete baseline arc that is small enough for the playable slice but rich enough to exercise the main Phase 1 contracts
+  - split follow-on implementation into explicit content and fixture tasks
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - REQUIREMENTS.md
+- Do Not Touch:
+  - src/
+  - public/
+  - data/spec/
+- Dependencies:
+  - None
+- Child Tasks:
+  - T64a
+  - T64b
+  - T64c
+- Validation:
+  - manual planning-doc consistency review
+  - child task validation listed on each child card
+- Definition of Done:
+  - the sample MVP story arc is locked in planning docs
+  - the implementation path is captured as explicit child tasks instead of an open decision note
+  - Phase 1 exit work has a concrete content target
+- Handoff Notes:
+  - created on 2026-03-08 during doc-only backlog cleanup after identifying that `D03` existed without delivery tasks
+  - the locked baseline arc identifier is `story_sample`; keep planning references generic until authored content work begins
+  - `T64b` owns authored content and `T64c` owns the golden walkthrough and replay proof
+
+### T64a - story_sample Brief And Acceptance Criteria
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: Product/UI lead
+- Goal: Define the `story_sample` arc placeholder clearly enough that later implementation, tutorial, and replay work share one content target without locking in drifting lore too early.
+- Scope:
+  - document the arc placeholder shape, minimum locations, and named-NPC expectations
+  - define the tutorial coverage and completion condition for the baseline slice
+  - sync roadmap and requirements language so the story-arc decision is no longer implicit and does not depend on provisional names
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - REQUIREMENTS.md
+- Do Not Touch:
+  - src/
+  - public/
+  - data/spec/
+- Dependencies:
+  - None
+- Validation:
+  - manual planning-doc consistency review
+- Definition of Done:
+  - `story_sample` is referenced consistently in planning docs
+  - the MVP arc has clear tutorial coverage and completion criteria
+  - later content tasks can implement one shared baseline instead of inventing their own sample quest
+- Handoff Notes:
+  - completed on 2026-03-08 as a doc-only planning slice
+  - keep later implementation honest to the locked content boundary while using placeholder-shaped labels such as `story_sample_name` and `story_sample_location` until authored content begins
+
+### T64b - story_sample Authored Content Slice
 
 - Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Product/UI lead
+- Goal: Author the playable `story_sample` content slice so the supported Phase 1 path reaches one concrete story arc instead of placeholder free play.
+- Scope:
+  - replace placeholder planning labels with authored content for `story_sample`
+  - ensure the authored content supports both the guided tutorial path and at least one plausible off-path success or compromise
+  - keep all player-facing consequences aligned with committed state and accepted outcomes
+- Files to Touch:
+  - BACKLOG.md
+  - data/spec/
+  - src/story/
+  - src/state/
+  - src/rules/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - packaging/
+- Dependencies:
+  - T34
+  - T57c
+- Validation:
+  - manual story-arc smoke test
+- Definition of Done:
+  - the `story_sample` arc is playable end to end through the supported turn path
+  - the authored path exercises dialogue, movement, item use, and a final resolution choice
+  - off-path but plausible actions still resolve coherently under the accepted-outcome contract
+- Handoff Notes:
+  - keep the slice narrow; this task is not the general quest-authoring system
+  - coordinate with `T64c` so the authored branch coverage is stable enough for a golden walkthrough fixture
+
+### T64c - Baseline Story Arc Walkthrough And Golden Replay Fixture
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Prove the baseline `story_sample` arc can be completed and replayed deterministically from one golden walkthrough.
+- Scope:
+  - add a canonical walkthrough or fixture for the baseline arc
+  - validate that the final committed state and event semantics replay correctly without depending on exact narrator prose
+  - capture the expected 10-turn guided path baseline used for later replay and regression checks
+- Files to Touch:
+  - BACKLOG.md
+  - scripts/
+  - src/state/
+  - src/server/
+  - data/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - packaging/
+- Dependencies:
+  - T64b
+  - T59b
+- Validation:
+  - replay fixture execution
+  - manual 10-turn story smoke
+- Definition of Done:
+  - one documented walkthrough completes `story_sample` end to end
+  - replay reproduces the same authoritative outcome from committed event data
+  - the baseline content slice now has a stable regression target for later save, memory, and budget work
+- Handoff Notes:
+  - keep the fixture grounded in committed semantics; exact prose may vary as long as the accepted outcome is stable
+  - prefer one canonical success path first; broader branch coverage can come later once the baseline replay target is stable
+
+### T58 - Player Agency And Pacing Boundary
+
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -593,6 +738,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - current prompt and director logic still lean toward beat-first steering, including instructions that tell the model to add beat unlock flags directly
   - this issue complements `T57`: `T57` protects truth authority, while `T58` protects agency and pacing boundaries
   - treat the director as a framing layer over accepted outcomes, not as the primary judge of whether the player's attempt was allowed
+  - parent issue closeout on 2026-03-08 confirmed the planning docs are aligned on the three-layer turn model: `REQUIREMENTS.md` now requires separated intent, simulation, and pacing; `ARCHITECTURE.md` defines the handoff between those layers; `ENGINEERING_STANDARDS.md` adds explicit agency-and-pacing test policy; and `ROADMAP.md` records the risk, sequencing, and decision-log impact
+  - the remaining implementation surface is explicit: `T58a` locks the contract and tests, `T58b` introduces simulation-first consequence resolution, and `T58c` reframes director pacing around accepted outcomes
+  - use the child tasks, not this parent card, as the execution gate for later turn orchestration, reducer, quest, and director-spec work
 
 ### T58a - Intent, Simulation, And Pacing Contract Split
 
@@ -721,7 +869,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T59 - Semantic Event Log And Replay Canon
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -754,18 +902,18 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - manual planning-doc consistency review
   - child task validation listed on each child card
 - Definition of Done:
-  - the repo defines what an event is in replay terms, not only in transcript terms
-  - deterministic replay no longer depends on rerunning a model or preserving exact narrator prose
-  - later save, replay, and fixture work share one canonical event-record definition
+  - the replay canon is locked in planning docs and decomposed into implementation-ready child tasks
+  - deterministic replay expectations are explicit before `T09` and `T59b` harden storage and fixtures
+  - later save, replay, and fixture work can execute against one canonical event-record definition
 - Handoff Notes:
   - user assigned this issue on 2026-03-08 after identifying replay drift risk from transcript-only event storage
-  - current storage still uses `events(role, content)` which is suitable for short history and UI transcript rendering but not yet sufficient as the canonical replay record
-  - this issue complements `T57`: `T57` defines what becomes true, while `T59` defines how accepted truth is durably recorded for replay
-  - raw prompt, response, and prose retention may still be useful for debugging, but those fields must be explicitly non-canonical for replay
+  - parent issue closeout on 2026-03-08 confirmed the planning docs align on committed semantic events as replay canon: `ROADMAP.md` now gates Phase 1 and replay work on committed semantic records, `REQUIREMENTS.md` requires authoritative transitions and accepted or rejected outcomes in the canonical event log, `ARCHITECTURE.md` treats raw prompt or prose retention as supplementary, and `ENGINEERING_STANDARDS.md` locks replay-affecting storage to committed semantics plus version markers
+  - the remaining implementation surface is explicit: `T59a` defines the concrete event contract in types and HTTP surfaces, and `T59b` owns DB persistence plus the golden replay fixture
+  - use the child tasks, not this parent card, as the execution gate for later event-log, replay, and save work
 
 ### T59a - Canonical Event Schema And Replay Contract
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -804,6 +952,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - decide the canonical event meaning now even if the DB migration lands in a later child task
   - prefer names that reflect committed outcome semantics rather than chat transcript wording
   - if transcript preservation remains useful, document it as supplementary so replay consumers do not treat it as canonical input
+  - completed on 2026-03-08 by introducing versioned `committed-event/v1` typing in `src/core/types.ts`, a matching validator in `src/rules/validator.ts`, and the `createCommittedTurnEventPayload` helper in `src/server/http-contract.ts`
+  - the canonical contract now explicitly separates replay-critical `attempt`, `outcome`, `committed`, and `contract_versions` fields from optional supplementary transcript, prompt, and presentation data
+  - `validateTurnResponse` was also corrected so the authoritative `player` snapshot is no longer misclassified as compact-schema creep during response validation
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, and `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/server/http-contract.test.ts src/rules/validator.test.ts`
+  - `T59b` should persist this contract without redefining field meaning; keep transcript storage explicitly supplementary if a compatibility bridge for legacy `events(role, content)` rows is needed
 
 ### T59b - Committed Outcome Event Persistence And Replay Fixture
 
@@ -851,7 +1004,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T60 - Memory Classes And Authority Policy
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -885,14 +1038,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - manual planning-doc consistency review
   - child task validation listed on each child card
 - Definition of Done:
-  - memory classes are explicit in the repo contract instead of implied by one generic fact bucket
-  - authority-sensitive and flavor-oriented memories have distinct admission and retrieval expectations
-  - Phase 2 memory tasks can proceed without re-litigating whether memory defines truth
+  - memory classes and authority expectations are locked in planning docs and decomposed into implementation-ready child tasks
+  - authority-relevant and flavor-oriented memory behavior is explicit before retrieval and embedding work expands
+  - later memory tasks can proceed without reopening whether memory is a second truth system
 - Handoff Notes:
   - user assigned this issue on 2026-03-08 after identifying the need for memory classes from the start
-  - current storage still inserts all memories as `kind = "fact"` and current retrieval treats all persisted memories as one pool
-  - this issue complements `T57` and `T59`: truth is still decided by committed state and semantic events, while memory remains a classed support system for continuity and narration
-  - use explicit classes such as hard canon facts, quest progression facts, relationship facts, world discoveries, and soft flavor recollections unless later product changes require renaming
+  - parent issue closeout on 2026-03-08 confirmed the planning docs align on explicit memory classes and authority policy: `REQUIREMENTS.md` names hard canon, quest progression, relationship, world-discovery, and soft-flavor classes; `ARCHITECTURE.md` and `ENGINEERING_STANDARDS.md` separate class from storage tier and forbid memory from becoming independent truth; `ROADMAP.md` now treats class-aware retrieval as a prerequisite for stable longer-session continuity
+  - the remaining implementation surface is explicit: `T60a` owns types, validator expectations, and admission rules, while `T60b` owns class-aware retrieval and summarization policy
+  - use the child tasks, not this parent card, as the execution gate for later retrieval, embeddings, and memory-persistence work
 
 ### T60a - Memory Class Contract And Admission Rules
 
@@ -983,7 +1136,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T61 - Compact Turn Schema Boundary
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -1017,14 +1170,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - manual planning-doc consistency review
   - child task validation listed on each child card
 - Definition of Done:
-  - the repo contract treats model schema as a compact transport boundary rather than as a scene model or rules engine
-  - downstream turn, validator, and memory tasks can evolve server-owned logic without repeatedly expanding the model schema
-  - schema changes have explicit guardrails against turning prompt structure into hidden gameplay design
+  - the compact schema boundary is locked in planning docs and decomposed into implementation-ready child tasks
+  - downstream turn, validator, and memory tasks can evolve server-owned logic without reopening schema-boundary debates
+  - schema evolution guardrails are explicit enough that future changes can be reviewed against one standard
 - Handoff Notes:
   - user assigned this issue on 2026-03-08 after identifying schema design as a major architectural risk
-  - current code still centers the turn contract on `state_updates`, `director_updates`, and `memory_updates`, which makes the model output read more like an engine surface than a compact proposal payload
-  - this issue complements `T57`, `T58`, `T59`, and `T60`: authority, pacing, replay, and memory all depend on keeping the model contract narrow enough that server-owned rules stay in control
-  - use this parent item to gate `T57a`, `T10`, `T52`, and `T60a` so validator and memory work do not harden schema sprawl as the default pattern
+  - parent issue closeout on 2026-03-08 confirmed the planning docs align on a compact transport-oriented schema boundary: `REQUIREMENTS.md` and `ARCHITECTURE.md` now reject scene-shaped world models and design-language payloads, `ENGINEERING_STANDARDS.md` requires transport justification for new model-facing fields, and `ROADMAP.md` records compact schema as a locked Phase 1 decision and an active sequencing gate
+  - `T61a` already landed the first implementation slice for the compact proposal contract; `T61b` remains the follow-on guardrail and fixture policy task
+  - use the child tasks, not this parent card, as the execution gate for later validator, turn-pipeline, and memory-contract work
 
 ### T61a - Compact Proposal Schema And Validator Contract
 
@@ -1118,7 +1271,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T62 - NPC Memory Significance Pipeline
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P2
 - Priority: P1
@@ -1152,14 +1305,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - manual planning-doc consistency review
   - child task validation listed on each child card
 - Definition of Done:
-  - NPC memory is planned as a significance pipeline instead of a raw transcript-retention feature
-  - durable NPC recall is tiered, sparse, and based on structured canon facts
-  - Phase 2 memory, retrieval, and summarization work can proceed without collapsing transcript, scene context, and long-lived memory into one bucket
+  - the NPC memory significance pipeline is locked in planning docs and decomposed into implementation-ready child tasks
+  - durable NPC recall expectations are explicit before Phase 2 retrieval and summarization work expands
+  - later NPC-memory work can proceed without collapsing transcript, scene context, and long-lived memory into one bucket
 - Handoff Notes:
   - user assigned this issue on 2026-03-08 after identifying NPC memory as a significance pipeline rather than a chat-log problem
-  - current repo planning covers memory classes and replay canon, but it does not yet define post-dialogue significance scoring, NPC importance tiers, or separation between NPC memory, world memory, player journal memory, and current scene context
-  - this issue complements `T59` and `T60`: transcript data remains for replay and debugging, while committed structured facts drive durable NPC continuity
-  - use this parent item to gate `T13`, `T14`, `T15`, and `T60b` so Phase 2 memory work does not harden raw-log retention as the default design
+  - parent issue closeout on 2026-03-08 confirmed the planning docs align on the four-layer NPC memory pipeline: `REQUIREMENTS.md` distinguishes transcript, encounter facts, thresholded long-lived memory, and short-lived scene context; `ARCHITECTURE.md` defines significance signals, importance tiers, and partitioned retrieval domains; `ENGINEERING_STANDARDS.md` requires sparse tiered NPC memory and fixtures that reject raw-chat flooding; `ROADMAP.md` records significance-scored structured recall as the Phase 2 direction
+  - the remaining implementation surface is explicit: `T62a` owns encounter-fact schema and significance scoring, `T62b` owns NPC importance tiers and admission, and `T62c` owns partitioned retrieval policy
+  - use the child tasks, not this parent card, as the execution gate for later NPC continuity, retrieval, and summarization work
 
 ### T62a - Encounter Fact Schema And Significance Evaluator
 
@@ -1293,7 +1446,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T63 - Memory Storage Hierarchy And Context-Budget Policy
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P2
 - Priority: P1
@@ -1330,14 +1483,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - manual planning-doc consistency review
   - child task validation listed on each child card
 - Definition of Done:
-  - memory is planned as hot versus durable storage instead of as one large prompt payload
-  - live context, compression, and measurement rules are explicit enough that retrieval and summary work cannot drift by accident
+  - the memory storage hierarchy and context-budget policy are locked in planning docs and decomposed into implementation-ready child tasks
+  - live-context, compression, and observability expectations are explicit before later retrieval and telemetry work expands
   - later budget, telemetry, and replay tasks can measure context assembly against one stable policy
 - Handoff Notes:
   - user assigned this issue on 2026-03-08 after identifying memory as a storage hierarchy rather than a monolithic prompt problem
-  - current planning covers classed memory, NPC significance, and budget work separately, but it does not yet define the hot-context contract, summary versioning, compression cadence, or context-entry tooling as one system
-  - this issue complements `T57`, `T59`, `T60`, and `T62`: server-owned canon still decides truth, while memory hierarchy decides what low-cost context the model receives
-  - use this parent item to gate `T60b`, `T15`, `T43`, and `T26` so retrieval, summarization, budget config, and telemetry all align to one measured context policy
+  - parent issue closeout on 2026-03-08 confirmed the planning docs align on storage tiers and context budgeting: `REQUIREMENTS.md` defines memory as a storage hierarchy with explicit live-context limits, `ARCHITECTURE.md` separates class from storage tier and requires bucketed inspectable context assembly, `ENGINEERING_STANDARDS.md` adds hot-versus-cold storage, per-bucket budgets, summary versioning, prompt diffs, and retrieval traces, and `ROADMAP.md` records storage hierarchy plus context-entry accounting as locked Phase 2 direction
+  - the remaining implementation surface is explicit: `T63a` owns live-context bucket contracts, `T63b` owns compression and versioned summary artifacts, and `T63c` owns context observability and replay tooling
+  - use the child tasks, not this parent card, as the execution gate for later retrieval, telemetry, budget, and summarization work
 
 ### T63a - Live Context Hierarchy And Retrieval Budget Contract
 
@@ -2877,13 +3030,974 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - `T43` and `T44` will add more config surface area; land this split before config behavior starts spilling into another mixed-purpose file
   - keep the public diagnostics payload stable so setup and debug UI code do not need a concurrent contract rewrite
 
+### T07 - Turn Handler And Model Orchestration
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Route a versioned turn request through prompt assembly, model execution, and response parsing without pushing gameplay authority into the HTTP layer.
+- Scope:
+  - compose prompt building, adapter calls, and response parsing behind one server-owned turn service
+  - keep the turn route thin while preserving the compact proposal contract and request or response version markers
+  - add focused orchestration coverage for the happy path and at least one malformed or failed model response
+- Files to Touch:
+  - BACKLOG.md
+  - src/ai/
+  - src/state/
+  - src/server/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T06
+  - T57a
+  - T58a
+- Validation:
+  - `npm test`
+- Definition of Done:
+  - turn orchestration has one explicit module boundary instead of route-local wiring
+  - the live turn path preserves proposal-only output and the intent or simulation or pacing split
+  - focused tests cover ordering, adapter failure handling, and response parsing
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep this task coordinated with `T57b`, `T08`, and `T10` so orchestration does not smuggle authority back into transport code
+
+### T07a - LiteLLM Default Chat Route For Turn Generation
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Use the default LiteLLM chat alias as the supported turn-generation route without leaking provider-specific behavior outside the adapter boundary.
+- Scope:
+  - wire turn generation through the documented LiteLLM chat alias and config surface
+  - keep provider-specific request or error handling inside the AI adapter boundary
+  - capture one repeatable manual validation path for the supported chat route before later fixture automation lands
+- Files to Touch:
+  - BACKLOG.md
+  - src/ai/
+  - src/core/config/
+  - scripts/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T02f
+  - T07
+- Validation:
+  - Manual turn submission against LiteLLM
+- Definition of Done:
+  - the supported chat path uses the default LiteLLM alias end to end
+  - turn generation does not require direct provider SDK usage outside the adapter boundary
+  - manual validation clearly proves which route and alias were exercised
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep follow-on automated route coverage in `T47` instead of expanding this task into a fixture suite
+
+### T08 - Deterministic State Reducer
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Apply accepted turn consequences through one deterministic server-side reducer so replay, save, and validation work share the same state transition contract.
+- Scope:
+  - define reducer inputs and outputs around accepted consequences rather than raw model prose
+  - keep reducer logic independent from HTTP transport and AI adapter details
+  - add deterministic tests for state transitions, rejection paths, and versioned player snapshots
+- Files to Touch:
+  - BACKLOG.md
+  - src/state/
+  - src/core/types.ts
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T06
+  - T57a
+  - T58a
+- Validation:
+  - `npm test`
+- Definition of Done:
+  - authoritative state transitions are driven by one reducer contract
+  - tests prove the same accepted input produces the same committed state result every time
+  - reducer logic is ready for later replay and save work without depending on narrator prose
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - coordinate closely with `T57b` so adjudicated consequences are the reducer input, not raw model deltas
+
+### T09 - Event Log Persistence And Replay
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Persist canonical turn events and replay them from committed semantics instead of relying on prompt or prose history.
+- Scope:
+  - store replay-relevant event data with explicit version markers and authoritative transitions
+  - provide a deterministic replay path that rebuilds state from canonical event semantics
+  - keep prompts and prose supplementary so replay stays stable across model or prompt changes
+- Files to Touch:
+  - BACKLOG.md
+  - src/core/
+  - src/state/
+  - src/server/
+  - scripts/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T04
+  - T08
+  - T57b
+  - T59a
+- Validation:
+  - Replay fixture execution
+- Definition of Done:
+  - event persistence distinguishes canonical replay data from diagnostics
+  - a replay path can reconstruct final state from stored committed events
+  - replay validation demonstrates stability without rerunning model generation
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep `T59a` and `T59b` as the contract-setting slices so this task focuses on the runtime persistence and replay path
+
+### T10 - Output Validator And Sanitizer
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Reject malformed, unsafe, or over-modeled turn output before it reaches adjudication or authoritative mutation.
+- Scope:
+  - validate the compact proposal contract strictly at the server boundary
+  - sanitize or reject narrative and option payloads that conflict with committed-state rules
+  - add focused tests for malformed schema, authority drift, and rejected extra fields
+- Files to Touch:
+  - BACKLOG.md
+  - src/rules/
+  - src/state/
+  - src/server/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T06
+  - T57a
+  - T61a
+- Validation:
+  - `npm test`
+- Definition of Done:
+  - invalid or overreaching model output is rejected before state mutation
+  - validator behavior is explicit enough to block schema creep and authority drift
+  - tests cover both malformed payloads and plausible-looking but unauthorized proposals
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep transport validation here and leave committed consequence decisions to `T57b`
+
+### T12a - Rate Limiting And Abuse Guard
+
+- Status: Ready
+- Queue: Later
+- Phase: P1
+- Priority: P3
+- Owner Role: Tech lead
+- Goal: Add a minimal server-side abuse guard so the supported player flow can throttle obvious misuse without changing the single-player product shape.
+- Scope:
+  - apply lightweight request throttling to player-facing mutation routes
+  - keep rate-limit responses plain-language and compatible with the current browser contract
+  - add focused tests or a documented simulation path for blocked versus allowed requests
+- Files to Touch:
+  - BACKLOG.md
+  - src/server/
+  - src/core/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T07
+- Validation:
+  - `npm test`
+- Definition of Done:
+  - obvious repeated turn spam is throttled by server-owned policy
+  - rate limiting does not corrupt session state or create unclear client failures
+  - the guard remains small enough to fit the MVP single-player scope
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - do not let this task expand into broad auth or multiplayer work
+
+### T13 - Embeddings Pipeline
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Generate and persist embeddings through the provider-neutral adapter so memory retrieval can rank committed facts without hard-coding one provider path.
+- Scope:
+  - add the runtime path that requests embeddings for admitted memory records
+  - keep embedding generation behind the shared AI adapter and LiteLLM boundary
+  - store embedding outputs in a format later retrieval tasks can consume deterministically
+- Files to Touch:
+  - BACKLOG.md
+  - src/ai/
+  - src/state/
+  - src/core/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T07a
+  - T60a
+  - T62b
+- Validation:
+  - Manual embedding call verification
+- Definition of Done:
+  - the app can request and persist embeddings through the supported adapter path
+  - embedding generation uses committed memory inputs rather than raw transcript dumps
+  - the stored shape is stable enough for later retrieval and budget work
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep retrieval policy out of this task; ranking belongs to `T14` and class policy belongs to `T60b`
+
+### T13a - LiteLLM Embedding Alias Integration
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Use the default LiteLLM embedding alias as the supported embedding route so later memory work can rely on one documented upstream path.
+- Scope:
+  - wire embedding requests through the documented LiteLLM embedding alias and config contract
+  - keep provider-specific route details inside the adapter boundary
+  - capture a repeatable verification path for the supported embedding alias before broader fixture automation lands
+- Files to Touch:
+  - BACKLOG.md
+  - src/ai/
+  - src/core/config/
+  - scripts/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T02f
+- Validation:
+  - Manual embedding route verification
+- Definition of Done:
+  - the supported embedding path uses the default LiteLLM alias end to end
+  - embedding route failures surface as adapter-level issues instead of leaking provider-specific assumptions
+  - manual validation identifies the exact alias and route exercised
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep combined chat-plus-embedding fixture automation in `T47` rather than expanding this task
+
+### T14 - Retrieval And Top-K Ranking
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Select the smallest useful memory set for each turn through deterministic retrieval and ranking instead of broad transcript replay.
+- Scope:
+  - implement ranking over the admitted embedding-backed memory corpus
+  - respect class-aware and partition-aware retrieval constraints from earlier memory tasks
+  - add fixture coverage for relevance, recency, and sparse top-k behavior
+- Files to Touch:
+  - BACKLOG.md
+  - src/state/
+  - src/ai/
+  - scripts/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T13
+  - T13a
+  - T60b
+  - T62c
+- Validation:
+  - Retrieval fixture check
+- Definition of Done:
+  - retrieval returns a ranked sparse set instead of a broad history dump
+  - top-k selection respects class and partition policy rather than flattening all memory into one pool
+  - fixtures prove both useful recall and controlled omission
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep summary generation out of this task; summarization belongs to `T15`
+
+### T15 - Memory Summarizer Job
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Compress older committed history into versioned summaries so hot context stays small and replayable memory can be recomputed later.
+- Scope:
+  - run post-scene or higher-level summary generation against canonical records
+  - version summary artifacts so later recomputation can replace stale formats safely
+  - keep raw history cold by default even after summary generation exists
+- Files to Touch:
+  - BACKLOG.md
+  - src/state/
+  - src/ai/
+  - src/core/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T09
+  - T60b
+  - T62c
+  - T63b
+- Validation:
+  - `npm test`
+- Definition of Done:
+  - summary generation follows the documented storage-hierarchy policy
+  - summary artifacts can be recomputed from canonical records when logic changes
+  - tests prove summary creation does not become a second authority source
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - align compression cadence and artifact shape with `T63b` rather than inventing a parallel summary contract
+
+### T16 - Director Spec Format And Versioning
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Lock a versioned director-spec contract so pacing rules can evolve without turning beat logic into hidden gameplay state.
+- Scope:
+  - validate and version the persisted JSON director-spec format at `data/spec/director.json`
+  - version the director spec so later reload and enforcement work have a stable contract
+  - keep pacing-oriented director semantics separate from simulation rules and quest truth
+- Files to Touch:
+  - BACKLOG.md
+  - src/story/
+  - src/rules/
+  - data/spec/
+  - ARCHITECTURE.md
+- Do Not Touch:
+  - src/ui/
+  - public/
+- Dependencies:
+  - T06
+  - T58a
+- Validation:
+  - Schema validation check
+- Definition of Done:
+  - the director spec format is chosen, versioned, and validated
+  - director data stays a pacing contract rather than a hidden simulation engine
+  - later enforcement and reload work can consume one stable spec surface
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - `D02` was locked to JSON on 2026-03-08 to match the existing runtime path, tooling, and requirements references to `data/spec/director.json`
+
+### T17 - Director Enforcement In Turn Pipeline
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Apply director framing after accepted outcomes so pacing remains server-owned without replacing simulation or plausibility checks.
+- Scope:
+  - integrate director enforcement with the adjudicated turn pipeline after accepted consequences exist
+  - keep director output bounded to framing, pacing, and authored progression signals
+  - add integration coverage for off-path but plausible play versus implausible actions
+- Files to Touch:
+  - BACKLOG.md
+  - src/story/
+  - src/state/
+  - src/server/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T16
+  - T58b
+- Validation:
+  - Integration test
+- Definition of Done:
+  - director enforcement runs after simulation or adjudication instead of acting as a hidden refusal gate
+  - the turn pipeline keeps player agency while still honoring authored pacing rules
+  - integration coverage proves pacing and plausibility stay separate
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - coordinate with `T20` so quest progress and director framing read the same accepted outcome data
+
+### T18 - Director Reload Endpoint
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Reload versioned director rules without reinstalling the app so authored pacing changes can be tested safely during development and playtest prep.
+- Scope:
+  - add a thin server endpoint or command path that reloads the active director spec
+  - reuse the versioned spec validation path instead of inventing a second loader contract
+  - keep runtime reload behavior observable and safe for invalid-spec failures
+- Files to Touch:
+  - BACKLOG.md
+  - src/server/
+  - src/story/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T16
+- Validation:
+  - Manual reload verification
+- Definition of Done:
+  - director spec reload uses the same validated contract as startup load
+  - invalid reload attempts fail without corrupting the live runtime state
+  - reload behavior is documented clearly enough for later packaged diagnostics or authoring tools
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep this task about reload mechanics, not director editing UX
+
+### T19 - Quest Schema And Validation
+
+- Status: Ready
+- Queue: Later
+- Phase: P4
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Define a versioned quest-spec contract so authored content can change without hand-editing gameplay code paths.
+- Scope:
+  - version and validate the quest-spec format under `data/spec/`
+  - keep quest data ownership in authored specs and server-side validation rather than in model schema
+  - add schema checks that later quest-state and tooling work can reuse
+- Files to Touch:
+  - BACKLOG.md
+  - src/story/
+  - src/rules/
+  - data/spec/
+- Do Not Touch:
+  - src/ui/
+  - public/
+- Dependencies:
+  - T16
+- Validation:
+  - Schema validation check
+- Definition of Done:
+  - quest specs are versioned and validated before use
+  - validation errors identify content problems without requiring engine debugging
+  - later quest runtime and tooling tasks can extend one stable authored contract
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep this task focused on schema and validation; state transitions belong to `T20`
+
+### T20 - Quest State Transitions
+
+- Status: Ready
+- Queue: Later
+- Phase: P4
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Apply quest progression from accepted outcomes through server-owned transition rules instead of prose inference.
+- Scope:
+  - define quest state mutations against committed turn outcomes and authored quest specs
+  - keep progression deterministic and replay-friendly
+  - add tests for success, failure, and off-path progression behavior
+- Files to Touch:
+  - BACKLOG.md
+  - src/story/
+  - src/state/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T19
+  - T58b
+- Validation:
+  - `npm test`
+- Definition of Done:
+  - quest progression is driven by server-owned rules over accepted outcomes
+  - quest transitions remain replayable and deterministic
+  - tests cover both expected and off-path advancement where the authored rules allow it
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - coordinate with `T17` so director framing and quest progression do not duplicate authority
+
+### T21 - Quest Editor UI
+
+- Status: Ready
+- Queue: Later
+- Phase: P4
+- Priority: P2
+- Owner Role: Product/UI lead
+- Goal: Provide a minimal editor surface for sample quest content without making browser tooling the first content-authoring dependency.
+- Scope:
+  - add a small browser editor or equivalent UI for the quest spec format
+  - keep edits validated against the same quest schema used by the runtime
+  - preserve a plain authored-data path so the UI is a helper, not the only content workflow
+- Files to Touch:
+  - BACKLOG.md
+  - src/ui/
+  - src/server/
+  - data/spec/
+- Do Not Touch:
+  - public/app.js
+- Dependencies:
+  - T19
+- Validation:
+  - Manual editor smoke test
+- Definition of Done:
+  - the editor can create or update sample quest data through the validated quest contract
+  - invalid edits are surfaced clearly before they become runtime data
+  - the UI remains a thin authoring aid over the underlying spec files or APIs
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep the sample content workflow small; richer authoring UX stays out of MVP scope
+
+### T22 - World State Inspector UI
+
+- Status: Ready
+- Queue: Later
+- Phase: P4
+- Priority: P2
+- Owner Role: Product/UI lead
+- Goal: Expose committed world-state changes in a readable inspection surface so replay and quest debugging do not require raw DB browsing.
+- Scope:
+  - add a browser-facing diff or inspection view for authoritative world-state changes
+  - reuse existing replay or event data instead of inventing a second truth store
+  - keep the inspector clearly separated from player-facing gameplay surfaces
+- Files to Touch:
+  - BACKLOG.md
+  - src/ui/
+  - src/server/
+  - src/state/
+- Do Not Touch:
+  - public/app.js
+- Dependencies:
+  - T20
+- Validation:
+  - Manual diff view check
+- Definition of Done:
+  - the inspector can show meaningful state changes without manual DB inspection
+  - the displayed data comes from canonical server-owned records
+  - the surface stays diagnostic and does not become an alternate mutation path
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - prefer readable diffs over raw table dumps
+
+### T23 - Quest Import And Export
+
+- Status: Ready
+- Queue: Later
+- Phase: P4
+- Priority: P2
+- Owner Role: Gameplay systems lead
+- Goal: Move quest data in and out of the validated authored format without bypassing schema checks or version markers.
+- Scope:
+  - add import and export paths for quest-spec data
+  - validate incoming quest data before it becomes active content
+  - preserve spec version markers and clear failure reporting during transfer
+- Files to Touch:
+  - BACKLOG.md
+  - src/story/
+  - src/server/
+  - data/spec/
+- Do Not Touch:
+  - src/ui/
+  - public/
+- Dependencies:
+  - T19
+- Validation:
+  - Import or export smoke test
+- Definition of Done:
+  - quest import and export paths preserve the validated authored contract
+  - invalid or mismatched versions fail with clear recovery information
+  - transferred content remains compatible with later editor and runtime tasks
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep content portability here and leave editor ergonomics to `T21`
+
+### T25 - Fuzz Tests For Validator
+
+- Status: Ready
+- Queue: Later
+- Phase: P4
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Stress validator boundaries with generated malformed input so schema and sanitizer regressions are caught before release hardening.
+- Scope:
+  - add fuzz coverage around turn, setup, and content-validation surfaces that accept untrusted input
+  - keep generated cases deterministic enough for repeatable CI use where practical
+  - report the failing contract area clearly when a generated case breaks validation
+- Files to Touch:
+  - BACKLOG.md
+  - src/rules/
+  - src/server/
+  - scripts/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T10
+- Validation:
+  - Fuzz test run
+- Definition of Done:
+  - validator fuzz coverage exercises malformed and adversarial payloads beyond hand-written fixtures
+  - failing cases point at the owning contract area clearly enough to debug quickly
+  - the fuzz path is repeatable enough for later CI adoption
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep this task focused on validation robustness, not general load testing
+
+### T27 - Audit Log Export
+
+- Status: Ready
+- Queue: Later
+- Phase: P4
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Export canonical operational and gameplay audit data without treating raw database files as the support workflow.
+- Scope:
+  - define an export path for audit-friendly event or telemetry records
+  - keep exported data aligned with canonical server-owned logs instead of UI-only snapshots
+  - preserve redaction and supportability concerns in the export format
+- Files to Touch:
+  - BACKLOG.md
+  - src/server/
+  - src/core/
+  - scripts/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T09
+- Validation:
+  - Export smoke test
+- Definition of Done:
+  - operators can export the intended audit data without direct DB surgery
+  - the export format is clear about canonical versus diagnostic fields
+  - export behavior is documented well enough for later runbook use
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - align with the future runbook and telemetry tasks instead of creating a one-off dump format
+
+### T28 - Model Failure Fallback
+
+- Status: Ready
+- Queue: Later
+- Phase: P4
+- Priority: P2
+- Owner Role: AI systems lead
+- Goal: Handle upstream model failures with a bounded fallback path so the app degrades predictably without committing partial truth.
+- Scope:
+  - define the server response path for timeouts, unavailable providers, and invalid model payloads
+  - keep fallback behavior outside authoritative mutation so failed turns do not half-commit state
+  - add a deterministic simulation path for at least one timeout or provider failure case
+- Files to Touch:
+  - BACKLOG.md
+  - src/ai/
+  - src/server/
+  - src/state/
+- Do Not Touch:
+  - src/ui/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T07
+  - T10
+- Validation:
+  - Timeout or failure simulation
+- Definition of Done:
+  - model or provider failure does not commit partial authoritative state
+  - the player-facing failure surface is recoverable and explicit about retry
+  - fallback logic stays compatible with validation and replay requirements
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep this task about bounded failure handling, not broad offline-mode scope
+
+### T30 - Save Import And Export
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Move save data in and out of the supported save contract without requiring manual file surgery or bypassing version checks.
+- Scope:
+  - add import and export paths for supported save-slot data
+  - validate save payload versions and migration rules during transfer
+  - keep the supported flow compatible with later packaged-path documentation and troubleshooting
+- Files to Touch:
+  - BACKLOG.md
+  - src/server/
+  - src/ui/
+  - src/core/
+- Do Not Touch:
+  - public/app.js
+  - data/spec/
+- Dependencies:
+  - T29
+- Validation:
+  - Import/export compatibility check
+- Definition of Done:
+  - save import and export preserves the supported schema and migration contract
+  - invalid or incompatible save data fails with actionable recovery language
+  - the feature fits the main save surface instead of becoming a hidden developer-only path
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep encrypted-save behavior separate in `T31`
+
+### T31 - Optional Save Encryption
+
+- Status: Ready
+- Queue: Later
+- Phase: P3
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Offer an optional encryption layer for saved data without changing the default supportable save path.
+- Scope:
+  - define the encryption boundary for exported or stored saves
+  - keep unencrypted saves as the baseline support path unless the user explicitly opts in
+  - add a smoke path that proves encryption and decryption preserve supported save compatibility
+- Files to Touch:
+  - BACKLOG.md
+  - src/core/
+  - src/server/
+  - src/ui/
+- Do Not Touch:
+  - public/app.js
+  - data/spec/
+- Dependencies:
+  - T29
+- Validation:
+  - Encryption or decryption smoke test
+- Definition of Done:
+  - encrypted saves remain compatible with the underlying save schema and migration policy
+  - users can tell whether a save is encrypted and how to recover it
+  - optional encryption does not become a hidden prerequisite for normal save or load
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep key-management scope explicit before implementation starts
+
+### T32 - Accessibility Pass
+
+- Status: Ready
+- Queue: Later
+- Phase: P3
+- Priority: P1
+- Owner Role: Product/UI lead
+- Goal: Bring the shipped UI and packaged player path up to the documented keyboard, contrast, and readability baseline.
+- Scope:
+  - audit keyboard navigation, focus order, labels, and contrast across the supported player flow
+  - fix player-facing accessibility regressions without rewriting unrelated UI behavior
+  - capture the documented accessibility checklist results in a repeatable review path
+- Files to Touch:
+  - BACKLOG.md
+  - src/ui/
+  - public/
+  - README.md
+- Do Not Touch:
+  - public/app.js
+- Dependencies:
+  - T11
+  - T34
+- Validation:
+  - Accessibility checklist
+- Definition of Done:
+  - the supported player flow meets the documented accessibility checklist
+  - major keyboard or contrast blockers are fixed in the shipped UI surfaces
+  - the review path is clear enough for packaged playtest validation
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - preserve existing player-flow structure while improving accessibility defects
+
+### T33 - Theme And Typography Pass
+
+- Status: Ready
+- Queue: Later
+- Phase: P3
+- Priority: P2
+- Owner Role: Product/UI lead
+- Goal: Polish the player-facing visual system so the packaged build feels intentional and readable without changing gameplay scope.
+- Scope:
+  - refine typography, spacing, and theming across the supported UI surfaces
+  - keep readability and mobile or desktop resilience ahead of decorative variation
+  - avoid changing gameplay contract or setup behavior while improving presentation quality
+- Files to Touch:
+  - BACKLOG.md
+  - src/ui/
+  - public/
+- Do Not Touch:
+  - public/app.js
+  - data/spec/
+- Dependencies:
+  - T11
+- Validation:
+  - Manual readability review
+- Definition of Done:
+  - the UI has a coherent visual system that remains readable on the supported surfaces
+  - theme and typography updates do not break onboarding, setup, or turn interactions
+  - the polish pass stays within the existing design system or documented direction
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - coordinate with `T32` so visual polish does not regress accessibility
+
+### T36a - macOS Feasibility Check
+
+- Status: Ready
+- Queue: Later
+- Phase: P5
+- Priority: P2
+- Owner Role: Release lead
+- Goal: Record whether the Windows-first packaging approach can extend to macOS or should stay explicitly deferred.
+- Scope:
+  - evaluate the current packaging stack against macOS runtime constraints and prerequisites
+  - capture the feasibility result and the main blockers or required follow-up work
+  - keep the output decision-oriented rather than turning this task into a full packaging implementation
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - README.md
+  - packaging/
+- Do Not Touch:
+  - src/ui/
+  - data/spec/
+- Dependencies:
+  - T35
+- Validation:
+  - Feasibility note
+- Definition of Done:
+  - the repo records a clear macOS feasibility decision or explicit deferral rationale
+  - major blockers are stated concretely enough to guide later release planning
+  - the task output does not pretend partial experimentation is a supported build
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep this as a release-planning decision, not a stealth platform expansion
+
+### T37 - Auto-Update Channel
+
+- Status: Ready
+- Queue: Later
+- Phase: P5
+- Priority: P2
+- Owner Role: Release lead
+- Goal: Add a supportable update path for packaged builds once installer and release mechanics are already stable.
+- Scope:
+  - define the packaged update channel and rollback-safe behavior
+  - keep update mechanics aligned with the packaged runtime ownership model
+  - capture one verification path for update success and failure handling
+- Files to Touch:
+  - BACKLOG.md
+  - packaging/
+  - README.md
+- Do Not Touch:
+  - src/state/
+  - data/spec/
+- Dependencies:
+  - T38
+- Validation:
+  - Update flow verification
+- Definition of Done:
+  - packaged builds can update through one documented channel
+  - update behavior preserves app integrity and user data expectations
+  - release documentation covers the supported update path
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - do not start this before installer and release-checklist work are stable
+
+### T39 - Linux Build
+
+- Status: Ready
+- Queue: Later
+- Phase: P5
+- Priority: P3
+- Owner Role: Release lead
+- Goal: Assess and, if approved, produce a Linux build only after the Windows packaging path is already supportable.
+- Scope:
+  - evaluate whether the current packaging stack can ship a practical Linux build
+  - capture the supported scope and validation path if Linux remains in scope
+  - keep Linux work explicitly subordinate to the validated Windows release process
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - README.md
+  - packaging/
+- Do Not Touch:
+  - src/state/
+  - data/spec/
+- Dependencies:
+  - T35
+- Validation:
+  - Build verification if supported
+- Definition of Done:
+  - the repo records either a validated Linux build path or an explicit deferral rationale
+  - Linux work does not compromise the primary Windows support path
+  - validation states clearly whether the build is experimental or supported
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - treat this as optional release expansion, not an MVP requirement
+
+### T40 - Release Checklist
+
+- Status: Ready
+- Queue: Later
+- Phase: P5
+- Priority: P1
+- Owner Role: Release lead
+- Goal: Define the repeatable release gate for packaged builds so shipping stops depending on memory and ad hoc manual steps.
+- Scope:
+  - write and validate the release checklist across build, install, rollback, and support handoff steps
+  - align the checklist with the packaged runtime, installer, and update strategy actually in use
+  - keep the checklist specific enough to expose missing release prerequisites early
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - README.md
+  - packaging/
+- Do Not Touch:
+  - src/state/
+  - data/spec/
+- Dependencies:
+  - T36
+  - T38
+- Validation:
+  - Checklist walkthrough
+- Definition of Done:
+  - release preparation has one documented repeatable checklist
+  - the checklist covers packaging, rollback, and support handoff expectations
+  - later release work can reuse the same checklist instead of inventing per-build steps
+- Handoff Notes:
+  - card restored on 2026-03-08 during backlog consistency cleanup
+  - keep this task focused on the release process itself rather than adding new packaging features
+
 ## Immediate Open Decisions
 
 | ID | Decision | Needed By | Owner | Status |
 | --- | --- | --- | --- | --- |
 | D01 | Concrete default numeric budgets for latency, token use, cost, and DB growth in the configurable budget file | Phase 0 exit | Tech lead | Locked |
-| D02 | Director spec format: JSON or YAML | Before T16 starts | Gameplay systems lead | Open |
-| D03 | Sample MVP quest or story arc definition | Before Phase 1 exit | Product/UI lead | Open |
+| D02 | Director spec format stays JSON at `data/spec/director.json` for MVP | Before T16 starts | Gameplay systems lead | Locked |
+| D03 | MVP sample story arc uses placeholder identifier `story_sample` until authored content begins | Before Phase 1 exit | Product/UI lead | Locked |
 | D04 | MVP packaging shell: launcher-only, Tauri, or Electron | Before Phase 0 exit | Release lead | Locked |
 | D05 | Default end-user AI setup: repo-managed LiteLLM Docker sidecar as the default control plane, with the GPU-backed Ollama launcher path as the normal local runtime contract | Before Phase 0 exit | Tech lead | Locked |
 | D06 | MVP packaged AI runtime: require Docker Desktop for the LiteLLM sidecar, or stage the gateway another way while preserving the same app-facing contract | Before T36 starts | Release lead | Locked |
@@ -2901,5 +4015,3 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - If the user request conflicts with the queue, follow the user request and then update this file to reflect reality.
 - For AI-related work, require a test-first flow: add or tighten a test, fixture, replay case, or harness step before changing implementation, then run the focused check plus the relevant broader validation.
 - For player-facing startup, setup, save or load, or packaging work, include a launcher or packaged-path smoke check whenever feasible.
-
-

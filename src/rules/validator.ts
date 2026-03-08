@@ -1,7 +1,10 @@
 import {
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
+  COMMITTED_EVENT_SCHEMA_VERSION,
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
+  type CanonicalEventCommittedChanges,
+  type CanonicalTurnEventPayload,
   type AuthoritativePlayerState,
   type DirectorSpec,
   type DirectorState,
@@ -238,6 +241,60 @@ export function validateTurnOutput(payload: unknown): ValidationResult<string> {
   return { ok: errors.length === 0, errors };
 }
 
+export function validateCanonicalTurnEvent(payload: unknown): ValidationResult<string> {
+  const errors: string[] = [];
+  if (!payload || typeof payload !== "object") {
+    return { ok: false, errors: ["canonical event must be an object."] };
+  }
+
+  const candidate = payload as Partial<CanonicalTurnEventPayload> & Record<string, unknown>;
+  const allowedTopLevelKeys = new Set([
+    "schema_version",
+    "event_kind",
+    "event_id",
+    "player_id",
+    "occurred_at",
+    "attempt",
+    "outcome",
+    "committed",
+    "contract_versions",
+    "supplemental"
+  ]);
+  for (const key of Object.keys(candidate)) {
+    if (!allowedTopLevelKeys.has(key)) {
+      errors.push(`${key} is not allowed in the canonical event schema.`);
+    }
+  }
+
+  if (candidate.schema_version !== COMMITTED_EVENT_SCHEMA_VERSION) {
+    errors.push(`schema_version must be ${COMMITTED_EVENT_SCHEMA_VERSION}.`);
+  }
+
+  if (candidate.event_kind !== "turn-resolution") {
+    errors.push("event_kind must be turn-resolution.");
+  }
+
+  if (typeof candidate.event_id !== "string") {
+    errors.push("event_id must be a string.");
+  }
+
+  if (typeof candidate.player_id !== "string") {
+    errors.push("player_id must be a string.");
+  }
+
+  if (typeof candidate.occurred_at !== "string") {
+    errors.push("occurred_at must be a string.");
+  }
+
+  errors.push(...validateCanonicalEventAttempt(candidate.attempt));
+  errors.push(...validateCanonicalEventOutcome(candidate.outcome));
+  errors.push(...validateCanonicalEventCommittedChanges(candidate.committed));
+  errors.push(...validateCanonicalEventContractVersions(candidate.contract_versions));
+  errors.push(...validateCanonicalEventSupplemental(candidate.supplemental));
+
+  return { ok: errors.length === 0, errors };
+}
+
 export function validateAuthoritativePlayerState(payload: unknown): ValidationResult<string> {
   const errors: string[] = [];
   if (!payload || typeof payload !== "object") {
@@ -308,8 +365,10 @@ export function validateTurnResponse(payload: unknown): ValidationResult<string>
   }
 
   // The turn payload may contain proposal fields, but `player` is the authoritative snapshot.
-  const turnErrors = validateTurnOutput(payload).errors;
   const candidate = payload as Partial<TurnResponsePayload> & Record<string, unknown>;
+  const turnPayloadCandidate = { ...candidate };
+  delete turnPayloadCandidate.player;
+  const turnErrors = validateTurnOutput(turnPayloadCandidate).errors;
 
   if (!candidate.player || typeof candidate.player !== "object") {
     return {
@@ -594,4 +653,217 @@ function validateRuntimePreflightIssue(issue: unknown): string[] {
   }
 
   return errors;
+}
+
+function validateCanonicalEventAttempt(attempt: unknown): string[] {
+  if (!attempt || typeof attempt !== "object") {
+    return ["attempt must be an object."];
+  }
+
+  const candidate = attempt as Record<string, unknown>;
+  const errors: string[] = [];
+  const allowedKeys = new Set(["input"]);
+  for (const key of Object.keys(candidate)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`attempt.${key} is not allowed in the canonical event schema.`);
+    }
+  }
+
+  if (typeof candidate.input !== "string" || !candidate.input.trim()) {
+    errors.push("attempt.input must be a non-empty string.");
+  }
+
+  return errors;
+}
+
+function validateCanonicalEventOutcome(outcome: unknown): string[] {
+  if (!outcome || typeof outcome !== "object") {
+    return ["outcome must be an object."];
+  }
+
+  const candidate = outcome as Record<string, unknown>;
+  const errors: string[] = [];
+  const allowedKeys = new Set(["status", "summary", "rejection_reason"]);
+  for (const key of Object.keys(candidate)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`outcome.${key} is not allowed in the canonical event schema.`);
+    }
+  }
+
+  if (!(candidate.status === "accepted" || candidate.status === "rejected")) {
+    errors.push("outcome.status must be accepted or rejected.");
+  }
+
+  if (typeof candidate.summary !== "string" || !candidate.summary.trim()) {
+    errors.push("outcome.summary must be a non-empty string.");
+  }
+
+  if (!(candidate.rejection_reason === null || typeof candidate.rejection_reason === "string")) {
+    errors.push("outcome.rejection_reason must be a string or null.");
+  }
+
+  return errors;
+}
+
+function validateCanonicalEventCommittedChanges(committed: unknown): string[] {
+  if (!committed || typeof committed !== "object") {
+    return ["committed must be an object."];
+  }
+
+  const candidate = committed as Partial<CanonicalEventCommittedChanges> & Record<string, unknown>;
+  const errors: string[] = [];
+  const allowedKeys = new Set(["state_updates", "director_updates", "memory_updates"]);
+  for (const key of Object.keys(candidate)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`committed.${key} is not allowed in the canonical event schema.`);
+    }
+  }
+
+  if (!(candidate.state_updates === null || candidate.state_updates === undefined)) {
+    errors.push(...prefixMessages(validateStateUpdates(candidate.state_updates).errors, "committed."));
+  }
+
+  if (!(candidate.director_updates === null || candidate.director_updates === undefined)) {
+    if (!candidate.director_updates || typeof candidate.director_updates !== "object") {
+      errors.push("committed.director_updates must be an object or null.");
+    } else {
+      const allowedDirectorKeys = new Set(["end_goal_progress"]);
+      const typedDirectorUpdates = candidate.director_updates as unknown as Record<string, unknown>;
+      for (const key of Object.keys(typedDirectorUpdates)) {
+        if (!allowedDirectorKeys.has(key)) {
+          errors.push(`committed.director_updates.${key} is not allowed in the canonical event schema.`);
+        }
+      }
+
+      if (typeof typedDirectorUpdates.end_goal_progress !== "string") {
+        errors.push("committed.director_updates.end_goal_progress must be a string.");
+      }
+    }
+  }
+
+  if (!Array.isArray(candidate.memory_updates)) {
+    errors.push("committed.memory_updates must be an array.");
+  } else if (candidate.memory_updates.some((item) => typeof item !== "string")) {
+    errors.push("committed.memory_updates must contain only strings.");
+  }
+
+  return errors;
+}
+
+function validateCanonicalEventContractVersions(contractVersions: unknown): string[] {
+  if (!contractVersions || typeof contractVersions !== "object") {
+    return ["contract_versions must be an object."];
+  }
+
+  const candidate = contractVersions as Record<string, unknown>;
+  const errors: string[] = [];
+  const allowedKeys = new Set(["turn_output", "authoritative_state", "ruleset"]);
+  for (const key of Object.keys(candidate)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`contract_versions.${key} is not allowed in the canonical event schema.`);
+    }
+  }
+
+  if (candidate.turn_output !== TURN_OUTPUT_SCHEMA_VERSION) {
+    errors.push(`contract_versions.turn_output must be ${TURN_OUTPUT_SCHEMA_VERSION}.`);
+  }
+
+  if (candidate.authoritative_state !== AUTHORITATIVE_STATE_SCHEMA_VERSION) {
+    errors.push(`contract_versions.authoritative_state must be ${AUTHORITATIVE_STATE_SCHEMA_VERSION}.`);
+  }
+
+  if (typeof candidate.ruleset !== "string" || !candidate.ruleset.trim()) {
+    errors.push("contract_versions.ruleset must be a non-empty string.");
+  }
+
+  return errors;
+}
+
+function validateCanonicalEventSupplemental(supplemental: unknown): string[] {
+  if (supplemental === undefined) {
+    return [];
+  }
+
+  if (!supplemental || typeof supplemental !== "object") {
+    return ["supplemental must be an object when provided."];
+  }
+
+  const candidate = supplemental as Record<string, unknown>;
+  const errors: string[] = [];
+  const allowedKeys = new Set(["transcript", "presentation", "prompt"]);
+  for (const key of Object.keys(candidate)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`supplemental.${key} is not allowed in the canonical event schema.`);
+    }
+  }
+
+  if ("transcript" in candidate) {
+    errors.push(...validateCanonicalEventTranscript(candidate.transcript));
+  }
+
+  if ("presentation" in candidate) {
+    errors.push(...validateCanonicalEventPresentation(candidate.presentation));
+  }
+
+  return errors;
+}
+
+function validateCanonicalEventTranscript(transcript: unknown): string[] {
+  if (!transcript || typeof transcript !== "object") {
+    return ["supplemental.transcript must be an object."];
+  }
+
+  const candidate = transcript as Record<string, unknown>;
+  const errors: string[] = [];
+  const allowedKeys = new Set(["player_text", "narrator_text"]);
+  for (const key of Object.keys(candidate)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`supplemental.transcript.${key} is not allowed in the canonical event schema.`);
+    }
+  }
+
+  errors.push(...validateNullableStringField(candidate.player_text, "supplemental.transcript.player_text"));
+  errors.push(...validateNullableStringField(candidate.narrator_text, "supplemental.transcript.narrator_text"));
+  return errors;
+}
+
+function validateCanonicalEventPresentation(presentation: unknown): string[] {
+  if (!presentation || typeof presentation !== "object") {
+    return ["supplemental.presentation must be an object."];
+  }
+
+  const candidate = presentation as Record<string, unknown>;
+  const errors: string[] = [];
+  const allowedKeys = new Set(["narrative", "player_options"]);
+  for (const key of Object.keys(candidate)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`supplemental.presentation.${key} is not allowed in the canonical event schema.`);
+    }
+  }
+
+  errors.push(...validateNullableStringField(candidate.narrative, "supplemental.presentation.narrative"));
+
+  if (!Array.isArray(candidate.player_options)) {
+    errors.push("supplemental.presentation.player_options must be an array.");
+  } else if (candidate.player_options.some((item) => typeof item !== "string")) {
+    errors.push("supplemental.presentation.player_options must contain only strings.");
+  }
+
+  return errors;
+}
+
+function validateNullableStringField(value: unknown, fieldName: string): string[] {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (value === null || typeof value === "string") {
+    return [];
+  }
+
+  return [`${fieldName} must be a string or null.`];
+}
+
+function prefixMessages(messages: string[], prefix: string): string[] {
+  return messages.map((message) => `${prefix}${message}`);
 }

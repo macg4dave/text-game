@@ -44,6 +44,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Any change that affects replay determinism requires a golden fixture update.
 - Version compatibility for saves must be tested before Phase 5 can close.
 - Replay-affecting storage must preserve committed semantic outcomes, authoritative transitions, and the ruleset or schema version needed to reproduce state without rerunning model generation.
+- Canonical replay-event typing should use the versioned `committed-event/v1` contract, and transcript, prompt, or presentation fields must remain clearly supplementary to that canonical shape.
 
 ## Test Minimums
 
@@ -165,6 +166,7 @@ Each `/api/turn` should record, at minimum:
 - Treat the event log as a canonical semantic record of committed gameplay outcomes, not as a transcript-only debug stream.
 - Player text and narrator prose may be stored for UX or debugging, but deterministic replay must depend on committed event semantics and authoritative transitions.
 - Event-log design changes should decide explicitly which fields are canonical for replay, which are diagnostics only, and which version or ruleset marker is required to interpret them safely.
+- The minimum canonical replay-event fields are: player attempt, accepted or rejected outcome, committed transitions, and the relevant event, turn-output, authoritative-state, and ruleset version markers.
 
 ## Operational Runbook Checklist
 

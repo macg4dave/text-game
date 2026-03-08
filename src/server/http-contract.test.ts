@@ -1,13 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  COMMITTED_EVENT_SCHEMA_VERSION,
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
+  type CanonicalTurnEventPayload,
   type Player,
   type TurnOutputPayload
 } from "../core/types.js";
-import { validateStateResponse, validateTurnResponse } from "../rules/validator.js";
-import { createAuthoritativePlayerState, createStateResponsePayload, createTurnResponsePayload } from "./http-contract.js";
+import { validateCanonicalTurnEvent, validateStateResponse, validateTurnResponse } from "../rules/validator.js";
+import {
+  createAuthoritativePlayerState,
+  createCommittedTurnEventPayload,
+  createStateResponsePayload,
+  createTurnResponsePayload
+} from "./http-contract.js";
 
 function createPlayer(): Player {
   return {
@@ -96,4 +103,46 @@ test("createTurnResponsePayload keeps proposal fields separate from the authorit
   assert.equal(response.state_updates.location, "Sky Bridge");
   assert.equal(response.player.location, "Rooftop Market");
   assert.deepEqual(validateTurnResponse(response), { ok: true, errors: [] });
+});
+
+test("createCommittedTurnEventPayload separates replay-critical semantics from supplementary transcript fields", () => {
+  const authoritativePlayer = createAuthoritativePlayerState(createPlayer());
+  const turnOutput = createTurnOutput();
+  const payload = createCommittedTurnEventPayload({
+    eventId: "event-123",
+    playerId: authoritativePlayer.id,
+    occurredAt: "2026-03-08T00:00:00.000Z",
+    input: "touch the lantern",
+    outcome: {
+      status: "accepted",
+      summary: "The player inspected the lantern and revealed the signal.",
+      rejection_reason: null
+    },
+    committed: {
+      state_updates: turnOutput.state_updates,
+      director_updates: turnOutput.director_updates,
+      memory_updates: turnOutput.memory_updates
+    },
+    rulesetVersion: "story-rules/v1",
+    supplemental: {
+      transcript: {
+        player_text: "touch the lantern",
+        narrator_text: turnOutput.narrative
+      },
+      presentation: {
+        narrative: turnOutput.narrative,
+        player_options: turnOutput.player_options
+      },
+      prompt: {
+        model: "game-chat"
+      }
+    }
+  });
+
+  assert.equal(payload.schema_version, COMMITTED_EVENT_SCHEMA_VERSION);
+  assert.equal(payload.contract_versions.turn_output, TURN_OUTPUT_SCHEMA_VERSION);
+  assert.equal(payload.contract_versions.authoritative_state, AUTHORITATIVE_STATE_SCHEMA_VERSION);
+  assert.deepEqual(payload.committed.state_updates, turnOutput.state_updates);
+  assert.deepEqual(payload.supplemental?.presentation?.player_options, turnOutput.player_options);
+  assert.deepEqual(validateCanonicalTurnEvent(payload), { ok: true, errors: [] });
 });

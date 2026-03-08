@@ -25,6 +25,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - AI turn generation must use a structured JSON proposal contract. Model-supplied consequences are proposals only until the server validates and commits them.
 - The model-facing turn schema must stay compact and transport-oriented. Prefer narrative, candidate actions, structured intents, and proposed deltas over scene-shaped world models or schema fields that encode gameplay design logic.
 - Turn input, turn output, and authoritative player state must each expose an explicit schema version marker at the HTTP boundary.
+- Canonical replay events must expose their own explicit schema version marker and use a versioned `committed-event/v1` contract separate from transcript-only storage.
 - In turn-output schema `v1`, transitional field names such as `state_updates`, `director_updates`, and `memory_updates` remain in the payload for compatibility, but they are proposal-only fields. The authoritative truth in `/api/turn` remains the versioned `player` snapshot until a later schema revision renames those fields.
 - The turn-output proposal contract must stay compact. It may carry narrative, player options, and narrowly scoped proposed deltas, but it must not grow scene graphs, world-state objects, beat-state mirrors, or other schema fields that encode game design logic.
 - Player-facing narrative, options, quest progress, and memory facts shown after a turn must align to committed authoritative state rather than uncommitted model prose.
@@ -32,6 +33,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - The player may attempt almost anything; implausible or failed actions should be resolved by simulation rules, not by the director acting as a hidden refusal gate.
 - Director and beat controls such as `required_flags`, `unlock_flags`, and `max_beats_per_turn` must shape pacing and framing after accepted outcomes, not replace simulation or plausibility checks.
 - Replayable event logging must record committed semantic outcomes and authoritative transitions, not only raw prompts, raw responses, or presentation prose.
+- The canonical replay-event contract must explicitly separate replay-critical fields such as player attempt, accepted or rejected outcome, committed transitions, and contract-version markers from optional transcript, prompt, or presentation data.
 - The default AI setup uses a LiteLLM-managed gateway that can route to local AI or hosted providers behind the same app-facing contract.
 - Startup preflight must validate host prerequisites, AI readiness, writable paths, and save or migration safety before the first turn.
 - Preflight issues must be classified as blocker, warning, or info; blockers must stop the first turn and present plain-language recovery steps.
@@ -59,6 +61,15 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Local assist endpoint for spellcheck + autocomplete, with small helper tasks intended to prefer hosted providers through the default gateway path.
 - Delivery budgets for latency, token usage, cost, and storage must come from a config file with sane defaults and be adjustable through the web UI.
 
+## Baseline MVP Story Arc
+
+- Working identifier: `story_sample`.
+- Placeholder naming policy: use generic identifiers such as `story_sample_name`, `story_sample_location`, `story_sample_npc`, and `story_sample_outcome` in planning and fixture discussions until authored content work begins.
+- Minimum playable path: the baseline sample must still cover investigation, dialogue with multiple named actors, gated progression toward a final scene, and one committed resolution path.
+- Tutorial coverage: the sample must naturally exercise look or inspect, movement between locations, dialogue, item use, one off-path but plausible action, and one safe save or load checkpoint.
+- Content boundary: one hub area, one support interior, one hazardous approach, and one final resolution scene are sufficient for MVP as long as the player can complete the sample in roughly 10 guided turns.
+- Completion condition: the MVP sample is complete only when the final outcome and key downstream consequences are server-committed, player-visible, and reproducible from replay data.
+
 ## Quality Attributes
 
 - Low token usage per turn.
@@ -72,6 +83,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - SQLite as the source of truth for game state.
 - Only server-committed state, accepted quest progression, and accepted memory facts are authoritative; prose alone cannot establish world truth.
 - The canonical event log must preserve what the player attempted, what the server accepted or rejected, and which authoritative transitions were committed under the active ruleset or schema version.
+- Transcript or prompt artifacts may still be retained for debugging or UX, but they must remain supplementary to the canonical replay-event contract rather than serving as replay input.
 - Summaries capped in size to control tokens.
 - Embeddings stored for memory retrieval.
 - Memory records must distinguish authority-relevant facts from flavor-only recollections so retrieval, summarization, and persistence policy can treat them differently.

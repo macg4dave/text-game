@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  AUTHORITATIVE_STATE_SCHEMA_VERSION,
+  COMMITTED_EVENT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
   type DirectorSpec,
   type Player,
@@ -9,6 +11,8 @@ import {
   type TurnResult
 } from "../core/types.js";
 import { SYSTEM_PROMPT } from "../ai/prompt.js";
+import { validateCanonicalTurnEvent } from "../rules/validator.js";
+import { createCommittedTurnEventPayload } from "../server/http-contract.js";
 import { createTurnService } from "./turn.js";
 
 function createPlayer(): Player {
@@ -417,4 +421,114 @@ test("turn service commits only server-accepted state changes before storing nar
   });
   assert.deepEqual(outcome.turnOutput.state_updates, committedUpdates);
   assert.deepEqual(callOrder, ["event:player", "event:narrator", "updatePlayerState", "updateDirectorState"]);
+});
+
+test("turn output can be translated into a canonical replay event without treating narrative as canonical state", async () => {
+  const player = createPlayer();
+  const service = createTurnService({
+    addEvent() {},
+    addMemories() {},
+    applyDirectorRules({ directorState }) {
+      return directorState;
+    },
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "The signal lantern hummed when touched.",
+        player_options: ["Inspect the lantern"],
+        state_updates: {
+          location: "Rooftop Market",
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: ["signal_seen"],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "The signal now points toward the tower."
+        },
+        memory_updates: ["The signal lantern hummed when touched."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    sanitizeTurnResult(result) {
+      return result as TurnResult;
+    },
+    updateDirectorState() {
+      return null;
+    },
+    updatePlayerState() {
+      return null;
+    },
+    updateSummary() {
+      return null;
+    },
+    validateStateUpdates() {
+      return { ok: true, errors: [] };
+    },
+    validateTurnOutput() {
+      return { ok: true, errors: [] };
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "touch the lantern",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createDirectorSpec(),
+    questSpec: createQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const canonicalEvent = createCommittedTurnEventPayload({
+    eventId: "event-123",
+    playerId: player.id,
+    occurredAt: "2026-03-08T00:00:00.000Z",
+    input: "touch the lantern",
+    outcome: {
+      status: "accepted",
+      summary: "The player inspected the lantern and revealed the signal.",
+      rejection_reason: null
+    },
+    committed: {
+      state_updates: outcome.turnOutput.state_updates,
+      director_updates: outcome.turnOutput.director_updates,
+      memory_updates: outcome.turnOutput.memory_updates
+    },
+    rulesetVersion: "story-rules/v1",
+    supplemental: {
+      transcript: {
+        player_text: "touch the lantern",
+        narrator_text: outcome.turnOutput.narrative
+      },
+      presentation: {
+        narrative: outcome.turnOutput.narrative,
+        player_options: outcome.turnOutput.player_options
+      }
+    }
+  });
+
+  assert.equal(canonicalEvent.schema_version, COMMITTED_EVENT_SCHEMA_VERSION);
+  assert.equal(canonicalEvent.contract_versions.authoritative_state, AUTHORITATIVE_STATE_SCHEMA_VERSION);
+  assert.equal(canonicalEvent.outcome.status, "accepted");
+  assert.equal(canonicalEvent.supplemental?.transcript?.narrator_text, outcome.turnOutput.narrative);
+  assert.deepEqual(validateCanonicalTurnEvent(canonicalEvent), { ok: true, errors: [] });
 });
