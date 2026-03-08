@@ -316,21 +316,24 @@ test("public runtime config exposes selected local GPU profile metadata when the
 });
 
 test("buildConfigPreflightIssues turns config failures into player-facing recovery steps", () => {
-  const loaded = loadConfig({
+  const env = {
+    AI_PROFILE: "custom",
     AI_PROVIDER: "openai-compatible",
     AI_BASE_URL: "not-a-url",
     PORT: "banana"
-  });
+  };
+  const loaded = loadConfig(env);
 
-  const issues = buildConfigPreflightIssues(loaded);
+  const issues = buildConfigPreflightIssues(loaded, env);
+  const blockerIssues = issues.filter((issue) => issue.severity === "blocker");
 
-  assert.equal(issues.length, 3);
+  assert.equal(blockerIssues.length, 3);
   assert.deepEqual(
-    issues.map((issue) => issue.title),
+    blockerIssues.map((issue) => issue.title),
     ["Fix the app port", "Add an API key", "Fix the AI service URL"]
   );
-  assert.match(issues[1]?.recovery.join(" "), /AI_API_KEY/i);
-  assert.match(issues[2]?.recovery.join(" "), /host\.docker\.internal/i);
+  assert.match(blockerIssues[1]?.recovery.join(" "), /AI_API_KEY/i);
+  assert.match(blockerIssues[2]?.recovery.join(" "), /host\.docker\.internal/i);
   const advisoryEnv = {
     OPENAI_API_KEY: "legacy-key"
   };

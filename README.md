@@ -476,7 +476,7 @@ Current prototype caveats:
 - this path is experimental and was added to de-risk packaging direction rather than replace the documented Docker launcher today
 - the MVP packaged playtest path still depends on Docker Desktop for AI startup; the app shell is bundled, but the AI gateway is not
 - code signing, icons, installer polish, and first-run config repair UX are still follow-on work
-- containerized packaging verification passed in this session with `docker compose run --rm app npm run desktop:prototype:dir`, but the host Windows shell path still needs a real dry run because host `node` and `npm` were unavailable here
+- containerized packaging verification passed in this session with `docker compose run --rm app npm run desktop:prototype:dir`, and a host Windows dry run was completed on 2026-03-08; see `packaging/decision-memo.md` for the validation details
 
 See `packaging/decision-memo.md` for the option comparison, save or log implications, and the clean-machine smoke checklist.
 
@@ -599,9 +599,12 @@ The repo includes an optional Docker GPU override intended for larger local-mode
 
 The direct preset keeps the same OpenAI-compatible adapter boundary and only swaps config defaults:
 
+- set `AI_PROFILE=custom` so startup diagnostics treat the direct-provider path as an intentional advanced override
 - chat model default: `gemma3:4b`
 - embedding model default: `embeddinggemma`
 - base URL default: `http://127.0.0.1:11434/v1`
+
+When the app runs in Docker against Ollama on your Windows host, switch the direct Ollama base URL to `http://host.docker.internal:11434/v1`.
 
 Setup steps and GPU notes live in [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md). Treat the local-model path as optional, not as the default small-task or end-user setup.
 

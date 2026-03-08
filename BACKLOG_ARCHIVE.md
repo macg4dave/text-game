@@ -400,7 +400,7 @@ This file contains archived task cards removed from BACKLOG.md on 2026-03-08 aft
 
 ### T02h - Auto-Select Local GPU Model Profile
 
-- Status: Review
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -650,7 +650,7 @@ This file contains archived task cards removed from BACKLOG.md on 2026-03-08 aft
 
 ### T02b - LiteLLM Proxy Template And Startup Docs
 
-- Status: Review
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -691,7 +691,7 @@ This file contains archived task cards removed from BACKLOG.md on 2026-03-08 aft
 
 ### T02f - Docker-First LiteLLM Sidecar And GPU Override
 
-- Status: Review
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1

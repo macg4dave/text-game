@@ -8,7 +8,8 @@ Kickoff-relative timing is used on purpose. "Week 1" means the first week active
 
 - Roadmap baseline date: 2026-03-08
 - Delivery status: pre-MVP
-- Planning status: rebaselined around end-user-first, double-click-friendly delivery
+- Phase status: Phase 0 closed, Phase 1 delivery work is now the active focus
+- Planning status: rebaselined around end-user-first, double-click-friendly delivery, with runtime budget controls scheduled after the current playable-slice work
 
 ## Primary Product Principle
 
@@ -64,7 +65,7 @@ The MVP is complete only when all of the following are true:
 - A golden replay fixture reproduces the same final state from the stored event log.
 - Save and load work across at least one schema version change using documented migration rules.
 - The default LiteLLM chat route and embedding route are both exercised in automated integration tests.
-- Numeric budgets for latency, tokens per turn, and cost per 100 turns are recorded in [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md) and met in the MVP test fixture suite.
+- Numeric budgets for latency, tokens per turn, and cost per 100 turns are recorded in [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md), loaded from the runtime budget config, and met in the MVP test fixture suite.
 - The packaged or launched player path and the browser dev path both use the same server-side gameplay stack.
 - The MVP scope in [BACKLOG.md](/g:/text-game/BACKLOG.md) has no open P1 items.
 
@@ -146,6 +147,7 @@ Exit gate:
 - Director rules are loaded from versioned specs and can be reloaded without app reinstall.
 - Director enforcement runs server-side before authoritative state is committed.
 - The embedding route, chat route, and fallback behavior are covered by integration tests.
+- Delivery budgets are loaded from one server-side config source and exposed through an advanced runtime surface without file edits.
 - Token use for the baseline replay fixture stays within the documented budget.
 - Save compatibility rules are documented and at least one migration path is tested.
 
@@ -184,6 +186,7 @@ Exit gate:
 - A non-engineer can modify the sample quest content using documented tooling.
 - Unit, integration, replay, and fuzz tests run in CI on every push.
 - Telemetry captures latency, token usage, validation failures, retries, and model costs.
+- The baseline fixture suite enforces configured latency, token, cost, and DB-growth budgets with clear breach reporting.
 - Safety policy, redaction rules, and failure fallback behavior are documented and implemented.
 - Backup, restore, and incident debugging steps are verified from the runbook.
 
@@ -216,25 +219,22 @@ Exit gate:
 
 ### Now
 
-- Lock the supported Windows-first double-click target and capture the packaging or wrapper decision early.
-- Close the remaining validation and packaging implications of the Docker-managed LiteLLM sidecar plus optional GPU override.
-- Define the first GPU-tier model matrix for the optional local inference path so setup can stop depending on manual model guesswork, starting with `8 GB`, `12 GB`, and `20 GB+` tiers.
-- Lock the shared blocker, warning, and info preflight policy and extend it to host, AI, storage, and save checks.
-- Finish launcher preflight, config validation, and clear recovery messaging.
-- Make onboarding, first-run troubleshooting, and save or load part of the core loop scope instead of late polish.
-- Add a clean-machine playtest checklist for the supported launch path.
+- Ship the versioned turn pipeline through the supported launched app.
+- Make the first-run player path understandable without README reading by landing onboarding, setup, retry, and recovery flow work.
+- Add save and load to the main player flow so session continuity is part of the supported slice, not a later add-on.
+- Keep the supported Windows launcher and browser path aligned while Phase 1 replaces developer-facing gaps with player-facing guidance.
 
 ### Next
 
-- Ship the deterministic turn pipeline through the supported launched app.
-- Add automatic local-model profile selection and setup guidance for common VRAM tiers.
-- Add guided retry, auto-fix, and advanced-details setup flows on top of the shared preflight contract.
 - Add memory retrieval and director control without increasing player-facing setup friction.
+- Move delivery budgets from doc-only values into a shared server-side config contract and expose them through an advanced UI surface.
+- Add automatic local-model profile selection and setup guidance for common VRAM tiers.
 - Produce the first packaged Windows playtest build.
 
 ### Later
 
 - Expand quest tooling and admin inspection.
+- Turn documented delivery budgets into an enforced fixture gate with breach reporting.
 - Harden operations and safety posture for broader playtesting.
 - Add signed multi-platform release work and update infrastructure after the Windows player path is stable.
 

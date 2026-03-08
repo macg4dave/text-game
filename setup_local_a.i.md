@@ -45,7 +45,8 @@ This is the first-class developer override path for Windows:
 docker compose exec ollama ollama pull gemma3:4b
 docker compose exec ollama ollama pull embeddinggemma
 ```
-6. Start the stack with the GPU override:
+
+1. Start the stack with the GPU override:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu
@@ -145,24 +146,37 @@ That way the app, launcher, and future setup UI keep talking about one stable co
 
 ## Direct Ollama Fallback Configuration
 
-If you do not want to run LiteLLM for a quick smoke test, set your `.env` file like this:
+If you do not want to run LiteLLM for a quick smoke test, set your `.env` file like this for the direct host `npm run dev` path:
 
 ```env
+AI_PROFILE=custom
 AI_PROVIDER=ollama
-OLLAMA_BASE_URL=http://ollama:11434/v1
+OLLAMA_BASE_URL=http://127.0.0.1:11434/v1
 OLLAMA_API_KEY=ollama
 OLLAMA_CHAT_MODEL=gemma3:4b
 OLLAMA_EMBEDDING_MODEL=embeddinggemma
 PORT=3000
 ```
 
+If you run the app in Docker while Ollama runs on your Windows host, keep the same direct-provider env vars but switch the base URL to `http://host.docker.internal:11434/v1`.
+
 Notes:
 
+- `AI_PROFILE=custom` keeps startup diagnostics aligned with the direct-provider smoke-test path instead of reporting the hosted default profile plus advanced overrides.
 - `OLLAMA_API_KEY` is required by the OpenAI SDK shape but ignored by Ollama.
 - If you switch to `gemma3:1b`, change only `OLLAMA_CHAT_MODEL`.
 - If you use a non-default Ollama host, update `OLLAMA_BASE_URL`.
 - `host.docker.internal` is the right default when the app runs in Docker and Ollama runs on the host machine.
 - This direct path is for smoke tests and local experimentation; the repo's default setup story stays LiteLLM-first.
+
+Direct Docker smoke example with a host-visible alternate port:
+
+```powershell
+$env:PORT='3316'
+docker compose run --rm --no-deps --service-ports -e PORT=3316 -e AI_PROFILE=custom -e AI_PROVIDER=ollama -e OLLAMA_BASE_URL=http://host.docker.internal:11434/v1 app npm run dev
+```
+
+That host-side `$env:PORT` assignment matters because Compose uses it when deciding which host port to publish. Passing only `-e PORT=3316` changes the container environment but does not change the published host port.
 
 ## Start The App
 
