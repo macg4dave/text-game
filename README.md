@@ -2,7 +2,7 @@
 
 A portable, text-based adventure with a director layer that nudges the story toward a defined end goal while letting the player attempt anything.
 
-The project uses the OpenAI Node SDK through a provider-neutral config layer, so you can keep the same app code while swapping between providers that support OpenAI-compatible generation and embeddings endpoints.
+The project uses the OpenAI Node SDK through a provider-neutral config layer, with LiteLLM as the default AI control plane so the same app code can target hosted providers and optional local model paths through one gateway-first contract.
 
 The application source is TypeScript-first: server code lives in `src/*.ts`, browser source lives in `public/app.ts`, and the browser still loads the emitted `public/app.js` asset.
 
@@ -20,6 +20,7 @@ Useful commands:
 
 ```bash
 npm run type-check
+npm run test:config
 npm run build
 npm run dev
 npm start
@@ -29,6 +30,7 @@ npm test
 What each command does:
 
 - `npm run type-check` validates all TypeScript source in `src/` and `public/`
+- `npm run test:config` runs the focused config-module checks after type-checking
 - `npm run build` compiles the server to `dist/` and rebuilds the browser asset at `public/app.js`
 - `npm run dev` rebuilds the browser asset once, then starts the TypeScript server directly through `tsx`
 - `npm start` runs the compiled server from `dist/server.js`
@@ -136,7 +138,7 @@ If your distro package is too old for current packages, use the official downloa
 
 ## Quick Start
 
-1. Copy `.env.example` to `.env` and choose either hosted API credentials or the local AI settings you want.
+1. Copy `.env.example` to `.env` and start with the LiteLLM gateway settings unless you intentionally need a different provider mode.
 1. For local development, run:
 
 ```bash
@@ -185,7 +187,7 @@ The launcher:
 
 - checks Docker and Compose
 - reads `.env` when present
-- falls back to the local Ollama preset for that run when `.env` is missing
+- falls back to the LiteLLM defaults when `.env` is missing
 - checks the configured AI path and starts local Ollama when possible
 - clears any previous `text-game` compose app container before starting the fresh app instance
 - automatically picks a free local port for that run if the configured port is already occupied by another service
@@ -199,6 +201,27 @@ Useful flags:
 - `-Rebuild` forces a Docker image rebuild before launch
 
 The launcher respects `PORT` from your PowerShell session or `.env`. If that port is already taken by another local service, the launcher now falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
+
+## Config Precedence
+
+The runtime config module now applies one consistent precedence order instead of making each caller guess:
+
+- provider-specific env vars win when `AI_PROVIDER` is `litellm` or `ollama`
+- generic `AI_*` vars are the next fallback
+- legacy `OPENAI_*` names remain supported as the last fallback during migration
+- blank values are treated as unset, so provider defaults still apply when a field is optional
+
+Provider selection now behaves like this:
+
+- explicit `AI_PROVIDER` always wins
+- if `AI_PROVIDER` is unset, existing `LITELLM_*`, `OLLAMA_*`, or legacy direct-provider env vars are inferred so older setups keep working
+- if nothing provider-specific is configured, the app defaults to `litellm`
+
+Examples:
+
+- in LiteLLM mode, `LITELLM_CHAT_MODEL` overrides `AI_CHAT_MODEL`, which overrides `OPENAI_MODEL`
+- in Ollama mode, `OLLAMA_BASE_URL` overrides `AI_BASE_URL`, which overrides `OPENAI_BASE_URL`
+- in default OpenAI-compatible mode, `AI_API_KEY` overrides `OPENAI_API_KEY`
 
 ## Desktop Packaging Prototype
 
@@ -260,7 +283,7 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 
 ## Environment
 
-- `AI_PROVIDER` - optional label; defaults to `openai-compatible`; supported repo presets are `openai-compatible`, `litellm`, and `ollama`
+- `AI_PROVIDER` - optional label; defaults to `litellm`; supported repo presets are `openai-compatible`, `litellm`, and `ollama`
 - `AI_API_KEY` - primary key for generic OpenAI-compatible mode
 - `AI_BASE_URL` - optional; point this at any OpenAI-compatible provider endpoint
 - `AI_CHAT_MODEL` - defaults to `gpt-4o-mini`
@@ -273,7 +296,7 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 - `OLLAMA_API_KEY` - optional Ollama key placeholder; defaults to `ollama`
 - `OLLAMA_CHAT_MODEL` - Ollama chat model; defaults to `gemma3:4b`
 - `OLLAMA_EMBEDDING_MODEL` - Ollama embedding model; defaults to `embeddinggemma`
-- Legacy `OPENAI_*` env vars still work for backward compatibility
+- Legacy `OPENAI_*` env vars still work during migration, but new setup should prefer LiteLLM or an explicit `AI_PROVIDER`
 
 ### Docker note for local AI
 
@@ -295,9 +318,10 @@ If Docker Desktop cannot mount the drive that contains this repo, the container 
 
 ### Provider notes
 
-- Default setup works with OpenAI directly.
-- To use another OpenAI-compatible provider, set `AI_BASE_URL` and update the model names.
-- For a local Windows smoke-test path, set `AI_PROVIDER=ollama` and follow [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md).
+- Default setup goes through LiteLLM.
+- Use LiteLLM to route hosted providers for the main turn path and smaller helper tasks.
+- If you need direct OpenAI-compatible mode, set `AI_PROVIDER=openai-compatible`, then provide `AI_API_KEY` and any model or base URL overrides.
+- For an optional larger local-model path, set `AI_PROVIDER=ollama` and follow [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md).
 - Best compatibility comes from providers that support:
   - `POST /v1/chat/completions` or an equivalent compatible generation endpoint
   - JSON schema response formatting
@@ -308,9 +332,9 @@ If you want maximum provider portability, avoid provider-specific features in th
 
 ## LiteLLM
 
-LiteLLM is now a first-class setup path for this project.
+LiteLLM is the default setup path for this project.
 
-It is also the supported MVP AI path for both hosted providers and local AI setups. The app should talk to LiteLLM; LiteLLM can then route to OpenAI, local models, or other compatible upstreams behind the same interface.
+The app should talk to LiteLLM first. LiteLLM can then route hosted providers for smaller helper tasks and the main turn path, or route to optional larger local-model paths behind the same interface.
 
 Recommended local setup:
 
@@ -320,17 +344,17 @@ Recommended local setup:
 4. Set `LITELLM_PROXY_URL=http://127.0.0.1:4000`.
 5. Set `LITELLM_CHAT_MODEL=game-chat` and `LITELLM_EMBEDDING_MODEL=game-embedding`.
 
-The runtime will automatically prefer LiteLLM-specific env vars when `AI_PROVIDER=litellm`, while still using the same game turn pipeline.
+The runtime automatically prefers LiteLLM-specific env vars when `AI_PROVIDER=litellm`, and now falls back to LiteLLM as the blank-slate default when no provider-specific env is configured.
 
 ## Windows Local AI
 
-The repo now includes an `ollama` preset intended for local smoke tests on Windows dev machines. It keeps the same OpenAI-compatible adapter boundary and only swaps config defaults:
+The repo includes an `ollama` preset intended for optional local smoke tests or larger local-model experiments on Windows dev machines. It keeps the same OpenAI-compatible adapter boundary and only swaps config defaults:
 
 - chat model default: `gemma3:4b`
 - embedding model default: `embeddinggemma`
 - base URL default: `http://127.0.0.1:11434/v1`
 
-Setup steps and download links live in [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md). Treat this path as a cheap local test harness, not as the default production-quality model setup.
+Setup steps and download links live in [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md). Treat this path as an optional large-model route, not as the default small-task or end-user setup.
 
 Once Ollama and the models are installed, the quickest Windows startup path is `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
 
@@ -359,8 +383,11 @@ The browser client is intentionally useful for local AI debugging:
 
 - `GET /api/state` returns the current player plus safe runtime/session debug data
 - runtime debug now includes a non-secret `preflight` block with startup status, plain-language recovery steps, and the env vars involved
+- runtime debug now also includes a non-secret `config_diagnostics` block showing whether each resolved config value came from provider-specific, generic, legacy, or default config paths
 - `POST /api/turn` returns the narrator payload plus safe debug details such as request id, latency, prompt preview, embedding fallback status, validation result, and before/after player state
 - API keys are not returned by the debug payload; only non-secret runtime metadata is exposed
+
+At startup, the server now prints a safe config summary plus a source summary so invalid env state is visible immediately without leaking credentials.
 
 ## Startup Recovery
 

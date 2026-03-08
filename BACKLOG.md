@@ -78,10 +78,10 @@ Use this exact shape when adding new work:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T01 | Now | P0 | P1 | Player launch bootstrap path | Done | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
 | T41 | Now | P0 | P1 | Full TypeScript migration | Done | None | `npm run type-check`; `npm test`; `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
-| T01a | Now | P0 | P1 | Runtime preflight and recovery messaging | Review | T01, T02 | Manual launcher failure checks |
+| T01a | Now | P0 | P1 | Runtime preflight and recovery messaging | Done | T01, T02 | Manual launcher failure checks |
 | T35 | Now | P0 | P1 | Packaging prototype and decision memo | Done | T01 | Prototype build verification |
-| T02 | Now | P0 | P1 | Config module with schema validation | Review | None | `npm test` |
-| T02a | Now | P0 | P1 | LiteLLM env contract and alias defaults | Ready | T02 | Manual config verification |
+| T02 | Now | P0 | P1 | Config module with schema validation | Done | None | `npm test` |
+| T02a | Now | P0 | P1 | LiteLLM env contract and alias defaults | Done | T02 | Manual config verification |
 | T02b | Now | P0 | P1 | LiteLLM proxy template and startup docs | Ready | T02a | Manual LiteLLM startup verification |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Review | T02 | Manual local provider startup verification |
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
@@ -258,7 +258,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T01a - Runtime Preflight And Recovery Messaging
 
-- Status: Review
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -298,6 +298,8 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - launcher validation on 2026-03-08 covered two cases: missing `AI_API_KEY` with `AI_PROVIDER=openai-compatible` now surfaces browser preflight guidance at `/api/state`, and unreachable `LITELLM_PROXY_URL=http://127.0.0.1:4011` still fails fast in `scripts/start-dev.ps1`
   - validated on 2026-03-08 with `docker compose build app`, `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, and a focused `docker run --rm text-game-app sh -lc 'npm exec tsx -- --test src/config.test.ts'` check because the current Docker-shell `npm test` output still reports only the older test count even after the new test is present in the built image
   - refreshed emitted `public/app.js` from the rebuilt Docker image because local `npm` is not installed in this shell environment
+  - final closeout validation on 2026-03-08 re-ran `docker compose run --rm app npm run type-check` and `docker compose run --rm app npm test` successfully from the main workspace
+  - final launcher validation on 2026-03-08 used a clean temp repo copy on `C:` so Docker bind-mount behavior from `G:` would not affect the result: with `AI_PROVIDER=openai-compatible` and no API key, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` started the app and `/api/state` returned a blocked preflight containing `missing_api_key`; with `AI_PROVIDER=litellm` and `LITELLM_PROXY_URL=http://127.0.0.1:4011`, the launcher failed before container startup with `Configured local AI endpoint did not respond`
 
 ### T35 - Packaging Prototype And Decision Memo
 
@@ -349,7 +351,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T02 - Config Module With Schema Validation
 
-- Status: In Progress
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -380,7 +382,92 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - docs reflect the actual config contract
 - Handoff Notes:
   - user assigned this task directly on 2026-03-08
-  - note any env vars intentionally left provisional for LiteLLM integration
+  - follow-on LiteLLM work should now treat LiteLLM as the default AI control plane, keep `game-chat` and `game-embedding` as the default aliases, and treat legacy `OPENAI_*` env vars as transitional compatibility only
+  - started centralizing provider-aware env precedence in `src/config.ts` so server preflight can reuse the same env-var contract instead of duplicating it
+  - validated this config-contract slice on 2026-03-08 with `docker compose build app`, `docker compose run --rm app npm run type-check`, and `docker compose run --rm app npm test`
+  - added safe config diagnostics for runtime debug and startup logging so callers can see whether values came from provider-specific, generic, legacy, or default sources without exposing secret values
+  - added a focused `npm run test:config` path so future config changes can validate the contract without waiting on the full suite
+  - final validation on 2026-03-08 re-ran `docker compose build app`, `docker compose run --rm app npm run test:config`, and `docker compose run --rm app npm test`
+  - manual startup validation on 2026-03-08 covered a syntactically valid Ollama config on port `3310`, where `/api/state` exposed `config_diagnostics` and startup logs showed the safe source summary while runtime preflight remained blocked only on the returned embedding model alias, not config parsing
+  - manual startup validation on 2026-03-08 also covered an invalid OpenAI-compatible config on port `3311`, where startup logs immediately printed the missing-key and invalid-URL errors and `/api/state` returned matching blocked preflight issues plus safe config diagnostics
+
+### T02a - LiteLLM Env Contract And Alias Defaults
+
+- Status: Review
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Make LiteLLM the default runtime config contract so all AI paths share one gateway-first setup.
+- Scope:
+  - switch the default template and docs to LiteLLM-first configuration
+  - lock `game-chat` and `game-embedding` as the default alias names for the current MVP path
+  - mark legacy `OPENAI_*` env vars as transitional compatibility rather than the preferred setup path
+  - keep the config module provider-neutral internally while making the gateway-first path obvious to users
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - REQUIREMENTS.md
+  - .env.example
+  - src/config.ts
+  - src/config.test.ts
+  - scripts/start-dev.ps1
+- Do Not Touch:
+  - public/
+  - data/spec/
+- Dependencies:
+  - T02
+- Validation:
+  - manual config verification
+  - `npm test`
+- Definition of Done:
+  - LiteLLM is the default documented env path for app setup
+  - `game-chat` and `game-embedding` are the locked default aliases in code and docs
+  - legacy `OPENAI_*` support remains functional but is clearly transitional in repo docs
+  - config behavior and docs agree on the same precedence and preferred setup path
+- Handoff Notes:
+  - user confirmed on 2026-03-08 that LiteLLM should manage all AI by default
+  - user confirmed the default aliases should stay `game-chat` and `game-embedding`
+  - user confirmed legacy `OPENAI_*` env vars are transition-only, not the long-term preferred interface
+  - default blank-slate config now resolves to LiteLLM while older direct-provider envs still infer `openai-compatible` and Ollama-specific envs still infer `ollama`
+  - updated `.env.example`, `README.md`, `REQUIREMENTS.md`, and `scripts/start-dev.ps1` so the default documented and launcher-adjacent path now matches the LiteLLM-first contract
+  - validated on 2026-03-08 with `docker compose build app`, `docker compose run --rm app npm run test:config`, and `docker compose run --rm app npm test`
+  - manual config verification on 2026-03-08 covered a no-env container on port `3312`, which defaulted to `litellm` with `game-chat`, `game-embedding`, and `http://127.0.0.1:4000`, plus a legacy `OPENAI_*`-only container on port `3313`, which inferred `openai-compatible` with legacy model values and surfaced `provider.source = inferred`
+
+### T02b - LiteLLM Proxy Template And Startup Docs
+
+- Status: Ready
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Make the LiteLLM gateway path easy to start and understand without requiring guesswork or README archaeology.
+- Scope:
+  - tighten the LiteLLM proxy template around the locked default aliases
+  - update startup docs to present LiteLLM as the default control plane for both hosted and optional local-model paths
+  - explain the hosted-provider-first path for small helper tasks such as autocomplete and spellcheck
+  - document the optional large local-model path through Ollama or another external AI agent behind the same gateway-oriented UX
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - litellm.config.yaml
+  - .env.example
+  - setup_local_a.i.md
+- Do Not Touch:
+  - public/
+  - data/spec/
+- Dependencies:
+  - T02a
+- Validation:
+  - manual LiteLLM startup verification
+- Definition of Done:
+  - LiteLLM startup docs match the default env template and alias contract
+  - the docs explain hosted small-task routing versus optional large local-model routing in plain language
+  - the gateway template is usable without reverse-engineering repo conventions
+- Handoff Notes:
+  - user confirmed on 2026-03-08 that small AI helper tasks should prefer hosted providers
+  - user confirmed on 2026-03-08 that larger optional generation can use a local model such as Ollama or an external AI agent
+  - keep the player-facing explanation UI-first and avoid turning this into an API-first setup workflow yet
 
 ### T03 - Logging With Levels And Redaction
 
@@ -585,6 +672,8 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - the setup flow matches launcher behavior and README guidance
 - Handoff Notes:
   - treat the supported AI path as a product decision, not just a config screen
+  - the user confirmed on 2026-03-08 that setup and diagnostics should stay UI-first for now
+  - the user confirmed on 2026-03-08 that LiteLLM is the default AI control plane the setup flow should steer toward
 
 ### T29 - Save Slots UI
 
@@ -692,6 +781,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - setup and config docs match the implemented env behavior
 - Handoff Notes:
   - use this path for smoke tests only until structured-output reliability is measured against fixtures
+  - user clarified on 2026-03-08 that Ollama or another local model is an optional larger-model path, not the default small-task setup
   - direct Ollama validation passed on 2026-03-07 for `POST /v1/chat/completions` with JSON schema, `POST /v1/embeddings`, and one full `game_turn`-shaped response using `gemma3:4b` plus `embeddinggemma`
   - this is still a developer smoke-test path, not the supported non-technical player path
   - `npm install`, `npm run dev`, and config runtime verification were not runnable in this session because `node` and `npm` were unavailable in the shell environment
@@ -775,7 +865,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 | D02 | Director spec format: JSON or YAML | Before T16 starts | Gameplay systems lead | Open |
 | D03 | Sample MVP quest or story arc definition | Before Phase 1 exit | Product/UI lead | Open |
 | D04 | MVP packaging shell: launcher-only, Tauri, or Electron | Before Phase 0 exit | Release lead | Locked |
-| D05 | Supported MVP AI setup for non-technical users: LiteLLM-managed gateway covering local AI and hosted providers | Before Phase 0 exit | Tech lead | Locked |
+| D05 | Default end-user AI setup: LiteLLM-managed gateway as the default control plane, with hosted small-task routing and an optional large local-model path | Before Phase 0 exit | Tech lead | Locked |
 
 ## Agent Execution Rules
 

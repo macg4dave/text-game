@@ -1,8 +1,15 @@
 import "dotenv/config";
 import crypto from "node:crypto";
 import path from "node:path";
+import process from "node:process";
 import express, { type Request, type Response } from "express";
-import { buildConfigPreflightIssues, config } from "./config.js";
+import {
+  buildConfigPreflightIssues,
+  config,
+  formatConfigErrors,
+  getAiEnvVarNames,
+  getSafeConfigDiagnostics
+} from "./config.js";
 import { initDb } from "./db.js";
 import {
   getOrCreatePlayer,
@@ -380,6 +387,7 @@ app.post("/api/turn", async (req: Request, res: Response) => {
 });
 
 app.listen(port, () => {
+  logStartupConfigState();
   console.log(`Server listening on http://localhost:${port}`);
 });
 
@@ -464,6 +472,7 @@ function normalizeDirectorState(player: Player): { director: DirectorState; chan
 function buildRuntimeDebug() {
   return {
     ...config.runtime,
+    config_diagnostics: getSafeConfigDiagnostics(config),
     preflight: runtimePreflight,
     server_time: new Date().toISOString()
   };
@@ -571,6 +580,24 @@ function readQueryValue(value: unknown): string | undefined {
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+function logStartupConfigState() {
+  const diagnostics = getSafeConfigDiagnostics(config);
+  const baseUrl = config.ai.baseUrl || "(provider default)";
+
+  if (!config.validation.ok) {
+    console.warn("[startup] Configuration needs attention; the app will stay in setup-required mode.");
+    console.warn(formatConfigErrors(config.validation.errors));
+  } else {
+    console.log(
+      `[startup] Configuration ready: provider=${config.ai.provider}, chat=${config.ai.chatModel}, embedding=${config.ai.embeddingModel}, baseUrl=${baseUrl}`
+    );
+  }
+
+  console.log(
+    `[startup] Config sources: provider=${diagnostics.provider.source}, port=${diagnostics.port.source}, apiKey=${diagnostics.ai.api_key.source}, baseUrl=${diagnostics.ai.base_url.source}, chatModel=${diagnostics.ai.chat_model.source}, embeddingModel=${diagnostics.ai.embedding_model.source}`
+  );
 }
 
 function createInitialRuntimePreflight(): RuntimePreflight {
@@ -733,12 +760,7 @@ function buildEndpointIssue(message: string): RuntimePreflightIssue {
           : "Confirm the provider URL is reachable and accepts OpenAI-compatible requests.",
       "If the app runs in Docker and the AI service runs on your PC, use host.docker.internal instead of localhost."
     ],
-    env_vars:
-      config.ai.provider === "ollama"
-        ? ["OLLAMA_BASE_URL", "AI_BASE_URL"]
-        : config.ai.provider === "litellm"
-          ? ["LITELLM_PROXY_URL", "AI_BASE_URL"]
-          : ["AI_BASE_URL", "OPENAI_BASE_URL"]
+      env_vars: getAiEnvVarNames(config.ai.provider, "baseUrl")
   };
 }
 
@@ -754,12 +776,7 @@ function buildAuthIssue(): RuntimePreflightIssue {
         : "Check the API key in .env and confirm it still has access to the selected models.",
       "Restart the launcher after saving the updated credentials."
     ],
-    env_vars:
-      config.ai.provider === "litellm"
-        ? ["LITELLM_API_KEY", "AI_API_KEY"]
-        : config.ai.provider === "ollama"
-          ? ["OLLAMA_API_KEY", "AI_API_KEY"]
-          : ["AI_API_KEY", "OPENAI_API_KEY"]
+    env_vars: getAiEnvVarNames(config.ai.provider, "apiKey")
   };
 }
 
@@ -769,18 +786,10 @@ function buildModelAliasIssue(
   availableModels: string[]
 ): RuntimePreflightIssue {
   const availablePreview = availableModels.slice(0, 5).join(", ");
-  const envVars =
-    kind === "chat"
-      ? config.ai.provider === "litellm"
-        ? ["LITELLM_CHAT_MODEL", "AI_CHAT_MODEL"]
-        : config.ai.provider === "ollama"
-          ? ["OLLAMA_CHAT_MODEL", "AI_CHAT_MODEL"]
-          : ["AI_CHAT_MODEL", "OPENAI_MODEL"]
-      : config.ai.provider === "litellm"
-        ? ["LITELLM_EMBEDDING_MODEL", "AI_EMBEDDING_MODEL"]
-        : config.ai.provider === "ollama"
-          ? ["OLLAMA_EMBEDDING_MODEL", "AI_EMBEDDING_MODEL"]
-          : ["AI_EMBEDDING_MODEL", "OPENAI_EMBEDDING_MODEL"];
+  const envVars = getAiEnvVarNames(
+    config.ai.provider,
+    kind === "chat" ? "chatModel" : "embeddingModel"
+  );
 
   const providerSpecificStep =
     config.ai.provider === "litellm"

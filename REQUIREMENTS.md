@@ -2,7 +2,7 @@
 
 ## Brief
 
-A portable, text-based adventure game powered by a provider-neutral AI adapter with a LiteLLM-managed gateway as the supported MVP AI path. Players can attempt anything, while a director layer nudges the story toward a defined end goal. The system uses compact state, summaries, and selective memory retrieval to minimize token usage. A local, lightweight spellcheck/autocomplete helper improves text entry without consuming main-model tokens.
+A portable, text-based adventure game powered by a provider-neutral AI adapter with a LiteLLM-managed gateway as the default AI control plane. Players can attempt anything, while a director layer nudges the story toward a defined end goal. The system uses compact state, summaries, and selective memory retrieval to minimize token usage. A lightweight spellcheck/autocomplete helper should prefer hosted providers through the gateway so it does not depend on a local large-model runtime.
 
 ## Goals
 
@@ -23,10 +23,10 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Event logging for player and narrator turns.
 - Director layer to track end goal, act, and remaining beats.
 - AI responses must be structured JSON with narrative + updates.
-- The supported MVP AI setup uses a LiteLLM-managed gateway that can route to local AI or hosted providers behind the same app-facing contract.
+- The default AI setup uses a LiteLLM-managed gateway that can route to local AI or hosted providers behind the same app-facing contract.
 - Memory system with summaries and embedding-based retrieval.
 - Web UI with text log, turn input, session controls, suggestion chips, and a local debug panel.
-- Local assist endpoint for spellcheck + autocomplete.
+- Local assist endpoint for spellcheck + autocomplete, with small helper tasks intended to prefer hosted providers through the default gateway path.
 - Delivery budgets for latency, token usage, cost, and storage must come from a config file with sane defaults and be adjustable through the web UI.
 
 ## Quality Attributes
@@ -52,7 +52,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 
 ## Configuration
 
-- `AI_PROVIDER` (optional; default `openai-compatible`)
+- `AI_PROVIDER` (optional; default `litellm`)
 - `AI_API_KEY` (primary key in generic provider mode)
 - `AI_BASE_URL` (optional; for OpenAI-compatible providers)
 - `AI_CHAT_MODEL` (default: `gpt-4o-mini`)
@@ -65,7 +65,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - `OLLAMA_API_KEY` (optional placeholder key in Ollama mode)
 - `OLLAMA_CHAT_MODEL` (default: `gemma3:4b` in Ollama mode)
 - `OLLAMA_EMBEDDING_MODEL` (default: `embeddinggemma` in Ollama mode)
-- Backward-compatible support for legacy `OPENAI_*` env vars
+- Transitional backward-compatible support for legacy `OPENAI_*` env vars
 - `PORT`
 
 ## Update Process

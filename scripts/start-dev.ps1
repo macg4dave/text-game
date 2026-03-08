@@ -147,6 +147,30 @@ function Get-PortValue {
   return 3000
 }
 
+function Test-AnyConfigValuePresent {
+  param(
+    [hashtable]$DotEnv,
+    [string[]]$Keys
+  )
+
+  foreach ($key in $Keys) {
+    if ([string]::IsNullOrWhiteSpace($key)) {
+      continue
+    }
+
+    $value = [Environment]::GetEnvironmentVariable($key)
+    if (-not [string]::IsNullOrWhiteSpace($value)) {
+      return $true
+    }
+
+    if ($DotEnv.ContainsKey($key) -and -not [string]::IsNullOrWhiteSpace($DotEnv[$key])) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
 function Get-UriObject {
   param([string]$Text)
 
@@ -367,7 +391,18 @@ function Resolve-ProviderConfig {
   param([hashtable]$DotEnv)
 
   $hasDotEnv = Test-Path -LiteralPath $dotEnvPath
-  $provider = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROVIDER") -Default ($(if ($hasDotEnv) { "openai-compatible" } else { "ollama" }))
+  $provider = Get-ConfigValue -DotEnv $DotEnv -Keys @("AI_PROVIDER") -Default ""
+  if ([string]::IsNullOrWhiteSpace($provider)) {
+    if (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("LITELLM_PROXY_URL", "LITELLM_API_KEY", "LITELLM_CHAT_MODEL", "LITELLM_EMBEDDING_MODEL")) {
+      $provider = "litellm"
+    } elseif (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("OLLAMA_BASE_URL", "OLLAMA_API_KEY", "OLLAMA_CHAT_MODEL", "OLLAMA_EMBEDDING_MODEL")) {
+      $provider = "ollama"
+    } elseif (Test-AnyConfigValuePresent -DotEnv $DotEnv -Keys @("AI_API_KEY", "AI_BASE_URL", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL", "OPENAI_EMBEDDING_MODEL")) {
+      $provider = "openai-compatible"
+    } else {
+      $provider = "litellm"
+    }
+  }
   $provider = $provider.Trim().ToLowerInvariant()
   $port = Get-PortValue (Get-ConfigValue -DotEnv $DotEnv -Keys @("PORT") -Default "3000")
 
@@ -572,7 +607,7 @@ Write-Info ("provider: {0}" -f $config.provider)
 if ($config.hasDotEnv) {
   Write-Info "configuration: using .env"
 } else {
-  Write-Info "configuration: no .env found, using Docker-side local defaults for this run"
+  Write-Info "configuration: no .env found, using LiteLLM-first defaults for this run"
 }
 
 Confirm-DockerTooling

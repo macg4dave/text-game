@@ -15,6 +15,7 @@
     "build:client": "esbuild public/app.ts --bundle --format=iife --platform=browser --outfile=public/app.js",
     "build": "npm run build:server && npm run build:client",
     "type-check": "tsc -p tsconfig.json",
+    "test:config": "npm run type-check && tsx --test src/config.test.ts",
     "test:local-ai": "npm run type-check && powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1",
     "test": "npm run type-check && tsx --test src/**/*.test.ts",
     "dev": "npm run build:client && tsx src/server.ts",

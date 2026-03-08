@@ -5,8 +5,52 @@ const DEFAULT_PORT = 3000;
 
 export const SUPPORTED_AI_PROVIDERS = ["openai-compatible", "litellm", "ollama"] as const;
 
+type SupportedAiProvider = (typeof SUPPORTED_AI_PROVIDERS)[number];
+type AiConfigField = "apiKey" | "baseUrl" | "chatModel" | "embeddingModel";
 type ProviderDefaults = Omit<AiConfig, "provider">;
 type ConfigLike = Pick<AppConfig, "port" | "ai" | "validation">;
+
+const AI_ENV_VAR_CANDIDATES: Record<
+  AiConfigField,
+  {
+    generic: string;
+    legacy?: string;
+    providerSpecific?: Partial<Record<SupportedAiProvider, string>>;
+  }
+> = {
+  apiKey: {
+    generic: "AI_API_KEY",
+    legacy: "OPENAI_API_KEY",
+    providerSpecific: {
+      litellm: "LITELLM_API_KEY",
+      ollama: "OLLAMA_API_KEY"
+    }
+  },
+  baseUrl: {
+    generic: "AI_BASE_URL",
+    legacy: "OPENAI_BASE_URL",
+    providerSpecific: {
+      litellm: "LITELLM_PROXY_URL",
+      ollama: "OLLAMA_BASE_URL"
+    }
+  },
+  chatModel: {
+    generic: "AI_CHAT_MODEL",
+    legacy: "OPENAI_MODEL",
+    providerSpecific: {
+      litellm: "LITELLM_CHAT_MODEL",
+      ollama: "OLLAMA_CHAT_MODEL"
+    }
+  },
+  embeddingModel: {
+    generic: "AI_EMBEDDING_MODEL",
+    legacy: "OPENAI_EMBEDDING_MODEL",
+    providerSpecific: {
+      litellm: "LITELLM_EMBEDDING_MODEL",
+      ollama: "OLLAMA_EMBEDDING_MODEL"
+    }
+  }
+};
 
 export interface RuntimePreflightIssue {
   code: string;
@@ -15,6 +59,48 @@ export interface RuntimePreflightIssue {
   message: string;
   recovery: string[];
   env_vars: string[];
+}
+
+export type ConfigValueSource = "provider-specific" | "generic" | "legacy" | "default";
+type ConfigEnvSource = "env" | "default" | "invalid-env" | "inferred";
+
+export interface SafeConfigDiagnostics {
+  provider: {
+    value: string;
+    source: ConfigEnvSource;
+    env_var: string | null;
+  };
+  port: {
+    value: number;
+    source: ConfigEnvSource;
+    env_var: string | null;
+  };
+  ai: {
+    api_key: {
+      configured: boolean;
+      source: ConfigValueSource;
+      env_var: string | null;
+    };
+    base_url: {
+      value: string | null;
+      source: ConfigValueSource;
+      env_var: string | null;
+    };
+    chat_model: {
+      value: string;
+      source: ConfigValueSource;
+      env_var: string | null;
+    };
+    embedding_model: {
+      value: string;
+      source: ConfigValueSource;
+      env_var: string | null;
+    };
+  };
+  validation: {
+    ok: boolean;
+    error_count: number;
+  };
 }
 
 function readEnv(env: EnvSource, ...keys: Array<string | undefined>): string | undefined {
@@ -29,9 +115,142 @@ function readEnv(env: EnvSource, ...keys: Array<string | undefined>): string | u
   return undefined;
 }
 
+function isSupportedAiProvider(value: string): value is SupportedAiProvider {
+  return SUPPORTED_AI_PROVIDERS.includes(value as SupportedAiProvider);
+}
+
+function readFirstEnvValue(
+  env: EnvSource,
+  keys: Array<string | undefined>
+): { value: string | undefined; envVar: string | null } {
+  for (const key of keys) {
+    if (!key) continue;
+    const value = env?.[key];
+    if (typeof value === "string" && value.trim()) {
+      return { value: value.trim(), envVar: key };
+    }
+  }
+
+  return { value: undefined, envVar: null };
+}
+
+function classifyAiEnvVarSource(provider: string, field: AiConfigField, envVar: string | null): ConfigValueSource {
+  if (!envVar) return "default";
+
+  const providerSpecific = isSupportedAiProvider(provider)
+    ? AI_ENV_VAR_CANDIDATES[field].providerSpecific?.[provider]
+    : undefined;
+  const generic = AI_ENV_VAR_CANDIDATES[field].generic;
+  const legacy = AI_ENV_VAR_CANDIDATES[field].legacy;
+
+  if (envVar === legacy) return "legacy";
+  if (envVar === generic) return "generic";
+  if (envVar === providerSpecific) return "provider-specific";
+  return "generic";
+}
+
+export function getAiEnvVarNames(provider: string, field: AiConfigField): string[] {
+  const candidates = AI_ENV_VAR_CANDIDATES[field];
+  const providerSpecific = isSupportedAiProvider(provider)
+    ? candidates.providerSpecific?.[provider]
+    : undefined;
+
+  return [providerSpecific, candidates.generic, candidates.legacy].filter(
+    (value): value is string => Boolean(value)
+  );
+}
+
+function resolveAiSetting(
+  env: EnvSource,
+  provider: string,
+  field: AiConfigField,
+  fallbackValue: string
+): { value: string; source: ConfigValueSource; envVar: string | null } {
+  const resolved = readFirstEnvValue(env, getAiEnvVarNames(provider, field));
+
+  return {
+    value: resolved.value ?? fallbackValue,
+    source: classifyAiEnvVarSource(provider, field, resolved.envVar),
+    envVar: resolved.envVar
+  };
+}
+
+function inferProviderFromEnv(env: EnvSource): { value: string; envVar: string | null } | null {
+  const litellmSignal = readFirstEnvValue(env, [
+    "LITELLM_PROXY_URL",
+    "LITELLM_API_KEY",
+    "LITELLM_CHAT_MODEL",
+    "LITELLM_EMBEDDING_MODEL"
+  ]);
+  if (litellmSignal.envVar) {
+    return { value: "litellm", envVar: litellmSignal.envVar };
+  }
+
+  const ollamaSignal = readFirstEnvValue(env, [
+    "OLLAMA_BASE_URL",
+    "OLLAMA_API_KEY",
+    "OLLAMA_CHAT_MODEL",
+    "OLLAMA_EMBEDDING_MODEL"
+  ]);
+  if (ollamaSignal.envVar) {
+    return { value: "ollama", envVar: ollamaSignal.envVar };
+  }
+
+  const directProviderSignal = readFirstEnvValue(env, [
+    "AI_API_KEY",
+    "AI_BASE_URL",
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "OPENAI_MODEL",
+    "OPENAI_EMBEDDING_MODEL"
+  ]);
+  if (directProviderSignal.envVar) {
+    return { value: "openai-compatible", envVar: directProviderSignal.envVar };
+  }
+
+  return null;
+}
+
+function resolveProvider(env: EnvSource): { value: string; source: ConfigEnvSource; envVar: string | null } {
+  const resolved = readFirstEnvValue(env, ["AI_PROVIDER"]);
+  if (resolved.envVar) {
+    return {
+      value: normalizeProvider(resolved.value),
+      source: "env",
+      envVar: resolved.envVar
+    };
+  }
+
+  const inferred = inferProviderFromEnv(env);
+  if (inferred) {
+    return {
+      value: inferred.value,
+      source: "inferred",
+      envVar: inferred.envVar
+    };
+  }
+
+  return {
+    value: "litellm",
+    source: "default",
+    envVar: null
+  };
+}
+
+function resolvePort(env: EnvSource): { value: number; source: ConfigEnvSource; envVar: string | null } {
+  const raw = readFirstEnvValue(env, ["PORT"]);
+  const parsed = parsePort(raw.value);
+
+  return {
+    value: parsed.value,
+    source: raw.envVar ? (parsed.errors.length ? "invalid-env" : "env") : "default",
+    envVar: raw.envVar
+  };
+}
+
 function normalizeProvider(value: string | undefined): string {
-  if (!value || typeof value !== "string") return "openai-compatible";
-  return value.trim().toLowerCase() || "openai-compatible";
+  if (!value || typeof value !== "string") return "litellm";
+  return value.trim().toLowerCase() || "litellm";
 }
 
 function normalizeBaseUrl(value: string | undefined): string {
@@ -89,7 +308,7 @@ function buildIssueFromConfigError(configToSummarize: ConfigLike, error: ConfigE
             ? [
                 "Set AI_API_KEY in .env for your OpenAI-compatible provider.",
                 "If you are using OpenAI directly, OPENAI_API_KEY still works.",
-                "If you meant to use LiteLLM or Ollama, set AI_PROVIDER first so the right defaults apply."
+                "If you want the default gateway path instead, switch to AI_PROVIDER=litellm and point LITELLM_PROXY_URL at your LiteLLM proxy."
               ]
             : [
                 `Add the missing key in .env for ${getProviderLabel(provider)}.`,
@@ -189,11 +408,20 @@ function getProviderDefaults(provider: string): ProviderDefaults {
     };
   }
 
+  if (provider === "openai-compatible") {
+    return {
+      apiKey: "",
+      baseUrl: "",
+      chatModel: "gpt-4o-mini",
+      embeddingModel: "text-embedding-3-small"
+    };
+  }
+
   return {
-    apiKey: "",
-    baseUrl: "",
-    chatModel: "gpt-4o-mini",
-    embeddingModel: "text-embedding-3-small"
+    apiKey: "anything",
+    baseUrl: "http://127.0.0.1:4000",
+    chatModel: "game-chat",
+    embeddingModel: "game-embedding"
   };
 }
 
@@ -260,7 +488,7 @@ function validateHttpUrl(
 function validateAiConfig(ai: AiConfig): ConfigError[] {
   const errors: ConfigError[] = [];
 
-  if (!SUPPORTED_AI_PROVIDERS.includes(ai.provider as (typeof SUPPORTED_AI_PROVIDERS)[number])) {
+  if (!isSupportedAiProvider(ai.provider)) {
     errors.push(
       buildConfigError({
         path: "ai.provider",
@@ -276,7 +504,7 @@ function validateAiConfig(ai: AiConfig): ConfigError[] {
       buildConfigError({
         path: "ai.apiKey",
         message: "AI_API_KEY is required when AI_PROVIDER is openai-compatible.",
-        envVars: ["AI_API_KEY", "OPENAI_API_KEY"],
+        envVars: getAiEnvVarNames(ai.provider, "apiKey"),
         code: "missing_api_key"
       })
     );
@@ -287,7 +515,7 @@ function validateAiConfig(ai: AiConfig): ConfigError[] {
       buildConfigError({
         path: "ai.chatModel",
         message: "A chat model must be configured.",
-        envVars: ["AI_CHAT_MODEL", "OPENAI_MODEL", "LITELLM_CHAT_MODEL", "OLLAMA_CHAT_MODEL"],
+        envVars: getAiEnvVarNames(ai.provider, "chatModel"),
         code: "missing_chat_model"
       })
     );
@@ -298,68 +526,93 @@ function validateAiConfig(ai: AiConfig): ConfigError[] {
       buildConfigError({
         path: "ai.embeddingModel",
         message: "An embedding model must be configured.",
-        envVars: [
-          "AI_EMBEDDING_MODEL",
-          "OPENAI_EMBEDDING_MODEL",
-          "LITELLM_EMBEDDING_MODEL",
-          "OLLAMA_EMBEDDING_MODEL"
-        ],
+        envVars: getAiEnvVarNames(ai.provider, "embeddingModel"),
         code: "missing_embedding_model"
       })
     );
   }
 
-  const baseUrlEnvVars =
-    ai.provider === "litellm"
-      ? ["LITELLM_PROXY_URL", "AI_BASE_URL", "OPENAI_BASE_URL"]
-      : ai.provider === "ollama"
-        ? ["OLLAMA_BASE_URL", "AI_BASE_URL", "OPENAI_BASE_URL"]
-        : ["AI_BASE_URL", "OPENAI_BASE_URL"];
-
-  errors.push(...validateHttpUrl(ai.baseUrl, { path: "ai.baseUrl", envVars: baseUrlEnvVars }));
+  errors.push(
+    ...validateHttpUrl(ai.baseUrl, {
+      path: "ai.baseUrl",
+      envVars: getAiEnvVarNames(ai.provider, "baseUrl")
+    })
+  );
 
   return errors;
 }
 
 function resolveAiConfig(env: EnvSource): AiConfig {
-  const provider = normalizeProvider(readEnv(env, "AI_PROVIDER"));
+  const provider = resolveProvider(env).value;
   const defaults = getProviderDefaults(provider);
+  const apiKey = resolveAiSetting(env, provider, "apiKey", defaults.apiKey);
+  const baseUrl = resolveAiSetting(env, provider, "baseUrl", defaults.baseUrl);
+  const chatModel = resolveAiSetting(env, provider, "chatModel", defaults.chatModel);
+  const embeddingModel = resolveAiSetting(env, provider, "embeddingModel", defaults.embeddingModel);
 
   return {
     provider,
-    apiKey:
-      readEnv(
-        env,
-        provider === "litellm" ? "LITELLM_API_KEY" : undefined,
-        provider === "ollama" ? "OLLAMA_API_KEY" : undefined,
-        "AI_API_KEY",
-        "OPENAI_API_KEY"
-      ) || defaults.apiKey,
-    baseUrl: normalizeBaseUrl(
-      readEnv(
-        env,
-        provider === "litellm" ? "LITELLM_PROXY_URL" : undefined,
-        provider === "ollama" ? "OLLAMA_BASE_URL" : undefined,
-        "AI_BASE_URL",
-        "OPENAI_BASE_URL"
-      ) || defaults.baseUrl
-    ),
-    chatModel:
-      readEnv(
-        env,
-        provider === "litellm" ? "LITELLM_CHAT_MODEL" : undefined,
-        provider === "ollama" ? "OLLAMA_CHAT_MODEL" : undefined,
-        "AI_CHAT_MODEL",
-        "OPENAI_MODEL"
-      ) || defaults.chatModel,
-    embeddingModel:
-      readEnv(
-        env,
-        provider === "litellm" ? "LITELLM_EMBEDDING_MODEL" : undefined,
-        provider === "ollama" ? "OLLAMA_EMBEDDING_MODEL" : undefined,
-        "AI_EMBEDDING_MODEL",
-        "OPENAI_EMBEDDING_MODEL"
-      ) || defaults.embeddingModel
+    apiKey: apiKey.value,
+    baseUrl: normalizeBaseUrl(baseUrl.value),
+    chatModel: chatModel.value,
+    embeddingModel: embeddingModel.value
+  };
+}
+
+export function getSafeConfigDiagnostics(
+  configToSummarize: ConfigLike = config,
+  env: EnvSource = process.env
+): SafeConfigDiagnostics {
+  const provider = resolveProvider(env);
+  const port = resolvePort(env);
+  const defaults = getProviderDefaults(configToSummarize.ai.provider);
+  const apiKey = resolveAiSetting(env, configToSummarize.ai.provider, "apiKey", defaults.apiKey);
+  const baseUrl = resolveAiSetting(env, configToSummarize.ai.provider, "baseUrl", defaults.baseUrl);
+  const chatModel = resolveAiSetting(env, configToSummarize.ai.provider, "chatModel", defaults.chatModel);
+  const embeddingModel = resolveAiSetting(
+    env,
+    configToSummarize.ai.provider,
+    "embeddingModel",
+    defaults.embeddingModel
+  );
+
+  return {
+    provider: {
+      value: configToSummarize.ai.provider,
+      source: provider.source,
+      env_var: provider.envVar
+    },
+    port: {
+      value: configToSummarize.port,
+      source: port.source,
+      env_var: port.envVar
+    },
+    ai: {
+      api_key: {
+        configured: Boolean(configToSummarize.ai.apiKey),
+        source: apiKey.source,
+        env_var: apiKey.envVar
+      },
+      base_url: {
+        value: configToSummarize.ai.baseUrl || null,
+        source: baseUrl.source,
+        env_var: baseUrl.envVar
+      },
+      chat_model: {
+        value: configToSummarize.ai.chatModel,
+        source: chatModel.source,
+        env_var: chatModel.envVar
+      },
+      embedding_model: {
+        value: configToSummarize.ai.embeddingModel,
+        source: embeddingModel.source,
+        env_var: embeddingModel.envVar
+      }
+    },
+    validation: {
+      ok: Boolean(configToSummarize.validation?.ok),
+      error_count: configToSummarize.validation?.errors?.length || 0
+    }
   };
 }
 
