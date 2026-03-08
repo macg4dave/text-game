@@ -23,6 +23,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Event logging for player and narrator turns.
 - Director layer to track end goal, act, and remaining beats.
 - AI responses must be structured JSON with narrative + updates.
+- Turn input, turn output, and authoritative player state must each expose an explicit schema version marker at the HTTP boundary.
 - The default AI setup uses a LiteLLM-managed gateway that can route to local AI or hosted providers behind the same app-facing contract.
 - Startup preflight must validate host prerequisites, AI readiness, writable paths, and save or migration safety before the first turn.
 - Preflight issues must be classified as blocker, warning, or info; blockers must stop the first turn and present plain-language recovery steps.
@@ -54,7 +55,8 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 ## API Requirements
 
 - `/api/state` returns or creates a player.
-- `/api/turn` runs a story turn and updates state.
+- `/api/state` returns a versioned authoritative player-state payload.
+- `/api/turn` accepts a versioned turn-input payload, runs a story turn, and returns a versioned turn-output payload plus the versioned authoritative player state.
 - `/api/assist` provides local text assistance.
 
 ## Configuration

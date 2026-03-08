@@ -14,6 +14,17 @@ export interface ValidationResult<TError = string> {
   errors: TError[];
 }
 
+export const TURN_INPUT_SCHEMA_VERSION = "turn-input/v1";
+export const TURN_OUTPUT_SCHEMA_VERSION = "turn-output/v1";
+export const AUTHORITATIVE_STATE_SCHEMA_VERSION = "authoritative-state/v1";
+
+export interface TurnInputPayload {
+  schema_version: typeof TURN_INPUT_SCHEMA_VERSION;
+  input: string;
+  player_id?: string;
+  player_name?: string;
+}
+
 export interface AiConfig {
   provider: string;
   apiKey: string;
@@ -166,6 +177,10 @@ export interface TurnResult {
   memory_updates: string[];
 }
 
+export interface TurnOutputPayload extends TurnResult {
+  schema_version: typeof TURN_OUTPUT_SCHEMA_VERSION;
+}
+
 export interface DirectorBeat {
   id: string;
   label: string;
@@ -225,6 +240,10 @@ export interface Player {
   inventory: string[];
   flags: string[];
   quests: QuestUpdate[];
+}
+
+export interface AuthoritativePlayerState extends Player {
+  schema_version: typeof AUTHORITATIVE_STATE_SCHEMA_VERSION;
 }
 
 export interface PlayerRow {

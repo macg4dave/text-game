@@ -132,7 +132,7 @@ Then choose one of these LiteLLM configs:
 - `litellm.config.yaml` for the default Docker Ollama smoke path
 - `litellm.local-gpu.config.yaml` for the Docker-backed Ollama GPU override
 
-The included `litellm.local-gpu.config.yaml` keeps `local-gpu-8gb` active and includes commented manual swap references for `local-gpu-12gb` and `local-gpu-20gb-plus`. T02g does not add runtime profile-selection env vars yet.
+The included `litellm.local-gpu.config.yaml` keeps `local-gpu-8gb` active and includes commented manual swap references for `local-gpu-12gb` and `local-gpu-20gb-plus`. The active alias block now resolves its upstream chat and embedding targets through `LITELLM_LOCAL_GPU_*` env vars so the launcher can keep one stable LiteLLM config while swapping tiers.
 
 If you build your own equivalent config, keep these rules:
 

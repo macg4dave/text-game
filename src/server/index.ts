@@ -7,7 +7,16 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { config, formatConfigErrors, getSafeConfigDiagnostics } from "../core/config.js";
 import { initDb } from "../core/db.js";
 import { createLogger } from "../core/logging.js";
-import type { Player, QuestSpec, RuntimePreflightIssue, RuntimePreflightReport } from "../core/types.js";
+import {
+  AUTHORITATIVE_STATE_SCHEMA_VERSION,
+  TURN_OUTPUT_SCHEMA_VERSION,
+  type AuthoritativePlayerState,
+  type Player,
+  type QuestSpec,
+  type RuntimePreflightIssue,
+  type RuntimePreflightReport,
+  type TurnOutputPayload
+} from "../core/types.js";
 import {
   addEvent,
   addMemories,
@@ -21,7 +30,14 @@ import {
 } from "../state/game.js";
 import { assistText } from "../utils/assist.js";
 import { applyDirectorRules, getCurrentBeat, loadDirectorSpec, reloadDirectorSpec } from "../story/director.js";
-import { validateDirectorSpec, validateQuestSpec, validateStateUpdates } from "../rules/validator.js";
+import {
+  parseTurnInput,
+  validateAuthoritativePlayerState,
+  validateDirectorSpec,
+  validateQuestSpec,
+  validateStateUpdates,
+  validateTurnOutput
+} from "../rules/validator.js";
 import { loadQuestSpec, reloadQuestSpec } from "../story/quest.js";
 import { generateTurn, getEmbedding, getEmbeddings } from "../ai/service.js";
 import { buildRuntimeDebug, buildSessionDebug, buildTurnDebug, type TurnDebugParams } from "./debug.js";
@@ -100,11 +116,27 @@ app.get("/api/state", async (req: Request, res: Response) => {
     player.director_state = normalized.director;
   }
 
+  const authoritativePlayer = createAuthoritativePlayerState(player);
+  const authoritativeStateValidation = validateAuthoritativePlayerState(authoritativePlayer);
+  if (!authoritativeStateValidation.ok) {
+    getRequestLogger(res).error("state request produced invalid authoritative player state", {
+      validationErrors: authoritativeStateValidation.errors
+    });
+    return res.status(500).json({
+      error: "Invalid authoritative state",
+      detail: authoritativeStateValidation.errors,
+      debug: {
+        runtime: buildRuntimeDebugPayload(),
+        session: null
+      }
+    });
+  }
+
   res.json({
-    player,
+    player: authoritativePlayer,
     debug: {
       runtime: buildRuntimeDebugPayload(),
-      session: buildSessionDebug(player)
+      session: buildSessionDebug(authoritativePlayer)
     }
   });
 });
@@ -191,7 +223,7 @@ app.post("/api/turn", async (req: Request, res: Response) => {
   let inputEmbedding: number[] = [];
   let inputEmbeddingError: string | null = null;
   let rawResult: unknown = null;
-  let result = null;
+  let result: TurnOutputPayload | null = null;
   let updateValidation: { ok: boolean; errors: string[] } = { ok: true, errors: [] };
   let memoryEmbeddings: number[][] = [];
   let memoryEmbeddingError: string | null = null;
@@ -200,12 +232,12 @@ app.post("/api/turn", async (req: Request, res: Response) => {
   res.setHeader("x-request-id", requestId);
 
   try {
-    const body = req.body as Partial<{ playerId: string; name: string; input: string }> | undefined;
-    input = typeof body?.input === "string" ? body.input : "";
-    if (!input) {
+    const turnInput = parseTurnInput(req.body);
+    if (!turnInput.ok || !turnInput.value) {
       requestLogger.warn("turn request rejected", { reason: "missing_input" });
       return res.status(400).json({
-        error: "Missing input",
+        error: "Invalid turn input",
+        detail: turnInput.errors,
         debug: buildTurnDebugPayload({
           requestId,
           startedAt,
@@ -225,6 +257,7 @@ app.post("/api/turn", async (req: Request, res: Response) => {
         })
       });
     }
+    input = turnInput.value.input;
 
     const preflight = await runtimePreflight.ensureReport();
     if (!preflight.ok) {
@@ -287,7 +320,7 @@ app.post("/api/turn", async (req: Request, res: Response) => {
       });
     }
 
-    player = getOrCreatePlayer({ playerId: body?.playerId, name: body?.name });
+    player = getOrCreatePlayer({ playerId: turnInput.value.player_id, name: turnInput.value.player_name });
     const normalized = normalizeDirectorState(player, directorSpec);
     if (normalized.changed) {
       updateDirectorState(player.id, normalized.director);
@@ -333,7 +366,38 @@ app.post("/api/turn", async (req: Request, res: Response) => {
       input
     });
 
-    result = sanitizeTurnResult(rawResult, player);
+    result = {
+      schema_version: TURN_OUTPUT_SCHEMA_VERSION,
+      ...sanitizeTurnResult(rawResult, player)
+    };
+    const turnOutputValidation = validateTurnOutput(result);
+    if (!turnOutputValidation.ok) {
+      requestLogger.warn("turn rejected after output schema validation", {
+        validationErrors: turnOutputValidation.errors
+      });
+      return res.status(400).json({
+        error: "Invalid turn output",
+        detail: turnOutputValidation.errors,
+        debug: buildTurnDebugPayload({
+          requestId,
+          startedAt,
+          input,
+          player,
+          refreshedPlayer,
+          shortHistory,
+          memories,
+          statePack,
+          inputEmbedding,
+          inputEmbeddingError,
+          rawResult,
+          result,
+          updateValidation,
+          memoryEmbeddings,
+          memoryEmbeddingError
+        })
+      });
+    }
+
     updateValidation = validateStateUpdates(result.state_updates);
     if (!updateValidation.ok) {
       requestLogger.warn("turn rejected after validation", {
@@ -397,6 +461,35 @@ app.post("/api/turn", async (req: Request, res: Response) => {
     }
 
     refreshedPlayer = getOrCreatePlayer({ playerId: player.id });
+    const authoritativePlayer = createAuthoritativePlayerState(refreshedPlayer);
+    const authoritativeStateValidation = validateAuthoritativePlayerState(authoritativePlayer);
+    if (!authoritativeStateValidation.ok) {
+      requestLogger.error("turn produced invalid authoritative player state", {
+        validationErrors: authoritativeStateValidation.errors
+      });
+      return res.status(500).json({
+        error: "Invalid authoritative state",
+        detail: authoritativeStateValidation.errors,
+        debug: buildTurnDebugPayload({
+          requestId,
+          startedAt,
+          input,
+          player,
+          refreshedPlayer,
+          shortHistory,
+          memories,
+          statePack,
+          inputEmbedding,
+          inputEmbeddingError,
+          rawResult,
+          result,
+          updateValidation,
+          memoryEmbeddings,
+          memoryEmbeddingError
+        })
+      });
+    }
+
     requestLogger.info("turn completed", {
       durationMs: Date.now() - startedAt,
       inputEmbeddingFallback: Boolean(inputEmbeddingError),
@@ -406,11 +499,12 @@ app.post("/api/turn", async (req: Request, res: Response) => {
     });
 
     return res.json({
+      schema_version: result.schema_version,
       narrative: result.narrative,
       player_options: result.player_options,
       state_updates: result.state_updates,
       director_updates: result.director_updates,
-      player: refreshedPlayer,
+      player: authoritativePlayer,
       debug: buildTurnDebugPayload({
         requestId,
         startedAt,
@@ -486,6 +580,13 @@ function buildTurnDebugPayload(params: ServerTurnDebugParams) {
     config,
     runtimePreflight: runtimePreflight.getCurrentReport()
   });
+}
+
+function createAuthoritativePlayerState(player: Player): AuthoritativePlayerState {
+  return {
+    schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+    ...player
+  };
 }
 
 function mergeList(existing: string[], addList: string[] = [], removeList: string[] = []): string[] {

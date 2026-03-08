@@ -103,8 +103,8 @@ Use this exact shape when adding new work:
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
 | T05 | Next | P0 | P2 | Error boundary and global handler | Review | None | `npm test` |
-| T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Review | T02f | Matrix review |
-| T06 | Next | P1 | P1 | Turn input, output, and state schemas | Ready | T02 | `npm test` |
+| T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Done | T02f | Matrix review |
+| T06 | Next | P1 | P1 | Turn input, output, and state schemas | Review | T02 | `npm test` |
 | T07 | Next | P1 | P1 | Turn handler and model orchestration | Ready | T06 | `npm test` |
 | T07a | Next | P1 | P1 | LiteLLM default chat route for turn generation | Ready | T02f, T07 | Manual turn submission against LiteLLM |
 | T08 | Next | P1 | P1 | Deterministic state reducer | Ready | T06 | `npm test` |
@@ -163,7 +163,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T02g - GPU Tier Matrix And Local Model Profiles
 
-- Status: Review
+- Status: Done
 - Queue: Next
 - Phase: P0
 - Priority: P1
@@ -202,9 +202,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - authoritative matrix data now lives in `scripts/local-gpu-profile-matrix.json` so future launcher and setup work can read one repo-owned JSON contract without introducing YAML parsing into app code
   - `litellm.local-gpu.config.yaml` now pins `local-gpu-8gb` as the active default profile and leaves `local-gpu-12gb` plus `local-gpu-20gb-plus` as commented manual swap references for later T02h selection work
   - `local-gpu-8gb` is documented as `verified` for this task's matrix sanity check path; `local-gpu-12gb` and `local-gpu-20gb-plus` remain `heuristic` until they are exercised on matching hardware
-  - validation on 2026-03-08 ran `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1` and a manual repo consistency review across `README.md`, `setup_local_a.i.md`, `.env.example`, `litellm.local-gpu.config.yaml`, `ROADMAP.md`, and this task card
-  - a real local GPU runtime smoke was not available in this session, so the task remains `Review` rather than `Done`
-  - re-audit on 2026-03-08: `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1` now fails because the validator still expects a literal active chat target in `litellm.local-gpu.config.yaml`, while the active profile now resolves the chat target from `LITELLM_LOCAL_GPU_CHAT_TARGET`
+  - validation on 2026-03-08 ran `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1` and a manual repo consistency review across `README.md`, `setup_local_a.i.md`, `.env.example`, `litellm.local-gpu.config.yaml`, `docker-compose.yml`, `ROADMAP.md`, and this task card
+  - the matrix validator now checks the uncommented env-driven alias block in `litellm.local-gpu.config.yaml` plus the matching default `LITELLM_LOCAL_GPU_*` values in `docker-compose.yml`, so it no longer passes or fails based on commented manual-swap examples
+  - no matching local GPU hardware runtime smoke was available in this session; that does not block `T02g` because the `12 GB` and `20 GB+` tiers are intentionally documented as `heuristic` until later hardware-specific follow-up work
 
 ### T05 - Error Boundary And Global Handler
 
@@ -252,7 +252,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T06 - Turn Input, Output, And State Schemas
 
-- Status: Ready
+- Status: Review
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -263,8 +263,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - define structured model output shape
   - define authoritative state shape and version marker
 - Files to Touch:
-  - src/validator.ts
-  - src/server.ts
+  - BACKLOG.md
+  - src/core/types.ts
+  - src/rules/validator.ts
+  - src/rules/validator.test.ts
+  - src/server/index.ts
   - REQUIREMENTS.md
 - Do Not Touch:
   - public/styles.css
@@ -279,6 +282,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - the schema contract is documented for future AI tasks
 - Handoff Notes:
   - record schema version names and any intentionally deferred fields
+  - implemented on 2026-03-08 with three HTTP-boundary schema markers: `turn-input/v1`, `turn-output/v1`, and `authoritative-state/v1`
+  - `/api/turn` now normalizes the legacy camelCase request body (`playerId`, `name`) into the versioned turn-input contract so the current UI keeps working while later tasks move fully to the explicit schema
+  - `/api/state` and `/api/turn` now return versioned authoritative player snapshots, and `/api/turn` also returns a top-level `schema_version` for the turn-output payload
+  - added focused coverage in `src/rules/validator.test.ts` for turn-input parsing, turn-output validation, and authoritative-state validation
+  - validation on 2026-03-08: `docker compose build app` passed, `docker compose run --rm --no-deps app npm run type-check` passed, and `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` passed
+  - `docker compose run --rm --no-deps app npm test` still fails because of the pre-existing unrelated failure in `src/core/config.test.ts` (`buildConfigPreflightIssues turns config failures into player-facing recovery steps` expects `3` issues but currently receives `4`)
 
 ### T11 - Minimal Player UI Loop
 

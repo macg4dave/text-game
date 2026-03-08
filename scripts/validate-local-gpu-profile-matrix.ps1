@@ -4,6 +4,7 @@ Set-StrictMode -Version Latest
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $matrixPath = Join-Path $PSScriptRoot "local-gpu-profile-matrix.json"
 $litellmConfigPath = Join-Path $repoRoot "litellm.local-gpu.config.yaml"
+$dockerComposePath = Join-Path $repoRoot "docker-compose.yml"
 
 $script:Failures = New-Object System.Collections.Generic.List[string]
 
@@ -52,6 +53,21 @@ function Require-NumberOrNull {
   return $true
 }
 
+function Get-ComposeEnvDefault {
+  param(
+    [string]$ComposeText,
+    [string]$VariableName
+  )
+
+  $pattern = '(?m)^\s*{0}:\s*"\$\{{{0}:-(?<value>[^}}]*)\}}"\s*$' -f [regex]::Escape($VariableName)
+  $match = [regex]::Match($ComposeText, $pattern)
+  if (-not $match.Success) {
+    return $null
+  }
+
+  return $match.Groups["value"].Value
+}
+
 if (-not (Test-Path -LiteralPath $matrixPath)) {
   throw "Missing matrix file: $matrixPath"
 }
@@ -60,8 +76,13 @@ if (-not (Test-Path -LiteralPath $litellmConfigPath)) {
   throw "Missing LiteLLM local GPU config: $litellmConfigPath"
 }
 
+if (-not (Test-Path -LiteralPath $dockerComposePath)) {
+  throw "Missing Docker Compose config: $dockerComposePath"
+}
+
 $matrix = Get-Content -LiteralPath $matrixPath -Raw | ConvertFrom-Json
 $litellmConfigText = Get-Content -LiteralPath $litellmConfigPath -Raw
+$dockerComposeText = Get-Content -LiteralPath $dockerComposePath -Raw
 
 if (($matrix.version -as [int]) -ne 1) {
   Add-Failure "version must be 1."
@@ -212,24 +233,77 @@ if (-not $activeProfileMatch.Success) {
 
 $defaultProfile = if ($defaultProfileId -and $profileById.ContainsKey($defaultProfileId)) { $profileById[$defaultProfileId] } else { $null }
 if ($null -ne $defaultProfile) {
-  $expectedChatLine = "model: ollama_chat/{0}" -f $defaultProfile.recommendedChatModel
-  if ($litellmConfigText -notmatch [regex]::Escape($expectedChatLine)) {
-    Add-Failure ("Active LiteLLM config is missing expected chat target: {0}" -f $expectedChatLine)
+  $chatAliasMatch = [regex]::Match($litellmConfigText, '(?ms)^\s*-\s*model_name:\s*game-chat\s+litellm_params:\s+model:\s*(?<model>[^\r\n]+)\s+api_base:\s*(?<apiBase>[^\r\n]+)')
+  if (-not $chatAliasMatch.Success) {
+    Add-Failure "Active LiteLLM config must declare an uncommented game-chat alias block."
+  } elseif ($chatAliasMatch.Groups["model"].Value.Trim() -ne "os.environ/LITELLM_LOCAL_GPU_CHAT_TARGET") {
+    Add-Failure "Active LiteLLM config game-chat alias must resolve model from LITELLM_LOCAL_GPU_CHAT_TARGET."
   } else {
-    Add-Pass ("Active LiteLLM config chat target matches {0}" -f $defaultProfile.recommendedChatModel)
+    Add-Pass "Active LiteLLM config game-chat alias uses the expected env-driven target."
+  }
+
+  if ($chatAliasMatch.Success) {
+    if ($chatAliasMatch.Groups["apiBase"].Value.Trim() -ne "os.environ/LITELLM_LOCAL_GPU_CHAT_API_BASE") {
+      Add-Failure "Active LiteLLM config game-chat alias must resolve api_base from LITELLM_LOCAL_GPU_CHAT_API_BASE."
+    } else {
+      Add-Pass "Active LiteLLM config game-chat alias uses the expected env-driven api_base."
+    }
+  }
+
+  $embeddingAliasMatch = [regex]::Match($litellmConfigText, '(?ms)^\s*-\s*model_name:\s*game-embedding\s+litellm_params:\s+model:\s*(?<model>[^\r\n]+)\s+api_key:\s*(?<apiKey>[^\r\n]+)\s+api_base:\s*(?<apiBase>[^\r\n]+)')
+  if (-not $embeddingAliasMatch.Success) {
+    Add-Failure "Active LiteLLM config must declare an uncommented game-embedding alias block."
+  } elseif ($embeddingAliasMatch.Groups["model"].Value.Trim() -ne "os.environ/LITELLM_LOCAL_GPU_EMBEDDING_TARGET") {
+    Add-Failure "Active LiteLLM config game-embedding alias must resolve model from LITELLM_LOCAL_GPU_EMBEDDING_TARGET."
+  } else {
+    Add-Pass "Active LiteLLM config game-embedding alias uses the expected env-driven target."
+  }
+
+  if ($embeddingAliasMatch.Success) {
+    if ($embeddingAliasMatch.Groups["apiKey"].Value.Trim() -ne "os.environ/LITELLM_LOCAL_GPU_EMBEDDING_API_KEY") {
+      Add-Failure "Active LiteLLM config game-embedding alias must resolve api_key from LITELLM_LOCAL_GPU_EMBEDDING_API_KEY."
+    } else {
+      Add-Pass "Active LiteLLM config game-embedding alias uses the expected env-driven api_key."
+    }
+  }
+
+  if ($embeddingAliasMatch.Success) {
+    if ($embeddingAliasMatch.Groups["apiBase"].Value.Trim() -ne "os.environ/LITELLM_LOCAL_GPU_EMBEDDING_API_BASE") {
+      Add-Failure "Active LiteLLM config game-embedding alias must resolve api_base from LITELLM_LOCAL_GPU_EMBEDDING_API_BASE."
+    } else {
+      Add-Pass "Active LiteLLM config game-embedding alias uses the expected env-driven api_base."
+    }
+  }
+
+  $expectedComposeDefaults = [ordered]@{
+    "LITELLM_LOCAL_GPU_PROFILE_ID" = [string]$defaultProfile.id
+    "LITELLM_LOCAL_GPU_CHAT_TARGET" = "ollama_chat/$($defaultProfile.recommendedChatModel)"
+    "LITELLM_LOCAL_GPU_CHAT_API_BASE" = "http://ollama:11434"
   }
 
   $embeddingRoute = $defaultProfile.recommendedEmbeddingRoute
-  $expectedEmbeddingLine = if ($embeddingRoute.mode -eq "hosted") {
-    "model: openai/{0}" -f $embeddingRoute.model
+  if ($embeddingRoute.mode -eq "hosted") {
+    $expectedComposeDefaults["LITELLM_LOCAL_GPU_EMBEDDING_TARGET"] = "openai/$($embeddingRoute.model)"
+    $expectedComposeDefaults["LITELLM_LOCAL_GPU_EMBEDDING_API_KEY"] = "sk-placeholder"
+    $expectedComposeDefaults["LITELLM_LOCAL_GPU_EMBEDDING_API_BASE"] = ""
   } else {
-    "model: ollama_embeddings/{0}" -f $embeddingRoute.model
+    $expectedComposeDefaults["LITELLM_LOCAL_GPU_EMBEDDING_TARGET"] = "ollama_embeddings/$($embeddingRoute.model)"
+    $expectedComposeDefaults["LITELLM_LOCAL_GPU_EMBEDDING_API_KEY"] = ""
+    $expectedComposeDefaults["LITELLM_LOCAL_GPU_EMBEDDING_API_BASE"] = "http://ollama:11434"
   }
 
-  if ($litellmConfigText -notmatch [regex]::Escape($expectedEmbeddingLine)) {
-    Add-Failure ("Active LiteLLM config is missing expected embedding target: {0}" -f $expectedEmbeddingLine)
-  } else {
-    Add-Pass ("Active LiteLLM config embedding target matches {0}" -f $embeddingRoute.model)
+  foreach ($variableName in $expectedComposeDefaults.Keys) {
+    $actualValue = Get-ComposeEnvDefault -ComposeText $dockerComposeText -VariableName $variableName
+    if ($null -eq $actualValue) {
+      Add-Failure ("docker-compose.yml is missing a default env value for {0}." -f $variableName)
+      continue
+    }
+
+    if ($actualValue -ne $expectedComposeDefaults[$variableName]) {
+      Add-Failure ("docker-compose.yml default for {0} must be '{1}', but was '{2}'." -f $variableName, $expectedComposeDefaults[$variableName], $actualValue)
+    } else {
+      Add-Pass ("docker-compose.yml default for {0} matches the active default profile." -f $variableName)
+    }
   }
 }
 
