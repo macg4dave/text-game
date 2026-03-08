@@ -11,7 +11,7 @@ The application source is TypeScript-first and module-oriented: server, state, A
 Current authoring layout:
 
 - `src/core/` - shared config, DB, types, and config tests
-- `src/server/` - server entrypoint and HTTP lifecycle
+- `src/server/` - server entrypoint plus server-only helpers for preflight, prompt shaping, turn sanitization, and debug payloads
 - `src/state/` - game state mutation and retrieval
 - `src/story/` - director and quest specs plus progression helpers
 - `src/rules/` - validation rules
@@ -396,6 +396,10 @@ For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File sc
 ## Key Files
 
 - `src/server/index.ts` - API server entrypoint and routing
+- `src/server/runtime-preflight.ts` - cached startup probe and AI readiness checks
+- `src/server/debug.ts` - runtime, session, and turn debug payload shaping
+- `src/server/turn-result.ts` - model output sanitization defaults
+- `src/server/player-state.ts` - player director-state normalization helpers
 - `src/core/config.ts` - runtime config and provider-neutral AI settings
 - `src/ai/service.ts` - OpenAI-compatible chat completions + JSON schema
 - `src/state/game.ts` - State, memory, director updates + retrieval scoring

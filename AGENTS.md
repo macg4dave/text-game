@@ -72,6 +72,20 @@ Before starting substantial work, read:
 - Prefer deterministic behavior and small, verifiable edits.
 - Treat `src/**/*.ts` as the authoring surface, including browser code under `src/ui/`. `public/app.js` is emitted build output and should not be hand-edited unless a task explicitly requires validating generated assets.
 
+## Module Boundary Rules
+
+- Organize new code by owning domain first. Prefer the existing module folders under `src/` over creating ad hoc top-level files.
+- Keep `src/core/` for shared primitives and infrastructure only: config, DB, shared contracts, and truly cross-cutting types. Do not turn `core` into a fallback bucket for unrelated feature logic.
+- Treat `src/server/` as the composition root. Keep HTTP routing, request parsing, response shaping, and startup wiring there. Move reusable gameplay, AI, validation, and preflight logic into non-server modules.
+- Do not import from `src/server/` or `src/ui/` into `src/state/`, `src/story/`, `src/rules/`, `src/ai/`, or `src/utils/`.
+- Keep `src/ui/` browser-only. It should talk to the server through the HTTP contract rather than importing server, DB, or gameplay implementation modules directly.
+- Prefer one-way dependency flow: `core` -> domain modules -> `server` or `ui`. Avoid circular imports and avoid feature modules depending on entrypoint code.
+- When a change introduces a new responsibility or a different dependency set, create a new module instead of extending a large mixed-purpose file.
+- Treat already-large files as split candidates before adding more code. If a file is a few hundred lines and already mixes concerns, refactor within the same change or record the split as follow-up work.
+- Keep feature-local types next to the feature. Promote a type into `src/core/types.ts` only when it is shared across modules or represents a boundary contract.
+- Place new tests beside the owning module when practical, using `*.test.ts` in the same feature folder.
+- Edit browser source in `src/ui/app.ts`. `public/app.ts` is a legacy placeholder and should not receive new logic.
+
 ## Script Structure Rules
 
 - Keep entry scripts under `scripts/` small and orchestration-focused.

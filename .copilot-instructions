@@ -58,6 +58,20 @@ Before making substantial changes, read:
 - Run `npm` and `node` commands in Docker for this project; do not execute them directly on the host.
 - Prefer deterministic behavior, compact state, and small verifiable patches.
 
+## Module Boundary Rules
+
+- Organize new code by ownership domain first, not by convenience. Prefer adding to `src/core`, `src/state`, `src/story`, `src/rules`, `src/ai`, `src/utils`, `src/server`, or `src/ui` based on who owns the behavior.
+- Keep `src/core/` limited to shared primitives and infrastructure such as config, DB access, shared types, and cross-cutting contracts. Do not move gameplay, HTTP, or provider-specific branching into `core` just because many files can import it.
+- Treat `src/server/` as the composition root. It should wire routes, translate HTTP payloads, and coordinate modules. If logic can run without Express, it likely does not belong in `src/server/`.
+- Keep `src/state/`, `src/story/`, `src/rules/`, `src/ai/`, and `src/utils/` independent from `src/server/` and `src/ui/`. These modules should not import from the server or browser layer.
+- Keep `src/ui/` limited to browser behavior and API consumption. Do not import server, DB, or gameplay implementation modules into the UI layer.
+- Prefer one-way dependency flow: `core` -> feature modules -> `server` or `ui`. Avoid circular dependencies and avoid peer modules reaching upward into entrypoint code.
+- Add a new module when work introduces a new responsibility, a different dependency set, or would otherwise enlarge an existing file that is already hard to scan. Do not keep extending `index.ts` or another large file as a default.
+- Treat very large files as refactor targets before adding more behavior. As a rule of thumb, once a file is already a few hundred lines and mixes unrelated concerns, split it first or in the same change.
+- Keep feature-local types near the owning module. Only move a type into `src/core/types.ts` when it is shared across multiple modules or defines a cross-boundary contract.
+- Put new tests beside the owning module when practical, using `*.test.ts` in the same feature folder.
+- Edit browser source in `src/ui/app.ts`; do not add logic to `public/app.js`, and do not treat `public/app.ts` as an active authoring surface.
+
 ## Script Formatting Rules
 
 - Keep top-level scripts such as files under `scripts/` thin and orchestration-focused.
@@ -79,6 +93,7 @@ Before making substantial changes, read:
 - `src/story/quest.ts`: quest spec loading
 - `src/rules/validator.ts`: spec and update validation
 - `src/ui/app.ts`: browser TypeScript authoring source
+- `public/app.ts`: legacy placeholder only; do not add runtime logic here
 - `public/app.js`: browser-side game loop and UI logic
 - `public/index.html`: main interface
 - `public/styles.css`: layout and presentation

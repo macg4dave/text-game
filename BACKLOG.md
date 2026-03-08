@@ -94,7 +94,7 @@ Use this exact shape when adding new work:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T01 | Now | P0 | P1 | Player launch bootstrap path | Done | None | `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
 | T41 | Now | P0 | P1 | Full TypeScript migration | Done | None | `npm run type-check`; `npm test`; `docker compose up --build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1` |
-| T42 | Now | P0 | P1 | Module-first source and script layout | In Progress | T41 | `npm run type-check`; `npm test`; `npm run build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
+| T42 | Now | P0 | P1 | Module-first source and script layout | Done | T41 | `npm run type-check`; `npm test`; `npm run build`; `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
 | T01a | Now | P0 | P1 | Runtime preflight and recovery messaging | Done | T01, T02 | Manual launcher failure checks |
 | T35 | Now | P0 | P1 | Packaging prototype and decision memo | Done | T01 | Prototype build verification |
 | T02 | Now | P0 | P1 | Config module with schema validation | Done | None | `npm test` |
@@ -330,7 +330,7 @@ When a human assigns a task directly, the assigned task overrides queue order.
 
 ### T42 - Module-First Source And Script Layout
 
-- Status: In Progress
+- Status: Done
 - Queue: Now
 - Phase: P0
 - Priority: P1
@@ -372,9 +372,12 @@ When a human assigns a task directly, the assigned task overrides queue order.
   - user explicitly assigned this structural refactor on 2026-03-08, overriding normal queue order
   - favor small compatibility-preserving moves inside the implementation, but the final authoring layout should read as module-first rather than flat
   - first implementation pass moved authoring files into `src/core`, `src/state`, `src/story`, `src/rules`, `src/utils`, `src/ai`, `src/server`, and `src/ui`
+  - follow-up structural pass split the oversized server entrypoint into focused helpers under `src/server/` for runtime preflight, turn-result sanitization, player-state normalization, prompt text, and debug payload shaping
   - browser build input now points at `src/ui/app.ts`, while `public/app.ts` remains only as a legacy placeholder and is no longer the source of truth
   - startup and local AI scripts now share dotenv/config/HTTP helper functions through `scripts/lib/shared.ps1`
   - validation on 2026-03-08 passed with `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, `docker compose build app`, `docker compose run --rm app npm run build`, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+  - closeout validation on 2026-03-08 also passed after the server split with `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, `docker compose run --rm app npm run build`, and `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`
+  - the launcher-driven Docker image build exposed one extra compatibility issue that the direct container checks did not surface: `src/core/types.ts` now uses `NodeJS.ProcessEnv` instead of importing `ProcessEnv` from `node:process`
   - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` was executed after the script refactor but failed in the current shell because the active local AI config still resolved to an unreachable Ollama endpoint at `http://127.0.0.1:11434/v1`; the script now reports that failure earlier and more clearly
 
 ### T01b - Preflight Blocker Contract And Advanced Diagnostics
