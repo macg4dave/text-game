@@ -194,12 +194,6 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
         memoriesAdded.push({ playerId, content: memory.content, embedding: memory.embedding });
       });
     },
-    applyDirectorRules({ directorState }) {
-      return {
-        ...directorState,
-        story_beats_remaining: 2
-      };
-    },
     async generateTurn(params): Promise<TurnResult> {
       capturedModel = params.model;
       capturedInput = params.input;
@@ -248,7 +242,7 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
       return nextPlayer;
     },
     sanitizeTurnResult(result) {
-      return result as TurnResult;
+      return result as Record<string, unknown>;
     },
     validateStateUpdates() {
       return { ok: true, errors: [] };
@@ -317,9 +311,6 @@ test("turn service returns a 400 outcome when turn output validation fails", asy
     },
     addEvent() {},
     addMemories() {},
-    applyDirectorRules({ directorState }) {
-      return directorState;
-    },
     async generateTurn(): Promise<TurnResult> {
       return {
         narrative: "Broken",
@@ -357,7 +348,7 @@ test("turn service returns a 400 outcome when turn output validation fails", asy
       return null;
     },
     sanitizeTurnResult(result) {
-      return result as TurnResult;
+      return result as Record<string, unknown>;
     },
     validateStateUpdates() {
       return { ok: true, errors: [] };
@@ -398,15 +389,376 @@ test("turn service returns a 400 outcome when turn output validation fails", asy
   );
 });
 
+test("turn service rejects malformed raw model output instead of sanitizing it into validity", async () => {
+  const player = createPlayer();
+  const committedEvents: string[] = [];
+  let persisted = false;
+
+  const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent.outcome.status);
+      }
+    },
+    addEvent() {},
+    addMemories() {},
+    async generateTurn() {
+      return {
+        narrative: "   ",
+        player_options: ["Inspect the lantern", 7],
+        state_updates: {
+          location: "Rooftop Market",
+          inventory_add: "signal shard",
+          inventory_remove: [],
+          flags_add: [],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "Still broken.",
+          current_beat_id: "beat-2"
+        },
+        memory_updates: [],
+        scene: {
+          weather: "storm"
+        }
+      } as unknown as TurnResult;
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState() {
+      persisted = true;
+      return null;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "inspect the lantern",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createDirectorSpec(),
+    questSpec: createQuestSpec()
+  });
+
+  assert.equal(outcome.ok, false);
+  if (outcome.ok) {
+    return;
+  }
+
+  assert.equal(outcome.statusCode, 400);
+  assert.equal(outcome.reason, "turn_output_validation");
+  assert.equal(persisted, false);
+  assert.deepEqual(committedEvents, ["rejected"]);
+  assert.match(String(outcome.detail), /narrative must be a non-empty string/i);
+  assert.match(String(outcome.detail), /player_options/i);
+  assert.match(String(outcome.detail), /state_updates\.inventory_add/i);
+  assert.match(String(outcome.detail), /director_updates\.current_beat_id/i);
+  assert.match(String(outcome.detail), /scene/i);
+});
+
+test("turn service trims valid raw narrative and options without changing their meaning", async () => {
+  const player = createPlayer();
+
+  const service = createTurnService({
+    addCommittedTurnEvent() {},
+    addEvent() {},
+    addMemories() {},
+    async generateTurn() {
+      return {
+        narrative: "  The signal lantern hummed when touched.  ",
+        player_options: ["  Inspect the lantern  ", " Leave quietly "],
+        state_updates: {
+          location: "  Rooftop Market  ",
+          inventory_add: [" signal shard "],
+          inventory_remove: [],
+          flags_add: [" signal_seen "],
+          flags_remove: [],
+          quests: [
+            {
+              id: " intro-signal ",
+              status: " active ",
+              summary: " You reached the lantern. "
+            }
+          ]
+        },
+        director_updates: {
+          end_goal_progress: " The signal now points toward the tower. "
+        },
+        memory_updates: [" The signal lantern hummed when touched. "]
+      } as unknown as TurnResult;
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "touch the lantern",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createDirectorSpec(),
+    questSpec: createQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  assert.equal(outcome.turnOutput.narrative, "The signal lantern hummed when touched.");
+  assert.deepEqual(outcome.turnOutput.player_options, ["Inspect the lantern", "Leave quietly"]);
+  assert.equal(outcome.turnOutput.state_updates.location, "Rooftop Market");
+  assert.deepEqual(outcome.turnOutput.state_updates.inventory_add, ["signal shard"]);
+  assert.deepEqual(outcome.turnOutput.state_updates.flags_add, ["signal_seen"]);
+  assert.deepEqual(outcome.turnOutput.state_updates.quests, [
+    {
+      id: "intro-signal",
+      status: "active",
+      summary: "You reached the lantern."
+    }
+  ]);
+  assert.equal(outcome.turnOutput.director_updates.end_goal_progress, "The signal now points toward the tower.");
+  assert.deepEqual(outcome.turnOutput.memory_updates, ["The signal lantern hummed when touched."]);
+});
+
+test("turn service rejects unearned quest and memory proposals before persistence while leaving raw turn output intact", async () => {
+  const player = createPlayer();
+  const committedEvents: CanonicalTurnEventPayload[] = [];
+  const persistedPlayers: Player[] = [];
+  const storedMemories: Array<{ playerId: string; content: string }> = [];
+
+  const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent);
+      }
+    },
+    addEvent() {},
+    addMemories(playerId, memoryList) {
+      memoryList.forEach((memory) => {
+        storedMemories.push({ playerId, content: memory.content });
+      });
+    },
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "You declare the signal quest complete and claim the city already trusts you.",
+        player_options: ["Press onward"],
+        state_updates: {
+          location: player.location,
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: [],
+          flags_remove: [],
+          quests: [
+            {
+              id: "intro-signal",
+              status: "complete",
+              summary: "The quest is apparently finished."
+            }
+          ]
+        },
+        director_updates: {
+          end_goal_progress: "The tower is basically won already."
+        },
+        memory_updates: ["Everyone in the city trusts the player now."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "declare victory",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createDirectorSpec(),
+    questSpec: createQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  assert.equal(outcome.turnOutput.state_updates.quests[0]?.status, "complete");
+  assert.equal(outcome.turnOutput.director_updates.end_goal_progress, "The tower is basically won already.");
+  assert.deepEqual(outcome.turnOutput.memory_updates, ["Everyone in the city trusts the player now."]);
+
+  const persistedPlayer = persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected adjudicated player state to be persisted");
+  }
+
+  assert.deepEqual(persistedPlayer.quests, player.quests);
+  assert.equal(persistedPlayer.director_state.end_goal_progress, player.director_state.end_goal_progress);
+  assert.equal(persistedPlayer.summary, player.summary);
+  assert.deepEqual(storedMemories, []);
+
+  assert.equal(committedEvents.length, 1);
+  assert.equal(committedEvents[0]?.committed.state_updates, null);
+  assert.deepEqual(committedEvents[0]?.committed.memory_updates, []);
+  assert.equal(committedEvents[0]?.committed.director_updates, null);
+});
+
+test("turn service persists only adjudicated state changes when proposals include impossible removals and duplicate progress", async () => {
+  const player = createPlayer();
+  const committedEvents: CanonicalTurnEventPayload[] = [];
+  const persistedPlayers: Player[] = [];
+  const storedMemories: Array<{ playerId: string; content: string }> = [];
+
+  const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent);
+      }
+    },
+    addEvent() {},
+    addMemories(playerId, memoryList) {
+      memoryList.forEach((memory) => {
+        storedMemories.push({ playerId, content: memory.content });
+      });
+    },
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "You cross onto the bridge, lose the shard, and somehow also finish the quest instantly.",
+        player_options: ["Study the tower lights"],
+        state_updates: {
+          location: "Sky Bridge",
+          inventory_add: ["bridge pass", "signal shard"],
+          inventory_remove: ["signal shard", "imaginary token"],
+          flags_add: ["signal_seen", "market_seen"],
+          flags_remove: ["market_seen", "unknown-flag"],
+          quests: [
+            {
+              id: "intro-signal",
+              status: "complete",
+              summary: "The bridge crossing ended the quest."
+            }
+          ]
+        },
+        director_updates: {
+          end_goal_progress: "The signal now points toward the tower."
+        },
+        memory_updates: ["The player reached the bridge.", "The player reached the bridge."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "cross onto the bridge",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createDirectorSpec(),
+    questSpec: createQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected adjudicated player state to be persisted");
+  }
+
+  assert.deepEqual(persistedPlayer.inventory, ["bridge pass"]);
+  assert.deepEqual(persistedPlayer.flags, ["signal_seen"]);
+  assert.deepEqual(persistedPlayer.quests, player.quests);
+  assert.equal(persistedPlayer.location, "Sky Bridge");
+  assert.equal(persistedPlayer.director_state.story_beats_remaining, 2);
+
+  assert.equal(committedEvents.length, 1);
+  assert.deepEqual(committedEvents[0]?.committed.state_updates, {
+    location: "Sky Bridge",
+    inventory_add: ["bridge pass"],
+    inventory_remove: ["signal shard"],
+    flags_add: ["signal_seen"],
+    flags_remove: ["market_seen"],
+    quests: []
+  });
+  assert.deepEqual(committedEvents[0]?.committed.memory_updates, ["The player reached the bridge."]);
+  assert.equal(storedMemories.length, 1);
+  assert.equal(storedMemories[0]?.content, "The player reached the bridge.");
+});
+
 test("turn service returns a 500 outcome when model execution throws unexpectedly", async () => {
   const player = createPlayer();
   const service = createTurnService({
     addCommittedTurnEvent() {},
     addEvent() {},
     addMemories() {},
-    applyDirectorRules({ directorState }) {
-      return directorState;
-    },
     async generateTurn() {
       throw new Error("model gateway timeout");
     },
@@ -429,7 +781,7 @@ test("turn service returns a 500 outcome when model execution throws unexpectedl
       return null;
     },
     sanitizeTurnResult(result) {
-      return result as TurnResult;
+      return result as Record<string, unknown>;
     },
     validateStateUpdates() {
       return { ok: true, errors: [] };
@@ -484,12 +836,6 @@ test("turn service persists only server-accepted state changes into the authorit
       callOrder.push(`event:${role}`);
     },
     addMemories() {},
-    applyDirectorRules({ directorState }) {
-      return {
-        ...directorState,
-        story_beats_remaining: 2
-      };
-    },
     async generateTurn(): Promise<TurnResult> {
       return {
         narrative: "You stride onto the bridge and the quest is complete.",
@@ -562,17 +908,12 @@ test("turn service persists only server-accepted state changes into the authorit
     summary: "You arrived at the market.",
     inventory: ["bridge pass"],
     flags: ["signal_seen"],
-    quests: [
-      {
-        id: "intro-signal",
-        status: "complete",
-        summary: "The bridge crossing ended the quest."
-      }
-    ],
+    quests: player.quests,
     director_state: {
       ...player.director_state,
       story_beats_remaining: 2,
-      end_goal_progress: "You now have a clear route toward the tower."
+      end_goal_progress: "You now have a clear route toward the tower.",
+      completed_beats: ["beat-1"]
     }
   });
   assert.deepEqual(
@@ -602,9 +943,6 @@ test("turn output can be translated into a canonical replay event without treati
     addCommittedTurnEvent() {},
     addEvent() {},
     addMemories() {},
-    applyDirectorRules({ directorState }) {
-      return directorState;
-    },
     async generateTurn(): Promise<TurnResult> {
       return {
         narrative: "The signal lantern hummed when touched.",
@@ -642,7 +980,7 @@ test("turn output can be translated into a canonical replay event without treati
       return null;
     },
     sanitizeTurnResult(result) {
-      return result as TurnResult;
+      return result as Record<string, unknown>;
     },
     validateStateUpdates() {
       return { ok: true, errors: [] };
@@ -666,37 +1004,20 @@ test("turn output can be translated into a canonical replay event without treati
     return;
   }
 
-  const canonicalEvent = createCommittedTurnEventPayload({
-    eventId: "event-123",
-    playerId: player.id,
-    occurredAt: "2026-03-08T00:00:00.000Z",
-    input: "touch the lantern",
-    outcome: {
-      status: "accepted",
-      summary: "The player inspected the lantern and revealed the signal.",
-      rejection_reason: null
-    },
-    committed: {
-      state_updates: outcome.turnOutput.state_updates,
-      director_updates: outcome.turnOutput.director_updates,
-      memory_updates: outcome.turnOutput.memory_updates
-    },
-    rulesetVersion: "story-rules/v1",
-    supplemental: {
-      transcript: {
-        player_text: "touch the lantern",
-        narrator_text: outcome.turnOutput.narrative
-      },
-      presentation: {
-        narrative: outcome.turnOutput.narrative,
-        player_options: outcome.turnOutput.player_options
-      }
-    }
-  });
+  const canonicalEvent = outcome.trace.committedEvent;
 
+  assert.ok(canonicalEvent);
   assert.equal(canonicalEvent.schema_version, COMMITTED_EVENT_SCHEMA_VERSION);
   assert.equal(canonicalEvent.contract_versions.authoritative_state, AUTHORITATIVE_STATE_SCHEMA_VERSION);
   assert.equal(canonicalEvent.outcome.status, "accepted");
   assert.equal(canonicalEvent.supplemental?.transcript?.narrator_text, outcome.turnOutput.narrative);
+  assert.deepEqual(canonicalEvent.committed.state_updates, {
+    location: "Rooftop Market",
+    inventory_add: [],
+    inventory_remove: [],
+    flags_add: ["signal_seen"],
+    flags_remove: [],
+    quests: []
+  });
   assert.deepEqual(validateCanonicalTurnEvent(canonicalEvent), { ok: true, errors: [] });
 });

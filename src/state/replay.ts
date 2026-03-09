@@ -3,6 +3,8 @@ import type {
   CanonicalPlayerCreatedEventPayload,
   Player
 } from "../core/types.js";
+import { loadDirectorSpec } from "../story/director.js";
+import { resolveDirectorStateFromAcceptedConsequences } from "./adjudication.js";
 import { reduceCommittedPlayerState } from "./reducer.js";
 
 export interface ReplayCommittedTurnEventsParams {
@@ -11,6 +13,7 @@ export interface ReplayCommittedTurnEventsParams {
 
 export function replayCommittedTurnEvents({ events }: ReplayCommittedTurnEventsParams): Player {
   const initialPlayer = getInitialPlayerFromEvents(events);
+  const directorSpec = loadDirectorSpec();
   let player = clonePlayer(initialPlayer);
 
   for (const event of events) {
@@ -18,9 +21,16 @@ export function replayCommittedTurnEvents({ events }: ReplayCommittedTurnEventsP
       continue;
     }
 
+    const resolvedDirectorState = resolveDirectorStateFromAcceptedConsequences({
+      player,
+      directorSpec,
+      acceptedConsequences: event.committed
+    });
+
     player = reduceCommittedPlayerState({
       player,
-      acceptedConsequences: event.committed
+      acceptedConsequences: event.committed,
+      resolvedDirectorState
     }).player;
   }
 

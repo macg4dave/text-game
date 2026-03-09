@@ -382,6 +382,11 @@ export interface CanonicalPlayerCreatedEventPayload extends CanonicalEventBase {
 export type CanonicalEventPayload = CanonicalTurnEventPayload | CanonicalPlayerCreatedEventPayload;
 export type AcceptedTurnConsequences = CanonicalEventCommittedChanges;
 
+export interface TurnAdjudicationResult {
+  acceptedConsequences: AcceptedTurnConsequences;
+  resolvedDirectorState?: DirectorState;
+}
+
 export interface DeterministicStateReducerInput {
   player: Player;
   acceptedConsequences: AcceptedTurnConsequences;

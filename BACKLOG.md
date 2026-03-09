@@ -163,7 +163,7 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T07a | Next | P1 | P1 | LiteLLM default chat route for turn generation | Ready | T02f, T07 | Manual turn submission against LiteLLM |
 | T08 | Next | P1 | P1 | Deterministic state reducer | Done | T06, T57a, T58a | `npm test` |
 | T09 | Next | P1 | P1 | Event log persistence and replay | Ready | T04, T08, T57b, T59a | Replay fixture execution |
-| T10 | Next | P1 | P1 | Output validator and sanitizer | Ready | T06, T57a, T61a | `npm test` |
+| T10 | Next | P1 | P1 | Output validator and sanitizer | Done | T06, T57a, T61a | `npm test` |
 | T11 | Next | P1 | P1 | Minimal player UI loop | Done | T06 | `docker compose run --rm --no-deps app npm test` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + manual browser smoke test |
 | T11a | Now | P1 | P2 | Browser UI module decomposition groundwork | Done | T11, T12b | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/global-error.test.ts src/ui/http-client.test.ts src/ui/player-name.test.ts src/ui/session-data.test.ts src/ui/setup-view.test.ts src/ui/debug-view.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
 | T48 | Now | P1 | P1 | Server route and turn pipeline extraction | Done | T06, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts` + `docker compose run --rm --no-deps app npm test` |
@@ -195,7 +195,7 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T64a | Now | P1 | P1 | story_sample brief and acceptance criteria | Done | None | Manual planning-doc consistency review |
 | T64b | Next | P1 | P1 | story_sample authored content slice | Ready | T34, T57c | Manual story-arc smoke test |
 | T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Ready | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
-| T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Ready | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
+| T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Done | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Ready | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Done | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T59c | Next | P1 | P1 | Canonical player-creation replay bootstrap | Done | T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
@@ -470,7 +470,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T57b - Server Consequence Adjudication And Commit Policy
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -510,6 +510,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - use `T07`, `T08`, and `T10` as supporting implementation slices; this task is the authority-boundary integration point that ties them together
   - do not let the adjudication module become a new mixed bucket; separate proposal validation from authoritative mutation
   - add focused tests for impossible or unearned progress, not only happy-path acceptance
+  - completed on 2026-03-09 by introducing `src/state/adjudication.ts` as the server-owned proposal-to-accepted-consequences boundary and routing `src/state/turn.ts` through it before any persistence or committed-event creation
+  - quest proposals are now dropped at adjudication time, inventory and flag add/remove conflicts are normalized against the current authoritative player state, director progress is only accepted when tied to accepted state or director advancement, and memory persistence is gated behind adjudicated outcomes
+  - `src/state/replay.ts` now reuses the same director-resolution helper so committed events replay with the same director-state derivation used during live turn execution
+  - focused coverage in `src/state/turn.test.ts` now proves impossible removals, duplicate flags, unearned quest completion, and unsupported memory claims do not become authoritative truth even when the raw turn output still proposes them
+  - validation on 2026-03-09 ran `docker compose build app`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts`, `docker compose run --rm --no-deps app npm run type-check`, and `docker compose run --rm --no-deps app npm test`
 
 ### T57c - Post-Commit Narration And Authority-Drift Fixtures
 
@@ -3244,7 +3249,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T10 - Output Validator And Sanitizer
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -3276,6 +3281,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - keep transport validation here and leave committed consequence decisions to `T57b`
+  - completed on 2026-03-09 by tightening `src/rules/validator.ts` so turn output rejects blank narrative, blank option text, blank memory updates, blank director progress, and missing or blank `state_updates.location` instead of only checking coarse types
+  - completed on 2026-03-09 by changing `src/state/turn-result.ts` from a forgiving fallback normalizer into a whitespace-only sanitizer that preserves malformed or over-modeled fields for validator rejection instead of silently dropping them
+  - focused coverage now includes malformed raw-output rejection and safe whitespace trimming in `src/state/turn.test.ts`, plus blank player-facing field coverage in `src/rules/validator.test.ts`
+  - validation on 2026-03-09 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts`, and `docker compose run --rm --no-deps app npm test`
 
 ### T12a - Rate Limiting And Abuse Guard
 

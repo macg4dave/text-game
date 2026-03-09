@@ -109,6 +109,12 @@ export function validateStateUpdates(updates: unknown): ValidationResult<string>
     }
   }
 
+  if (typeof typedUpdates.location !== "string") {
+    errors.push("state_updates.location must be a string.");
+  } else if (!typedUpdates.location.trim()) {
+    errors.push("state_updates.location must be a non-empty string.");
+  }
+
   const listFields: Array<keyof Pick<StateUpdates, "inventory_add" | "inventory_remove" | "flags_add" | "flags_remove">> = [
     "inventory_add",
     "inventory_remove",
@@ -124,6 +130,8 @@ export function validateStateUpdates(updates: unknown): ValidationResult<string>
 
     if (typedUpdates[field].some((item) => typeof item !== "string")) {
       errors.push(`state_updates.${field} must contain only strings.`);
+    } else if (typedUpdates[field].some((item) => !item.trim())) {
+      errors.push(`state_updates.${field} must contain only non-empty strings.`);
     }
   });
 
@@ -238,6 +246,8 @@ export function validateTurnOutput(payload: unknown): ValidationResult<string> {
 
   if (typeof candidate.narrative !== "string") {
     errors.push("narrative must be a string.");
+  } else if (!candidate.narrative.trim()) {
+    errors.push("narrative must be a non-empty string.");
   }
 
   if (!Array.isArray(candidate.player_options)) {
@@ -245,6 +255,8 @@ export function validateTurnOutput(payload: unknown): ValidationResult<string> {
   } else {
     if (candidate.player_options.some((item) => typeof item !== "string")) {
       errors.push("player_options must contain only strings.");
+    } else if (candidate.player_options.some((item) => !item.trim())) {
+      errors.push("player_options must contain only non-empty strings.");
     }
     if (candidate.player_options.length > 6) {
       errors.push("player_options must contain at most 6 entries.");
@@ -267,6 +279,8 @@ export function validateTurnOutput(payload: unknown): ValidationResult<string> {
 
     if (typeof candidate.director_updates.end_goal_progress !== "string") {
       errors.push("director_updates.end_goal_progress must be a string.");
+    } else if (!candidate.director_updates.end_goal_progress.trim()) {
+      errors.push("director_updates.end_goal_progress must be a non-empty string.");
     }
   }
 
@@ -275,6 +289,8 @@ export function validateTurnOutput(payload: unknown): ValidationResult<string> {
   } else {
     if (candidate.memory_updates.some((item) => typeof item !== "string")) {
       errors.push("memory_updates must contain only strings.");
+    } else if (candidate.memory_updates.some((item) => !item.trim())) {
+      errors.push("memory_updates must contain only non-empty strings.");
     }
     if (candidate.memory_updates.length > 8) {
       errors.push("memory_updates must contain at most 8 entries.");

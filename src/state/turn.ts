@@ -24,9 +24,10 @@ import {
   summarizeAcceptedTurnOutcome,
   summarizeRejectedTurnOutcome
 } from "./committed-event.js";
+import { adjudicateTurnOutput } from "./adjudication.js";
 import { reduceCommittedPlayerState } from "./reducer.js";
 import { sanitizeTurnResult } from "./turn-result.js";
-import { applyDirectorRules, getCurrentBeat } from "../story/director.js";
+import { getCurrentBeat } from "../story/director.js";
 import { validateStateUpdates, validateTurnOutput } from "../rules/validator.js";
 
 export interface TurnExecutionTrace {
@@ -83,7 +84,7 @@ export interface TurnServiceDependencies {
   addCommittedTurnEvent: typeof addCommittedTurnEvent;
   addEvent: typeof addEvent;
   addMemories: typeof addMemories;
-  applyDirectorRules: typeof applyDirectorRules;
+  adjudicateTurnOutput: typeof adjudicateTurnOutput;
   generateTurn: typeof generateTurn;
   getEmbedding: typeof getEmbedding;
   getEmbeddings: typeof getEmbeddings;
@@ -120,7 +121,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
     addCommittedTurnEvent,
     addEvent,
     addMemories,
-    applyDirectorRules,
+    adjudicateTurnOutput,
     generateTurn,
     getEmbedding,
     getEmbeddings,
@@ -170,12 +171,13 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           input
         });
 
-        trace.result = {
+        const sanitizedResult = {
           schema_version: TURN_OUTPUT_SCHEMA_VERSION,
           ...deps.sanitizeTurnResult(trace.rawResult, player)
         };
+        trace.result = sanitizedResult as TurnOutputPayload;
 
-        const turnOutputValidation = deps.validateTurnOutput(trace.result);
+        const turnOutputValidation = deps.validateTurnOutput(sanitizedResult);
         if (!turnOutputValidation.ok) {
           trace.committedEvent = createCommittedTurnEventPayload({
             playerId: player.id,
@@ -215,6 +217,8 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
             trace
           };
         }
+
+        trace.result = sanitizedResult as TurnOutputPayload;
 
         trace.updateValidation = deps.validateStateUpdates(trace.result.state_updates);
         if (!trace.updateValidation.ok) {
@@ -257,26 +261,13 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           };
         }
 
-        const acceptedConsequences = {
-          state_updates: trace.result.state_updates,
-          director_updates: trace.result.director_updates,
-          memory_updates: trace.result.memory_updates
-        };
-        const reducedForFlags = reduceCommittedPlayerState({
+        const adjudication = deps.adjudicateTurnOutput({
           player,
-          acceptedConsequences: {
-            state_updates: trace.result.state_updates,
-            director_updates: null,
-            memory_updates: []
-          }
+          turnOutput: trace.result,
+          directorSpec,
+          questSpec
         });
-        const directorState = deps.applyDirectorRules({
-          spec: directorSpec,
-          directorState: player.director_state,
-          stateUpdates: trace.result.state_updates,
-          flags: reducedForFlags.player.flags
-        });
-        directorState.end_goal_progress = trace.result.director_updates.end_goal_progress;
+        const { acceptedConsequences, resolvedDirectorState: directorState } = adjudication;
         const reducedState = reduceCommittedPlayerState({
           player,
           acceptedConsequences,
@@ -286,11 +277,11 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
         deps.addEvent(player.id, "narrator", trace.result.narrative);
         deps.persistPlayerState(reducedState.player);
 
-        if (trace.result.memory_updates.length) {
+        if (acceptedConsequences.memory_updates.length) {
           try {
             trace.memoryEmbeddings = await deps.getEmbeddings({
               model: embeddingModel,
-              inputs: trace.result.memory_updates
+              inputs: acceptedConsequences.memory_updates
             });
           } catch (error) {
             trace.memoryEmbeddings = [];
@@ -299,7 +290,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
 
           deps.addMemories(
             player.id,
-            trace.result.memory_updates.map((content, index) => ({
+            acceptedConsequences.memory_updates.map((content, index) => ({
               content,
               embedding: trace.memoryEmbeddings[index]
             }))

@@ -169,6 +169,33 @@ test("validateTurnOutput rejects payload fields that try to encode intent, simul
   assert.match(result.errors.join(" "), /director_updates\.pacing_decision/i);
 });
 
+test("validateTurnOutput rejects blank narrative and blank or malformed player-facing fields", () => {
+  const result = validateTurnOutput({
+    schema_version: TURN_OUTPUT_SCHEMA_VERSION,
+    narrative: "   ",
+    player_options: ["Inspect the lantern", "   "],
+    state_updates: {
+      location: "   ",
+      inventory_add: [],
+      inventory_remove: [],
+      flags_add: [],
+      flags_remove: [],
+      quests: []
+    },
+    director_updates: {
+      end_goal_progress: "   "
+    },
+    memory_updates: [" "]
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /narrative must be a non-empty string/i);
+  assert.match(result.errors.join(" "), /player_options must contain only non-empty strings/i);
+  assert.match(result.errors.join(" "), /state_updates\.location must be a non-empty string/i);
+  assert.match(result.errors.join(" "), /director_updates\.end_goal_progress must be a non-empty string/i);
+  assert.match(result.errors.join(" "), /memory_updates must contain only non-empty strings/i);
+});
+
 test("validateAuthoritativePlayerState accepts a versioned player snapshot", () => {
   const state: AuthoritativePlayerState = {
     schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
