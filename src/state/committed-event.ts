@@ -9,8 +9,7 @@ import {
   type CanonicalEventOutcome,
   type CanonicalPlayerCreatedEventPayload,
   type CanonicalEventSupplemental,
-  type CanonicalTurnEventPayload,
-  type TurnOutputPayload
+  type CanonicalTurnEventPayload
 } from "../core/types.js";
 
 export interface CreateCommittedTurnEventPayloadParams {
@@ -85,32 +84,32 @@ export function createPlayerCreatedEventPayload({
   };
 }
 
-export function summarizeAcceptedTurnOutcome(turnOutput: TurnOutputPayload): string {
+export function summarizeAcceptedTurnOutcome(committed: CanonicalEventCommittedChanges): string {
   const parts: string[] = [];
-  const stateUpdates = turnOutput.state_updates;
-  if (stateUpdates.location) {
+  const stateUpdates = committed.state_updates;
+  if (stateUpdates?.location) {
     parts.push(`location=${stateUpdates.location}`);
   }
-  if (stateUpdates.inventory_add.length) {
+  if (stateUpdates?.inventory_add.length) {
     parts.push(`inventory_add=${stateUpdates.inventory_add.join(",")}`);
   }
-  if (stateUpdates.inventory_remove.length) {
+  if (stateUpdates?.inventory_remove.length) {
     parts.push(`inventory_remove=${stateUpdates.inventory_remove.join(",")}`);
   }
-  if (stateUpdates.flags_add.length) {
+  if (stateUpdates?.flags_add.length) {
     parts.push(`flags_add=${stateUpdates.flags_add.join(",")}`);
   }
-  if (stateUpdates.flags_remove.length) {
+  if (stateUpdates?.flags_remove.length) {
     parts.push(`flags_remove=${stateUpdates.flags_remove.join(",")}`);
   }
-  if (stateUpdates.quests.length) {
+  if (stateUpdates?.quests.length) {
     parts.push(`quests=${stateUpdates.quests.map((quest) => `${quest.id}:${quest.status}`).join(",")}`);
   }
-  if (turnOutput.director_updates.end_goal_progress) {
-    parts.push(`director_progress=${turnOutput.director_updates.end_goal_progress}`);
+  if (committed.director_updates?.end_goal_progress) {
+    parts.push(`director_progress=${committed.director_updates.end_goal_progress}`);
   }
-  if (turnOutput.memory_updates.length) {
-    parts.push(`memory_updates=${turnOutput.memory_updates.length}`);
+  if (committed.memory_updates.length) {
+    parts.push(`memory_updates=${committed.memory_updates.length}`);
   }
 
   return parts.length ? `Accepted committed turn outcome: ${parts.join("; ")}` : "Accepted committed turn outcome.";

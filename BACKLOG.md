@@ -196,7 +196,7 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T64b | Next | P1 | P1 | story_sample authored content slice | Ready | T34, T57c | Manual story-arc smoke test |
 | T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Ready | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
 | T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Done | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
-| T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Ready | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Done | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Done | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T59c | Next | P1 | P1 | Canonical player-creation replay bootstrap | Done | T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T58b | Later | P2 | P1 | Simulation-first consequence resolution | Ready | T58a, T57b, T07, T08 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
@@ -518,7 +518,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T57c - Post-Commit Narration And Authority-Drift Fixtures
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -557,6 +557,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - this task closes the highest-risk gap left after adjudication: prose drift that still tells the wrong story even when state stayed correct
   - prefer deterministic fixtures over ad hoc manual examples so later agents can rerun the same drift cases
   - keep the player surface simple; if proposed-versus-accepted details need to be exposed, confine them to debug tooling rather than normal gameplay text
+  - completed on 2026-03-09 by adding `src/state/presentation.ts` as the post-commit reconciliation layer that rewrites player-facing narrative and suggested options when accepted consequences diverge from raw model proposals
+  - `src/state/turn.ts` now returns, stores, and logs the reconciled presentation after adjudication, while the canonical committed event keeps accepted `supplemental.presentation` separate from raw `supplemental.proposal_presentation` for debugging authority drift
+  - the turn debug payload now distinguishes raw model output, proposal output, and returned output so drift analysis does not depend on ambiguous `sanitized_output` fields
+  - focused coverage in `src/state/turn.test.ts` now proves unearned quest completion and normalized state deltas cannot leak back into player-facing prose or options, and validator plus contract coverage accepts the new proposal-presentation supplemental shape without affecting replay semantics
+  - validation on 2026-03-09 ran `docker compose build app`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts src/server/http-contract.test.ts`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts`, `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`, and `docker compose run --rm --no-deps app npm test`
 
 ### T64 - MVP Sample Story Arc Definition And Delivery Slices
 

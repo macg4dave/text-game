@@ -58,6 +58,21 @@ npm start
 npm test
 ```
 
+## VS Code Workspace Setup
+
+After you run `npm install`, this repo includes workspace settings that point VS Code at the local TypeScript SDK in `node_modules/typescript/lib`.
+
+That keeps editor IntelliSense aligned with the repo toolchain so imports such as `node:test` and `node:assert/strict` resolve from the installed Node typings instead of a mismatched bundled TypeScript version.
+
+If your machine already has a different system Node major installed, the repo workspace also prepends the portable Node 22 host install at `%LOCALAPPDATA%\Programs\nodejs-22\node-v22.14.0-win-x64` for VS Code terminals so the editor shell matches the repo's declared `22.x` engine without requiring an admin-level system downgrade.
+
+Recommended VS Code extensions for this repo:
+
+- PowerShell
+- Docker
+
+The supported validation and runtime path still stays in Docker even if you use the host install for editor support.
+
 What each command does:
 
 - `npm run type-check` validates all TypeScript source in `src/`

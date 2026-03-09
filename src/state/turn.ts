@@ -25,6 +25,7 @@ import {
   summarizeRejectedTurnOutcome
 } from "./committed-event.js";
 import { adjudicateTurnOutput } from "./adjudication.js";
+import { reconcileTurnPresentation } from "./presentation.js";
 import { reduceCommittedPlayerState } from "./reducer.js";
 import { sanitizeTurnResult } from "./turn-result.js";
 import { getCurrentBeat } from "../story/director.js";
@@ -41,6 +42,7 @@ export interface TurnExecutionTrace {
   inputEmbedding: number[];
   inputEmbeddingError: string | null;
   rawResult: unknown;
+  proposedResult: TurnOutputPayload | null;
   result: TurnOutputPayload | null;
   updateValidation: ValidationResult<string>;
   memoryEmbeddings: number[][];
@@ -109,6 +111,7 @@ export function createTurnExecutionTrace(input = ""): TurnExecutionTrace {
     inputEmbedding: [],
     inputEmbeddingError: null,
     rawResult: null,
+    proposedResult: null,
     result: null,
     updateValidation: { ok: true, errors: [] },
     memoryEmbeddings: [],
@@ -175,7 +178,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           schema_version: TURN_OUTPUT_SCHEMA_VERSION,
           ...deps.sanitizeTurnResult(trace.rawResult, player)
         };
-        trace.result = sanitizedResult as TurnOutputPayload;
+        trace.proposedResult = sanitizedResult as TurnOutputPayload;
 
         const turnOutputValidation = deps.validateTurnOutput(sanitizedResult);
         if (!turnOutputValidation.ok) {
@@ -218,9 +221,9 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           };
         }
 
-        trace.result = sanitizedResult as TurnOutputPayload;
+        trace.proposedResult = sanitizedResult as TurnOutputPayload;
 
-        trace.updateValidation = deps.validateStateUpdates(trace.result.state_updates);
+        trace.updateValidation = deps.validateStateUpdates(trace.proposedResult.state_updates);
         if (!trace.updateValidation.ok) {
           trace.committedEvent = createCommittedTurnEventPayload({
             playerId: player.id,
@@ -242,8 +245,8 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
                 narrator_text: null
               },
               presentation: {
-                narrative: trace.result.narrative,
-                player_options: trace.result.player_options
+                narrative: trace.proposedResult.narrative,
+                player_options: trace.proposedResult.player_options
               },
               prompt: {
                 model
@@ -263,7 +266,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
 
         const adjudication = deps.adjudicateTurnOutput({
           player,
-          turnOutput: trace.result,
+          turnOutput: trace.proposedResult,
           directorSpec,
           questSpec
         });
@@ -272,6 +275,13 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           player,
           acceptedConsequences,
           resolvedDirectorState: directorState
+        });
+
+        trace.result = reconcileTurnPresentation({
+          player,
+          proposedTurnOutput: trace.proposedResult,
+          acceptedConsequences,
+          nextPlayer: reducedState.player
         });
 
         deps.addEvent(player.id, "narrator", trace.result.narrative);
@@ -302,7 +312,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           input,
           outcome: {
             status: "accepted",
-            summary: summarizeAcceptedTurnOutcome(trace.result),
+            summary: summarizeAcceptedTurnOutcome(acceptedConsequences),
             rejection_reason: null
           },
           committed: acceptedConsequences,
@@ -315,6 +325,10 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
             presentation: {
               narrative: trace.result.narrative,
               player_options: trace.result.player_options
+            },
+            proposal_presentation: {
+              narrative: trace.proposedResult.narrative,
+              player_options: trace.proposedResult.player_options
             },
             prompt: {
               model

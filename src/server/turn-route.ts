@@ -31,6 +31,7 @@ interface TurnRouteDependencies {
     inputEmbedding: number[];
     inputEmbeddingError: string | null;
     rawResult: unknown;
+    proposedResult: TurnOutputPayload | null;
     result: TurnOutputPayload | null;
     updateValidation: { ok: boolean; errors: string[] };
     memoryEmbeddings: number[][];

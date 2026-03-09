@@ -131,6 +131,10 @@ test("createCommittedTurnEventPayload separates replay-critical semantics from s
         narrator_text: turnOutput.narrative
       },
       presentation: {
+        narrative: "You make it to Sky Bridge.",
+        player_options: ["Look around"]
+      },
+      proposal_presentation: {
         narrative: turnOutput.narrative,
         player_options: turnOutput.player_options
       },
@@ -144,7 +148,8 @@ test("createCommittedTurnEventPayload separates replay-critical semantics from s
   assert.equal(payload.contract_versions.turn_output, TURN_OUTPUT_SCHEMA_VERSION);
   assert.equal(payload.contract_versions.authoritative_state, AUTHORITATIVE_STATE_SCHEMA_VERSION);
   assert.deepEqual(payload.committed.state_updates, turnOutput.state_updates);
-  assert.deepEqual(payload.supplemental?.presentation?.player_options, turnOutput.player_options);
+  assert.deepEqual(payload.supplemental?.presentation?.player_options, ["Look around"]);
+  assert.deepEqual(payload.supplemental?.proposal_presentation?.player_options, turnOutput.player_options);
   assert.deepEqual(validateCanonicalTurnEvent(payload), { ok: true, errors: [] });
 });
 

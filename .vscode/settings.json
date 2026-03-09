@@ -1,0 +1,13 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.tsserver.maxTsServerMemory": 3072,
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.env.windows": {
+    "PATH": "${env:LOCALAPPDATA}\\Programs\\nodejs-22\\node-v22.14.0-win-x64;${env:PATH}"
+  },
+  "search.exclude": {
+    "dist": true,
+    "public/app.js": true
+  }
+}

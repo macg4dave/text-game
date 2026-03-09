@@ -17,6 +17,7 @@ import { SYSTEM_PROMPT } from "../ai/prompt.js";
 import { TURN_RESPONSE_SCHEMA, validateTurnResponseSchemaContract } from "../ai/turn-schema.js";
 import { validateCanonicalTurnEvent, validateMemoryCandidate } from "../rules/validator.js";
 import { createCommittedTurnEventPayload } from "../server/http-contract.js";
+import { DRIFT_RECONCILED_PLAYER_OPTIONS } from "./presentation.js";
 import { createTurnService } from "./turn.js";
 
 function getTurnResolutionEvent(event: CanonicalEventPayload): CanonicalTurnEventPayload | null {
@@ -384,7 +385,7 @@ test("turn service returns a 400 outcome when turn output validation fails", asy
   assert.deepEqual(outcome.trace.updateValidation, { ok: true, errors: [] });
   assert.deepEqual(committedEvents, ["rejected"]);
   assert.equal(
-    (outcome.trace.result as { schema_version?: string } | null)?.schema_version,
+    (outcome.trace.proposedResult as { schema_version?: string } | null)?.schema_version,
     TURN_OUTPUT_SCHEMA_VERSION
   );
 });
@@ -484,17 +485,11 @@ test("turn service trims valid raw narrative and options without changing their 
         player_options: ["  Inspect the lantern  ", " Leave quietly "],
         state_updates: {
           location: "  Rooftop Market  ",
-          inventory_add: [" signal shard "],
+          inventory_add: [],
           inventory_remove: [],
           flags_add: [" signal_seen "],
           flags_remove: [],
-          quests: [
-            {
-              id: " intro-signal ",
-              status: " active ",
-              summary: " You reached the lantern. "
-            }
-          ]
+          quests: []
         },
         director_updates: {
           end_goal_progress: " The signal now points toward the tower. "
@@ -539,15 +534,9 @@ test("turn service trims valid raw narrative and options without changing their 
   assert.equal(outcome.turnOutput.narrative, "The signal lantern hummed when touched.");
   assert.deepEqual(outcome.turnOutput.player_options, ["Inspect the lantern", "Leave quietly"]);
   assert.equal(outcome.turnOutput.state_updates.location, "Rooftop Market");
-  assert.deepEqual(outcome.turnOutput.state_updates.inventory_add, ["signal shard"]);
+  assert.deepEqual(outcome.turnOutput.state_updates.inventory_add, []);
   assert.deepEqual(outcome.turnOutput.state_updates.flags_add, ["signal_seen"]);
-  assert.deepEqual(outcome.turnOutput.state_updates.quests, [
-    {
-      id: "intro-signal",
-      status: "active",
-      summary: "You reached the lantern."
-    }
-  ]);
+  assert.deepEqual(outcome.turnOutput.state_updates.quests, []);
   assert.equal(outcome.turnOutput.director_updates.end_goal_progress, "The signal now points toward the tower.");
   assert.deepEqual(outcome.turnOutput.memory_updates, ["The signal lantern hummed when touched."]);
 });
@@ -633,6 +622,8 @@ test("turn service rejects unearned quest and memory proposals before persistenc
   assert.equal(outcome.turnOutput.state_updates.quests[0]?.status, "complete");
   assert.equal(outcome.turnOutput.director_updates.end_goal_progress, "The tower is basically won already.");
   assert.deepEqual(outcome.turnOutput.memory_updates, ["Everyone in the city trusts the player now."]);
+  assert.equal(outcome.turnOutput.narrative, "You press the attempt, but nothing new is committed yet.");
+  assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
 
   const persistedPlayer = persistedPlayers.at(-1);
   if (!persistedPlayer) {
@@ -648,6 +639,13 @@ test("turn service rejects unearned quest and memory proposals before persistenc
   assert.equal(committedEvents[0]?.committed.state_updates, null);
   assert.deepEqual(committedEvents[0]?.committed.memory_updates, []);
   assert.equal(committedEvents[0]?.committed.director_updates, null);
+  assert.equal(committedEvents[0]?.supplemental?.presentation?.narrative, outcome.turnOutput.narrative);
+  assert.deepEqual(committedEvents[0]?.supplemental?.presentation?.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
+  assert.equal(
+    committedEvents[0]?.supplemental?.proposal_presentation?.narrative,
+    "You declare the signal quest complete and claim the city already trusts you."
+  );
+  assert.deepEqual(committedEvents[0]?.supplemental?.proposal_presentation?.player_options, ["Press onward"]);
 });
 
 test("turn service persists only adjudicated state changes when proposals include impossible removals and duplicate progress", async () => {
@@ -738,6 +736,11 @@ test("turn service persists only adjudicated state changes when proposals includ
   assert.deepEqual(persistedPlayer.quests, player.quests);
   assert.equal(persistedPlayer.location, "Sky Bridge");
   assert.equal(persistedPlayer.director_state.story_beats_remaining, 2);
+  assert.equal(
+    outcome.turnOutput.narrative,
+    "You make it to Sky Bridge. You gain bridge pass. You lose signal shard. The signal now points toward the tower."
+  );
+  assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
 
   assert.equal(committedEvents.length, 1);
   assert.deepEqual(committedEvents[0]?.committed.state_updates, {
@@ -751,6 +754,8 @@ test("turn service persists only adjudicated state changes when proposals includ
   assert.deepEqual(committedEvents[0]?.committed.memory_updates, ["The player reached the bridge."]);
   assert.equal(storedMemories.length, 1);
   assert.equal(storedMemories[0]?.content, "The player reached the bridge.");
+  assert.equal(committedEvents[0]?.supplemental?.presentation?.narrative, outcome.turnOutput.narrative);
+  assert.deepEqual(committedEvents[0]?.supplemental?.proposal_presentation?.player_options, ["Study the tower lights"]);
 });
 
 test("turn service returns a 500 outcome when model execution throws unexpectedly", async () => {
@@ -1020,4 +1025,98 @@ test("turn output can be translated into a canonical replay event without treati
     quests: []
   });
   assert.deepEqual(validateCanonicalTurnEvent(canonicalEvent), { ok: true, errors: [] });
+});
+
+test("turn service stores accepted presentation separately from raw proposal presentation when authority drift is reconciled", async () => {
+  const player = createPlayer();
+  const events: Array<{ role: string; content: string }> = [];
+  const committedEvents: CanonicalTurnEventPayload[] = [];
+  const persistedPlayers: Player[] = [];
+
+  const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent);
+      }
+    },
+    addEvent(_playerId, role, content) {
+      events.push({ role, content });
+    },
+    addMemories() {},
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "You stride onto the bridge and the quest is complete.",
+        player_options: ["Celebrate the finished quest"],
+        state_updates: {
+          location: "Sky Bridge",
+          inventory_add: ["signal shard", "bridge pass"],
+          inventory_remove: ["signal shard"],
+          flags_add: ["signal_seen"],
+          flags_remove: ["market_seen"],
+          quests: [
+            {
+              id: "intro-signal",
+              status: "complete",
+              summary: "The bridge crossing ended the quest."
+            }
+          ]
+        },
+        director_updates: {
+          end_goal_progress: "You now have a clear route toward the tower."
+        },
+        memory_updates: []
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "cross onto the bridge",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createDirectorSpec(),
+    questSpec: createQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  assert.equal(
+    outcome.turnOutput.narrative,
+    "You make it to Sky Bridge. You gain bridge pass. You lose signal shard. You now have a clear route toward the tower."
+  );
+  assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
+  assert.equal(outcome.trace.proposedResult?.narrative, "You stride onto the bridge and the quest is complete.");
+  assert.equal(events[1]?.content, outcome.turnOutput.narrative);
+  assert.equal(committedEvents[0]?.supplemental?.presentation?.narrative, outcome.turnOutput.narrative);
+  assert.equal(
+    committedEvents[0]?.supplemental?.proposal_presentation?.narrative,
+    "You stride onto the bridge and the quest is complete."
+  );
+  assert.deepEqual(
+    committedEvents[0]?.supplemental?.proposal_presentation?.player_options,
+    ["Celebrate the finished quest"]
+  );
 });

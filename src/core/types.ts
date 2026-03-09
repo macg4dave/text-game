@@ -355,6 +355,7 @@ export interface CanonicalEventPresentation {
 export interface CanonicalEventSupplemental {
   transcript?: CanonicalEventTranscript;
   presentation?: CanonicalEventPresentation;
+  proposal_presentation?: CanonicalEventPresentation;
   prompt?: unknown;
 }
 

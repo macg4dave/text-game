@@ -497,6 +497,10 @@ test("validateCanonicalTurnEvent accepts a versioned replay event with canonical
         narrator_text: "The signal lantern hummed when touched."
       },
       presentation: {
+        narrative: "You make it to Sky Bridge.",
+        player_options: ["Look around"]
+      },
+      proposal_presentation: {
         narrative: "The signal lantern hummed when touched.",
         player_options: ["Inspect the lantern"]
       },
@@ -554,6 +558,10 @@ test("validateCanonicalTurnEvent rejects malformed canonical fields while allowi
       presentation: {
         narrative: [],
         player_options: ["Inspect the lantern", 7]
+      },
+      proposal_presentation: {
+        narrative: [],
+        player_options: ["Inspect the lantern", 7]
       }
     },
     raw_response: "not allowed"
@@ -570,6 +578,7 @@ test("validateCanonicalTurnEvent rejects malformed canonical fields while allowi
   assert.match(result.errors.join(" "), /contract_versions\.authoritative_state/i);
   assert.match(result.errors.join(" "), /supplemental\.transcript\.player_text/i);
   assert.match(result.errors.join(" "), /supplemental\.presentation\.narrative/i);
+  assert.match(result.errors.join(" "), /supplemental\.proposal_presentation\.narrative/i);
   assert.match(result.errors.join(" "), /raw_response/i);
 });
 

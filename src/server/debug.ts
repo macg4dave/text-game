@@ -15,6 +15,7 @@ export interface TurnDebugParams {
   inputEmbedding: number[];
   inputEmbeddingError: string | null;
   rawResult: unknown;
+  proposedResult: TurnResult | null;
   result: TurnResult | null;
   updateValidation: { ok: boolean; errors: string[] };
   memoryEmbeddings: number[][];
@@ -58,6 +59,7 @@ export function buildTurnDebug({
   inputEmbedding,
   inputEmbeddingError,
   rawResult,
+  proposedResult,
   result,
   updateValidation,
   memoryEmbeddings,
@@ -84,7 +86,8 @@ export function buildTurnDebug({
         errors: updateValidation.errors || []
       },
       raw_model_output: rawResult,
-      sanitized_output: result,
+      proposed_output: proposedResult,
+      returned_output: result,
       state_before_turn: buildPlayerSnapshot(player),
       state_after_turn: buildPlayerSnapshot(refreshedPlayer),
       error

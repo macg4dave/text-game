@@ -889,7 +889,7 @@ function validateCanonicalEventSupplemental(supplemental: unknown): string[] {
 
   const candidate = supplemental as Record<string, unknown>;
   const errors: string[] = [];
-  const allowedKeys = new Set(["transcript", "presentation", "prompt"]);
+  const allowedKeys = new Set(["transcript", "presentation", "proposal_presentation", "prompt"]);
   for (const key of Object.keys(candidate)) {
     if (!allowedKeys.has(key)) {
       errors.push(`supplemental.${key} is not allowed in the canonical event schema.`);
@@ -902,6 +902,10 @@ function validateCanonicalEventSupplemental(supplemental: unknown): string[] {
 
   if ("presentation" in candidate) {
     errors.push(...validateCanonicalEventPresentation(candidate.presentation));
+  }
+
+  if ("proposal_presentation" in candidate) {
+    errors.push(...validateCanonicalEventPresentation(candidate.proposal_presentation, "supplemental.proposal_presentation"));
   }
 
   return errors;
@@ -926,9 +930,12 @@ function validateCanonicalEventTranscript(transcript: unknown): string[] {
   return errors;
 }
 
-function validateCanonicalEventPresentation(presentation: unknown): string[] {
+function validateCanonicalEventPresentation(
+  presentation: unknown,
+  fieldName = "supplemental.presentation"
+): string[] {
   if (!presentation || typeof presentation !== "object") {
-    return ["supplemental.presentation must be an object."];
+    return [`${fieldName} must be an object.`];
   }
 
   const candidate = presentation as Record<string, unknown>;
@@ -936,16 +943,16 @@ function validateCanonicalEventPresentation(presentation: unknown): string[] {
   const allowedKeys = new Set(["narrative", "player_options"]);
   for (const key of Object.keys(candidate)) {
     if (!allowedKeys.has(key)) {
-      errors.push(`supplemental.presentation.${key} is not allowed in the canonical event schema.`);
+      errors.push(`${fieldName}.${key} is not allowed in the canonical event schema.`);
     }
   }
 
-  errors.push(...validateNullableStringField(candidate.narrative, "supplemental.presentation.narrative"));
+  errors.push(...validateNullableStringField(candidate.narrative, `${fieldName}.narrative`));
 
   if (!Array.isArray(candidate.player_options)) {
-    errors.push("supplemental.presentation.player_options must be an array.");
+    errors.push(`${fieldName}.player_options must be an array.`);
   } else if (candidate.player_options.some((item) => typeof item !== "string")) {
-    errors.push("supplemental.presentation.player_options must contain only strings.");
+    errors.push(`${fieldName}.player_options must contain only strings.`);
   }
 
   return errors;
