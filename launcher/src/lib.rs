@@ -3,6 +3,8 @@ pub mod env;
 pub mod error;
 pub mod logging;
 pub mod process;
+pub mod start_dev;
+pub mod test_local_ai_workflow;
 
 use std::env as std_env;
 
@@ -10,7 +12,8 @@ use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
 
 use crate::config::{command_contracts, resolve_workspace_root_from, SunrayCommand};
-use crate::env::load_repo_env;
+use crate::start_dev::StartDevOptions;
+use crate::test_local_ai_workflow::TestLocalAiWorkflowOptions;
 
 #[derive(Parser, Debug, PartialEq, Eq)]
 #[command(name = "SunRay")]
@@ -28,6 +31,9 @@ pub enum Commands {
         /// Skip opening the browser after the app becomes ready.
         #[arg(long)]
         no_browser: bool,
+        /// Rebuild the app image without cache before launch.
+        #[arg(long)]
+        rebuild: bool,
     },
     /// Local AI harness parity target for scripts/test-local-ai-workflow.ps1.
     TestLocalAiWorkflow {
@@ -49,14 +55,16 @@ pub fn run(cli: Cli) -> Result<()> {
     logging::init_logging();
 
     match cli.command {
-        Commands::StartDev { no_browser } => run_contract_stub(
-            SunrayCommand::StartDev,
-            &[format!("--no-browser={no_browser}")],
-        ),
-        Commands::TestLocalAiWorkflow { selection_only } => run_contract_stub(
-            SunrayCommand::TestLocalAiWorkflow,
-            &[format!("--selection-only={selection_only}")],
-        ),
+        Commands::StartDev {
+            no_browser,
+            rebuild,
+        } => start_dev::run(StartDevOptions {
+            no_browser,
+            rebuild,
+        }),
+        Commands::TestLocalAiWorkflow { selection_only } => {
+            test_local_ai_workflow::run(TestLocalAiWorkflowOptions { selection_only })
+        }
         Commands::TestSetupBrowserSmoke => run_contract_stub(SunrayCommand::TestSetupBrowserSmoke, &[]),
         Commands::ValidateLocalGpuProfileMatrix => {
             run_contract_stub(SunrayCommand::ValidateLocalGpuProfileMatrix, &[])
@@ -70,8 +78,7 @@ pub fn run(cli: Cli) -> Result<()> {
 
 fn run_contract_stub(command: SunrayCommand, parsed_flags: &[String]) -> Result<()> {
     let current_dir = std_env::current_dir()?;
-    let repo_root = resolve_workspace_root_from(&current_dir).unwrap_or(current_dir.clone());
-    let repo_env = load_repo_env(&repo_root)?;
+    let repo_root = resolve_workspace_root_from(&current_dir).unwrap_or(current_dir);
     let contract = command.contract();
 
     println!("SunRay command contract ready: {}", contract.name);
@@ -79,12 +86,6 @@ fn run_contract_stub(command: SunrayCommand, parsed_flags: &[String]) -> Result<
     println!("Legacy parity target: {}", contract.legacy_script);
     println!("Backlog slice: {}", contract.backlog_task);
     println!("Workspace root: {}", repo_root.display());
-
-    if repo_env.exists {
-        println!("Detected workspace .env: {}", repo_env.path.display());
-    } else {
-        println!("Detected workspace .env: none");
-    }
 
     if parsed_flags.is_empty() {
         println!("Parsed flags: none");
@@ -140,6 +141,19 @@ mod tests {
             cli.command,
             Commands::StartDev {
                 no_browser: true,
+                rebuild: false,
+            }
+        );
+    }
+
+    #[test]
+    fn start_dev_accepts_rebuild_flag() {
+        let cli = Cli::parse_from(["SunRay", "start-dev", "--rebuild"]);
+        assert_eq!(
+            cli.command,
+            Commands::StartDev {
+                no_browser: false,
+                rebuild: true,
             }
         );
     }

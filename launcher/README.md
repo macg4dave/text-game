@@ -18,8 +18,8 @@
 
 | Subcommand | Legacy parity target | Backlog slice | Current status |
 | --- | --- | --- | --- |
-| `start-dev` | `scripts/start-dev.ps1` | `T65b` | CLI scaffolded; behavior parity pending |
-| `test-local-ai-workflow` | `scripts/test-local-ai-workflow.ps1` | `T65c` | CLI scaffolded; behavior parity pending |
+| `start-dev` | `scripts/start-dev.ps1` | `T65b` | Implemented in Rust; legacy script deleted |
+| `test-local-ai-workflow` | `scripts/test-local-ai-workflow.ps1` | `T65c` | Implemented in Rust; awaiting manual legacy-script deletion |
 | `test-setup-browser-smoke` | `scripts/test-setup-browser-smoke.ps1` | `T65e` | CLI scaffolded; behavior parity pending |
 | `validate-local-gpu-profile-matrix` | `scripts/validate-local-gpu-profile-matrix.ps1` | `T65d` | CLI scaffolded; behavior parity pending |
 | `validate-litellm-default-config` | `scripts/validate-litellm-default-config.ps1` | `T65d` | CLI scaffolded; behavior parity pending |
@@ -40,14 +40,16 @@ Use Cargo directly:
 
 - `cargo run --manifest-path launcher/Cargo.toml -- --help`
 - `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`
+- `cargo run --manifest-path launcher/Cargo.toml -- start-dev --rebuild`
 
 Or use the repo convenience scripts:
 
 - `npm run sunray -- --help`
 - `npm run sunray:check`
 - `npm run sunray:test`
+- `npm run sunray:start-dev -- --no-browser`
 
-At the `T65a` stage the subcommands intentionally report their mapping and migration target rather than pretending parity is done already.
+`start-dev` is the first migrated launcher path. The remaining subcommands still expose the scaffolded contract until their parity slices land.
 
 ## Migration rule
 

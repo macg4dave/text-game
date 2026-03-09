@@ -143,7 +143,7 @@ The authoritative local-GPU profile matrix for manual larger-model tuning still 
 On Windows, the launcher wraps the same compiled Docker path and opens the browser for you:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
 Migration note as of 2026-03-09:
@@ -178,7 +178,7 @@ What those do:
 After a reset, restart the app with your normal path:
 
 - `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`
-- `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`
+- `cargo run --manifest-path launcher/Cargo.toml -- start-dev`
 - `npm run dev`
 
 ## Install Node.js And npm
@@ -285,7 +285,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 On Windows, the repo now has a one-command launcher:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
 The launcher now always uses the GPU-backed Docker path and blocks early if `nvidia-smi` or the Docker NVIDIA runtime is unavailable on the host.
@@ -300,7 +300,7 @@ The launcher:
 
 - checks Docker and Compose
 - confirms Docker is using the Linux container runtime required by the supported path
-- currently relies on legacy PowerShell helper code for dotenv parsing and HTTP readiness checks until `T65` replaces that layer with Rust
+- now performs dotenv loading, Docker checks, GPU detection, port fallback, and app readiness polling in Rust through `launcher/SunRay`
 - reads `.env` when present
 - falls back to the GPU-backed LiteLLM defaults when `.env` is missing
 - uses the LiteLLM stack for the supported Docker launcher modes even if an older `.env` still contains a direct-provider experiment
@@ -346,7 +346,6 @@ Active migration direction:
 
 Current legacy entrypoints being replaced:
 
-- `scripts/start-dev.ps1` - launcher orchestration
 - `scripts/test-local-ai-workflow.ps1` - local AI contract harness
 - `scripts/test-setup-browser-smoke.ps1` - targeted launch-screen setup smoke harness for blocked and recovered browser states
 - `scripts/start-desktop-prototype.ps1` - Electron prototype wrapper
@@ -356,9 +355,9 @@ Current legacy entrypoints being replaced:
 
 When you add automation behavior, extend `launcher/SunRay` rather than adding another shell helper or wrapper.
 
-You can inspect the current Rust command surface with `cargo run --manifest-path launcher/Cargo.toml -- --help` or `npm run sunray -- --help`. At the current migration stage those subcommands report their mapping and backlog target; the PowerShell scripts remain the working behavior path until each parity slice lands.
+You can inspect the current Rust command surface with `cargo run --manifest-path launcher/Cargo.toml -- --help` or `npm run sunray -- --help`. The `start-dev` launcher path now runs through `SunRay`; the remaining PowerShell scripts stay temporary legacy paths until their parity slices land.
 
-The current legacy launcher respects `PORT` from your shell session or `.env`. If that port is already taken by another local service, the launcher falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
+The current Rust launcher respects `PORT` from your shell session or `.env`. If that port is already taken by another local service, the launcher falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
 
 ## Default LiteLLM Gateway Path
 
@@ -380,8 +379,8 @@ docker compose exec ollama ollama pull gemma3:4b
 docker compose exec ollama ollama pull embeddinggemma
 ```
 
-1. Start the Docker stack with `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
-1. Start the app with `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`, `npm run dev`, or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+1. Start the Docker stack with `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` or `cargo run --manifest-path launcher/Cargo.toml -- start-dev`.
+1. Start the app with `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`, `npm run dev`, or `cargo run --manifest-path launcher/Cargo.toml -- start-dev`.
 
 Current default Docker smoke guidance:
 
@@ -521,7 +520,7 @@ The browser UI includes:
 
 For a Windows-only local model setup, use [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md).
 
-For local AI regression checks, the current legacy command is `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` until `T65` lands.
+For local AI regression checks, use `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow`.
 
 For the launch-screen setup smoke harness, the current legacy command is `powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1` until `T65` lands.
 
@@ -610,7 +609,7 @@ The Windows launcher auto-translates local host URLs to Docker-reachable URLs fo
 
 If Docker Desktop cannot mount the drive that contains this repo, the container now falls back to the copy baked into the image.
 
-- startup still works through `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` or `scripts/start-dev.ps1`
+- startup still works through `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` or `cargo run --manifest-path launcher/Cargo.toml -- start-dev`
 - live source edits are not reflected until you rebuild
 - this fallback is meant to keep launch reliable while later tasks improve the packaged path
 
@@ -640,7 +639,7 @@ Recommended local setup:
 1. Use the included [litellm.config.yaml](./litellm.config.yaml) as the default Docker-Ollama template.
 2. Keep `AI_PROVIDER=litellm`, `LITELLM_CHAT_MODEL=game-chat`, and `LITELLM_EMBEDDING_MODEL=game-embedding` in `.env`.
 3. Pull `gemma3:4b` and `embeddinggemma` into the repo-managed Docker `ollama` service.
-4. Start the supported Docker path with `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` or `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1`.
+4. Start the supported Docker path with `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build` or `cargo run --manifest-path launcher/Cargo.toml -- start-dev`.
 5. Keep `LITELLM_MASTER_KEY` equal to `LITELLM_API_KEY` in `.env`. The default Docker smoke path now uses `anything` for both unless you override them together.
 
 The runtime automatically prefers LiteLLM-specific env vars when `AI_PROVIDER=litellm`, and now falls back to LiteLLM as the blank-slate default when no provider-specific env is configured.
@@ -675,7 +674,7 @@ Artifact-size references for those recommendations come from the official Ollama
 For the Docker-backed GPU path, the quickest Windows startup path is:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
 ## AI Workflow Test Loop
@@ -684,7 +683,7 @@ Use a test-first loop as the default workflow for prompt, schema, adapter, retri
 
 1. Add or tighten a test, fixture, replay case, or harness assertion that captures the desired behavior.
 2. Run `npm run type-check` and that focused check first so the missing behavior or coverage gap is visible.
-3. Run the current legacy local AI harness command, `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`, before changing AI behavior when a compatible local provider is available, and expect this to move to the Rust tooling runtime under `T65`.
+3. Run `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow` before changing AI behavior when a compatible local provider is available. Use `--selection-only` when you only need the deterministic contract checks.
 4. Make the smallest change.
 5. Re-run `npm run type-check`, then re-run the focused check, then re-run the same local AI harness immediately after the change.
 6. Only move on to broader app testing after the type-check, focused check, and harness all pass.

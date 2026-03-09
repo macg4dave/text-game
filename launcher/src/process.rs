@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -10,6 +11,14 @@ pub struct ProcessInvocation {
 	pub program: String,
 	pub args: Vec<String>,
 	pub cwd: Option<PathBuf>,
+	pub env_overrides: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessCapture {
+	pub exit_code: Option<i32>,
+	pub stdout: String,
+	pub stderr: String,
 }
 
 impl ProcessInvocation {
@@ -18,11 +27,12 @@ impl ProcessInvocation {
 			program: program.into(),
 			args: Vec::new(),
 			cwd: None,
+			env_overrides: BTreeMap::new(),
 		}
 	}
 
 	pub fn with_args(mut self, args: impl IntoIterator<Item = impl Into<String>>) -> Self {
-		self.args = args.into_iter().map(Into::into).collect();
+		self.args.extend(args.into_iter().map(Into::into));
 		self
 	}
 
@@ -31,17 +41,28 @@ impl ProcessInvocation {
 		self
 	}
 
+	pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+		self.env_overrides.insert(key.into(), value.into());
+		self
+	}
+
+	pub fn with_envs<I, K, V>(mut self, envs: I) -> Self
+	where
+		I: IntoIterator<Item = (K, V)>,
+		K: Into<String>,
+		V: Into<String>,
+	{
+		self.env_overrides
+			.extend(envs.into_iter().map(|(key, value)| (key.into(), value.into())));
+		self
+	}
+
 	pub fn render(&self) -> String {
 		render_command_preview(&self.program, &self.args)
 	}
 
 	pub fn run_checked(&self) -> Result<()> {
-		let mut command = Command::new(&self.program);
-		command.args(&self.args);
-
-		if let Some(cwd) = &self.cwd {
-			command.current_dir(cwd);
-		}
+		let mut command = self.to_command();
 
 		let status = command.status()?;
 		if status.success() {
@@ -56,6 +77,30 @@ impl ProcessInvocation {
 				.unwrap_or_else(|| "terminated by signal".to_string()),
 		}
 		.into())
+	}
+
+	pub fn capture(&self) -> Result<ProcessCapture> {
+		let output = self.to_command().output()?;
+		Ok(ProcessCapture {
+			exit_code: output.status.code(),
+			stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
+			stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+		})
+	}
+
+	fn to_command(&self) -> Command {
+		let mut command = Command::new(&self.program);
+		command.args(&self.args);
+
+		if let Some(cwd) = &self.cwd {
+			command.current_dir(cwd);
+		}
+
+		if !self.env_overrides.is_empty() {
+			command.envs(&self.env_overrides);
+		}
+
+		command
 	}
 }
 
@@ -100,5 +145,11 @@ mod tests {
 	fn invocation_render_uses_preview_format() {
 		let invocation = ProcessInvocation::new("cargo").with_args(["test", "--help"]);
 		assert_eq!(invocation.render(), "cargo test --help");
+	}
+
+	#[test]
+	fn invocation_stores_env_overrides() {
+		let invocation = ProcessInvocation::new("cargo").with_env("PORT", "3100");
+		assert_eq!(invocation.env_overrides.get("PORT"), Some(&"3100".to_string()));
 	}
 }

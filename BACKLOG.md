@@ -159,10 +159,10 @@ Global blocker as of 2026-03-09:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T65 | Now | P1 | P1 | Rust script-runtime migration | In Progress | None | Manual planning-doc consistency review + child task validation |
 | T65a | Now | P1 | P1 | SunRay workspace and command contract | Done | T65 | `cargo check --manifest-path launcher/Cargo.toml` + `cargo test --manifest-path launcher/Cargo.toml` + manual command-surface review |
-| T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
-| T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
+| T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
+| T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Review | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
 | T65d | Now | P1 | P1 | SunRay validator command migration | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
-| T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Blocked | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
+| T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Ready | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
 | T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Blocked | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Done | T02 | `docker compose run --rm --no-deps app npm run test:config` + manual Docker Ollama smoke |
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
@@ -3158,7 +3158,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T65b - SunRay Launcher And Preflight Parity
 
-- Status: Blocked
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -3193,10 +3193,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - keep the GPU-backed Docker LiteLLM plus Ollama contract intact
   - do not rewrite Docker configuration as part of this task
   - `SunRay` is still not a webview shell or alternate runtime host; it only orchestrates the existing app path
+  - completed on 2026-03-09 by implementing `SunRay start-dev` in Rust with shared launcher config/env/process helpers plus direct Docker, NVIDIA, port-fallback, and readiness orchestration under `launcher/src/start_dev.rs`
+  - the launcher now forces the supported GPU-backed LiteLLM plus Ollama path even when `.env` still contains older direct-provider experiments, and it supports both `--no-browser` and `--rebuild`
+  - `scripts/start-dev.ps1` is already absent in the workspace; for future parity tasks in this workspace, ask the user to remove legacy files manually at the end instead of attempting automatic deletion here
+  - validation on 2026-03-09 ran `cargo check --manifest-path launcher/Cargo.toml`, `cargo test --manifest-path launcher/Cargo.toml`, and `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`
 
 ### T65c - SunRay Local AI Workflow Harness Migration
 
-- Status: Blocked
+- Status: Review
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -3231,6 +3235,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - keep the validation contract deterministic first; live provider smoke remains secondary to the focused contract checks
   - do not silently drop current assertions just because the implementation language changes
+  - completed implementation on 2026-03-09 by adding `launcher/src/test_local_ai_workflow.rs` and wiring `SunRay test-local-ai-workflow` to run the deterministic local GPU profile-selection assertions, the compact-schema guardrail command, and the OpenAI-compatible embedding plus chat smoke checks from the Rust launcher runtime
+  - `package.json` now points `npm run test:local-ai` at the Rust command surface instead of the PowerShell harness, and README guidance now treats the Rust command as the supported path
+  - validation on 2026-03-09 ran `cargo check --manifest-path launcher/Cargo.toml`, `cargo test --manifest-path launcher/Cargo.toml`, `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`, and a full `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow` smoke against the configured local Ollama-compatible provider
+  - awaiting final manual removal of `scripts/test-local-ai-workflow.ps1` before this task can move from `Review` to `Done` because file deletion is being handled manually in this workspace
 
 ### T65d - SunRay Validator Command Migration
 
