@@ -159,9 +159,9 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T05 | Next | P0 | P2 | Error boundary and global handler | Done | None | `npm test` |
 | T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Done | T02f | Matrix review |
 | T06 | Next | P1 | P1 | Turn input, output, and state schemas | Done | T02 | `npm test` |
-| T07 | Next | P1 | P1 | Turn handler and model orchestration | Ready | T06, T57a, T58a | `npm test` |
+| T07 | Next | P1 | P1 | Turn handler and model orchestration | Done | T06, T57a, T58a | `npm test` |
 | T07a | Next | P1 | P1 | LiteLLM default chat route for turn generation | Ready | T02f, T07 | Manual turn submission against LiteLLM |
-| T08 | Next | P1 | P1 | Deterministic state reducer | Ready | T06, T57a, T58a | `npm test` |
+| T08 | Next | P1 | P1 | Deterministic state reducer | Done | T06, T57a, T58a | `npm test` |
 | T09 | Next | P1 | P1 | Event log persistence and replay | Ready | T04, T08, T57b, T59a | Replay fixture execution |
 | T10 | Next | P1 | P1 | Output validator and sanitizer | Ready | T06, T57a, T61a | `npm test` |
 | T11 | Next | P1 | P1 | Minimal player UI loop | Done | T06 | `docker compose run --rm --no-deps app npm test` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + manual browser smoke test |
@@ -175,15 +175,15 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T57 | Now | P1 | P1 | Authority-safe turn truth boundary | Done | T06 | Manual planning-doc consistency review |
 | T57a | Now | P1 | P1 | Proposal-only turn contract and prompt boundary | Done | T06, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T58 | Next | P1 | P1 | Player agency and pacing boundary | Done | T06, T57 | Manual planning-doc consistency review |
-| T58a | Next | P1 | P1 | Intent, simulation, and pacing contract split | Ready | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T58a | Next | P1 | P1 | Intent, simulation, and pacing contract split | Done | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59 | Now | P1 | P1 | Semantic event log and replay canon | Done | T06, T57 | Manual planning-doc consistency review |
 | T59a | Now | P1 | P1 | Canonical event schema and replay contract | Done | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/server/http-contract.test.ts src/rules/validator.test.ts` |
 | T60 | Next | P1 | P1 | Memory classes and authority policy | Done | T06, T57, T59 | Manual planning-doc consistency review |
-| T60a | Next | P1 | P1 | Memory class contract and admission rules | Ready | T57a, T59a, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T60a | Next | P1 | P1 | Memory class contract and admission rules | Done | T57a, T59a, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T60b | Later | P2 | P1 | Class-aware retrieval and summarization policy | Ready | T60a, T13, T62b, T63a | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
 | T61 | Now | P1 | P1 | Compact turn schema boundary | Done | T06, T57 | Manual planning-doc consistency review |
 | T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Done | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Ready | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Done | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T12 | Next | P1 | P1 | New game onboarding | Review | T06 | Manual new-game flow check |
 | T12b | Next | P1 | P1 | First-run setup wizard and connection test | Done | T02f, T11, T12 | Manual first-run flow check |
 | T11b | Next | P1 | P2 | Turn surface renderer extraction | Done | T11a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
@@ -745,7 +745,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T58a - Intent, Simulation, And Pacing Contract Split
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -784,6 +784,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - this is the contract-setting slice for the issue; keep it small and explicit
   - if current field names cannot be renamed safely yet, lock semantics first and record transitional naming clearly
   - coordinate with `T57a` so proposal-only wording and three-layer ownership land together instead of diverging
+  - completed on 2026-03-08 by rewriting `src/ai/prompt.ts` so the model interprets the player's attempted action first, treats off-beat success and simulation-led failure as valid outcomes, and uses the current beat only for pacing or framing rather than permission logic
+  - `src/ai/turn-schema.ts`, `src/core/types.ts`, and focused tests now lock `state_updates` to candidate simulation consequences, `director_updates` to pacing or framing only, and `narrative` to plausible attempted outcomes that still remain non-authoritative until server commit
+  - focused deterministic coverage in `src/state/turn.test.ts` and `src/rules/validator.test.ts` now rejects prompt or payload drift that tries to encode interpreted intent, simulation reasoning, or pacing decisions as new schema fields or beat-gated permission logic
+  - planning-doc sync for this slice tightened `REQUIREMENTS.md`, `ARCHITECTURE.md`, and `ENGINEERING_STANDARDS.md` so later work can treat current beat and unlock flags as pacing context rather than the main plausibility gate
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts`, and `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`
 
 ### T58b - Simulation-First Consequence Resolution
 
@@ -1102,7 +1107,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T60a - Memory Class Contract And Admission Rules
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -1142,6 +1147,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - land the contract before storage or retrieval expansion so later tasks do not bake in the current single `fact` bucket
   - if existing field names cannot be upgraded cleanly in one slice, document transitional semantics but keep the class boundary explicit
   - make authority level obvious enough that later agents do not need to infer it from task notes
+  - completed on 2026-03-08 by adding explicit `MEMORY_CLASS_RULES`, `MemoryCandidate`, and authority or source typing in `src/core/types.ts`, plus `validateMemoryCandidate` admission checks in `src/rules/validator.ts`
+  - the contract now locks hard canon and quest progression to server-commit admission, allows relationship and world-discovery memory from server commits or trusted summaries, and keeps soft flavor memory narration-only and non-authoritative
+  - focused coverage now includes validator and turn-level checks proving soft flavor memory cannot be promoted into authoritative truth through class or source drift
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts`, and `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`
 
 ### T60b - Class-Aware Retrieval And Summarization Policy
 
@@ -1283,7 +1292,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T61b - Schema Evolution Guardrails And Fixture Policy
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -1321,6 +1330,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - use this task to keep later prompt and validator work honest after `T61a` lands; otherwise the compact boundary will drift back into a smart-scene schema over time
   - prefer adding richer server-side interpretation or adjudication modules over adding more model fields whenever the change is really about game rules
   - keep fixture coverage small and deterministic so this policy remains runnable during normal contract work
+  - completed on 2026-03-08 by extracting the shared request-side schema contract into `src/ai/turn-schema.ts`, validating that contract at module load in `src/ai/service.ts`, and adding deterministic guardrail coverage in `src/state/turn.test.ts`
+  - the local AI workflow harness now runs a selection-only compact-schema contract check through `scripts/validate-turn-schema.ts` before any live provider calls, so request-side schema drift fails even when model behavior would otherwise mask it
+  - roadmap and standards language now explicitly require deterministic guardrail coverage for request-side schema evolution, not only payload validation after the model responds
+  - validation on 2026-03-08 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts`, and `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`
 
 ### T62 - NPC Memory Significance Pipeline
 
@@ -3085,7 +3098,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T07 - Turn Handler And Model Orchestration
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -3117,6 +3130,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - keep this task coordinated with `T57b`, `T08`, and `T10` so orchestration does not smuggle authority back into transport code
+  - completed on 2026-03-08 by keeping `src/state/turn.ts` as the orchestration boundary for prompt assembly inputs, adapter execution, response parsing, validation, and committed-event shaping while `src/server/turn-route.ts` stays focused on HTTP concerns
+  - `createTurnHandler` now accepts injected `turnExecutionService`, `getOrCreatePlayer`, and `updateDirectorState` dependencies for focused testing while still defaulting to the live production modules in `src/server/index.ts`
+  - focused coverage now includes `src/server/turn-route.test.ts` for the thin route happy path and injected-service failure path, plus an added `src/state/turn.test.ts` case proving unexpected adapter failures surface as `Turn failed` without collapsing the service boundary back into the route
+  - validation on 2026-03-08 ran `docker compose build app` and `docker compose run --rm --no-deps app npm test`
 
 ### T07a - LiteLLM Default Chat Route For Turn Generation
 
@@ -3154,7 +3171,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T08 - Deterministic State Reducer
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -3185,6 +3202,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - coordinate closely with `T57b` so adjudicated consequences are the reducer input, not raw model deltas
+  - completed on 2026-03-09 by adding `src/state/reducer.ts` and routing `src/state/game.ts`, `src/state/replay.ts`, and `src/state/turn.ts` through the same accepted-consequences reducer
+  - validation on 2026-03-09 ran `docker compose build app`, `docker compose run --rm --no-deps app npx tsx --test src/state/reducer.test.ts src/state/replay.test.ts src/state/turn.test.ts`, `docker compose run --rm --no-deps app npm run type-check`, and `docker compose run --rm --no-deps app npm test`
 
 ### T09 - Event Log Persistence And Replay
 

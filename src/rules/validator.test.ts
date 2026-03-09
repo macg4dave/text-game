@@ -2,13 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   COMMITTED_EVENT_SCHEMA_VERSION,
-  type SetupStatusPayload,
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
+  MEMORY_CLASS_RULES,
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
+  type MemoryCandidate,
   type CanonicalPlayerCreatedEventPayload,
   type CanonicalTurnEventPayload,
   type AuthoritativePlayerState,
+  type SetupStatusPayload,
   type StateResponsePayload,
   type TurnResponsePayload,
   type TurnOutputPayload
@@ -17,6 +19,7 @@ import {
   parseTurnInput,
   validateCanonicalTurnEvent,
   validateAuthoritativePlayerState,
+  validateMemoryCandidate,
   validateSetupStatusResponse,
   validateStateResponse,
   validateTurnResponse,
@@ -136,6 +139,36 @@ test("validateTurnOutput rejects over-modeled scene and world fields outside the
   assert.match(result.errors.join(" "), /director_updates\.current_beat_id/i);
 });
 
+test("validateTurnOutput rejects payload fields that try to encode intent, simulation, or pacing decisions directly", () => {
+  const result = validateTurnOutput({
+    schema_version: TURN_OUTPUT_SCHEMA_VERSION,
+    narrative: "You weigh the jump across the gap.",
+    player_options: ["Leap", "Look for a safer route"],
+    state_updates: {
+      location: "Clocktower ledge",
+      inventory_add: [],
+      inventory_remove: [],
+      flags_add: [],
+      flags_remove: [],
+      quests: [],
+      simulation_reason: "The ledge is narrow but reachable."
+    },
+    director_updates: {
+      end_goal_progress: "The tower route feels closer.",
+      pacing_decision: "Force the player back toward beat 2."
+    },
+    memory_updates: [],
+    interpreted_intent: {
+      summary: "cross the gap"
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /interpreted_intent/i);
+  assert.match(result.errors.join(" "), /state_updates\.simulation_reason/i);
+  assert.match(result.errors.join(" "), /director_updates\.pacing_decision/i);
+});
+
 test("validateAuthoritativePlayerState accepts a versioned player snapshot", () => {
   const state: AuthoritativePlayerState = {
     schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
@@ -187,6 +220,38 @@ test("validateAuthoritativePlayerState rejects malformed versioned player snapsh
   assert.equal(result.ok, false);
   assert.match(result.errors.join(" "), /quests/i);
   assert.match(result.errors.join(" "), /director_state/i);
+});
+
+test("validateMemoryCandidate accepts server-derived canon and summary-derived continuity classes", () => {
+  const hardCanon: MemoryCandidate = {
+    content: "The moon shard is cracked.",
+    memory_class: "hard_canon",
+    authority: MEMORY_CLASS_RULES.hard_canon.authority,
+    source: "server_commit"
+  };
+  const relationship: MemoryCandidate = {
+    content: "The mechanic now trusts the player.",
+    memory_class: "relationship",
+    authority: MEMORY_CLASS_RULES.relationship.authority,
+    source: "summary"
+  };
+
+  assert.deepEqual(validateMemoryCandidate(hardCanon), { ok: true, errors: [] });
+  assert.deepEqual(validateMemoryCandidate(relationship), { ok: true, errors: [] });
+});
+
+test("validateMemoryCandidate rejects flavor memory when it tries to become authoritative truth", () => {
+  const result = validateMemoryCandidate({
+    content: "The alley felt haunted.",
+    memory_class: "soft_flavor",
+    authority: "authoritative",
+    source: "server_commit"
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /soft_flavor/i);
+  assert.match(result.errors.join(" "), /narration-only/i);
+  assert.match(result.errors.join(" "), /server_commit/i);
 });
 
 test("validateStateResponse accepts a versioned authoritative player envelope", () => {

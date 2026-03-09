@@ -30,8 +30,10 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - The turn-output proposal contract must stay compact. It may carry narrative, player options, and narrowly scoped proposed deltas, but it must not grow scene graphs, world-state objects, beat-state mirrors, or other schema fields that encode game design logic.
 - Player-facing narrative, options, quest progress, and memory facts shown after a turn must align to committed authoritative state rather than uncommitted model prose.
 - Turn handling must separate freeform intent interpretation, world simulation resolution, and story pacing or framing.
+- The model-facing turn contract must treat those layers distinctly: infer what the player is trying to do first, propose plausible world consequences second, and use director guidance only to frame or pace the aftermath.
 - The player may attempt almost anything; implausible or failed actions should be resolved by simulation rules, not by the director acting as a hidden refusal gate.
 - Director and beat controls such as `required_flags`, `unlock_flags`, and `max_beats_per_turn` must shape pacing and framing after accepted outcomes, not replace simulation or plausibility checks.
+- Current beat, `required_flags`, and `unlock_flags` must not serve as the sole permission logic for an otherwise plausible action.
 - Replayable event logging must record committed semantic outcomes and authoritative transitions, not only raw prompts, raw responses, or presentation prose.
 - The canonical replay-event contract must explicitly separate replay-critical fields such as player attempt, accepted or rejected outcome, committed transitions, and contract-version markers from optional transcript, prompt, or presentation data.
 - Canonical replay must bootstrap authoritative state from an explicit `player-created` event in the committed event log rather than relying on an external initial player snapshot.
@@ -42,6 +44,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Each preflight issue must include one recommended next step for end users, while advanced diagnostics stay available behind an expandable details surface.
 - Memory system with summaries and embedding-based retrieval.
 - Memory must support explicit classes from the start, including hard canon facts, quest progression facts, relationship facts, world discoveries, and soft flavor recollections.
+- Hard canon and quest progression memory must be admitted only from server-accepted outcomes; relationship and world-discovery memory may also come from trusted summaries; soft flavor recollection must stay narration-only and non-authoritative.
 - Memory design has two orthogonal dimensions: semantic class defines what a fact means, while storage tier defines how hot, compressed, or durable it is.
 - Retrieval policy must differ by memory class; only the classes that matter for the current turn should be retrieved, and always-on retrieval should be limited to the smallest authority-relevant set.
 - Memory classes may support narration and continuity, but memory retrieval itself must not become a second authority channel that overrides committed state.

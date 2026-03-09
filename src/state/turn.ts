@@ -15,17 +15,16 @@ import {
   addEvent,
   addMemories,
   getOrCreatePlayer,
+  persistPlayerState,
   getRelevantMemories,
-  getShortHistory,
-  updateDirectorState,
-  updatePlayerState,
-  updateSummary
+  getShortHistory
 } from "./game.js";
 import {
   createCommittedTurnEventPayload,
   summarizeAcceptedTurnOutcome,
   summarizeRejectedTurnOutcome
 } from "./committed-event.js";
+import { reduceCommittedPlayerState } from "./reducer.js";
 import { sanitizeTurnResult } from "./turn-result.js";
 import { applyDirectorRules, getCurrentBeat } from "../story/director.js";
 import { validateStateUpdates, validateTurnOutput } from "../rules/validator.js";
@@ -91,10 +90,8 @@ export interface TurnServiceDependencies {
   getOrCreatePlayer: typeof getOrCreatePlayer;
   getRelevantMemories: typeof getRelevantMemories;
   getShortHistory: typeof getShortHistory;
+  persistPlayerState: typeof persistPlayerState;
   sanitizeTurnResult: typeof sanitizeTurnResult;
-  updateDirectorState: typeof updateDirectorState;
-  updatePlayerState: typeof updatePlayerState;
-  updateSummary: typeof updateSummary;
   validateStateUpdates: typeof validateStateUpdates;
   validateTurnOutput: typeof validateTurnOutput;
 }
@@ -130,10 +127,8 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
     getOrCreatePlayer,
     getRelevantMemories,
     getShortHistory,
+    persistPlayerState,
     sanitizeTurnResult,
-    updateDirectorState,
-    updatePlayerState,
-    updateSummary,
     validateStateUpdates,
     validateTurnOutput,
     ...overrides
@@ -262,18 +257,34 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           };
         }
 
-        deps.addEvent(player.id, "narrator", trace.result.narrative);
-        deps.updatePlayerState(player.id, trace.result.state_updates);
-
-        const nextFlags = mergeList(player.flags, trace.result.state_updates.flags_add, trace.result.state_updates.flags_remove);
+        const acceptedConsequences = {
+          state_updates: trace.result.state_updates,
+          director_updates: trace.result.director_updates,
+          memory_updates: trace.result.memory_updates
+        };
+        const reducedForFlags = reduceCommittedPlayerState({
+          player,
+          acceptedConsequences: {
+            state_updates: trace.result.state_updates,
+            director_updates: null,
+            memory_updates: []
+          }
+        });
         const directorState = deps.applyDirectorRules({
           spec: directorSpec,
           directorState: player.director_state,
           stateUpdates: trace.result.state_updates,
-          flags: nextFlags
+          flags: reducedForFlags.player.flags
         });
         directorState.end_goal_progress = trace.result.director_updates.end_goal_progress;
-        deps.updateDirectorState(player.id, directorState);
+        const reducedState = reduceCommittedPlayerState({
+          player,
+          acceptedConsequences,
+          resolvedDirectorState: directorState
+        });
+
+        deps.addEvent(player.id, "narrator", trace.result.narrative);
+        deps.persistPlayerState(reducedState.player);
 
         if (trace.result.memory_updates.length) {
           try {
@@ -293,7 +304,6 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
               embedding: trace.memoryEmbeddings[index]
             }))
           );
-          deps.updateSummary(player.id, trace.result.memory_updates);
         }
 
         trace.committedEvent = createCommittedTurnEventPayload({
@@ -304,11 +314,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
             summary: summarizeAcceptedTurnOutcome(trace.result),
             rejection_reason: null
           },
-          committed: {
-            state_updates: trace.result.state_updates,
-            director_updates: trace.result.director_updates,
-            memory_updates: trace.result.memory_updates
-          },
+          committed: acceptedConsequences,
           rulesetVersion: DEFAULT_RULESET_VERSION,
           supplemental: {
             transcript: {
@@ -370,13 +376,6 @@ function createStatePack(player: Player, directorSpec: DirectorSpec, questSpec: 
     },
     quest_spec: questSpec
   };
-}
-
-function mergeList(existing: string[], addList: string[] = [], removeList: string[] = []): string[] {
-  const set = new Set(existing);
-  addList.forEach((item) => set.add(item));
-  removeList.forEach((item) => set.delete(item));
-  return Array.from(set);
 }
 
 function getErrorMessage(error: unknown): string {

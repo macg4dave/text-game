@@ -69,6 +69,7 @@ Do not assume:
 - World simulation resolution decides plausibility, accepted consequences, failures, and side effects against authoritative state and rules.
 - Director logic should consume accepted simulation outcomes and decide how to frame, emphasize, or pace them toward the end goal.
 - Beat controls such as `required_flags`, `unlock_flags`, and `max_beats_per_turn` are pacing tools. They should not be the primary reason an otherwise plausible action succeeds or fails.
+- Prompt and schema language should preserve the same split: candidate state consequences belong to simulation-oriented proposal fields, while director-facing progress text belongs to pacing or framing fields rather than permission logic.
 
 ## Model Turn Schema Boundary
 
@@ -104,6 +105,7 @@ Do not assume:
   - class explains what kind of fact or recollection a record represents
   - tier explains whether that record belongs in hot context, warm summaries, or cold history
 - Authority-relevant classes should be admitted only from server-accepted outcomes or trusted derivation paths.
+- Admission rules should stay explicit by class: hard canon and quest progression come from server commits only, relationship and world-discovery memory may also come from trusted summaries, and soft flavor recollection remains narration-only.
 - Retrieval policy should be class-aware so each turn pulls the smallest useful set instead of treating all memories as equivalent.
 - Soft flavor recollections may enrich narration, but they must not mutate or override authoritative state on their own.
 - Treat memory as a storage hierarchy:

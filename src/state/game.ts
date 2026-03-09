@@ -14,6 +14,7 @@ import type {
   QuestUpdate
 } from "../core/types.js";
 import { createPlayerCreatedEventPayload } from "./committed-event.js";
+import { reduceCommittedPlayerState } from "./reducer.js";
 
 interface ContentRow {
   content: string;
@@ -192,23 +193,48 @@ export function updatePlayerState(playerId: string, updates: {
 
   if (!player) return null;
 
-  const inventory = mergeList(safeJsonParse(player.inventory, [] as string[]), updates.inventory_add, updates.inventory_remove);
-  const flags = mergeList(safeJsonParse(player.flags, [] as string[]), updates.flags_add, updates.flags_remove);
-  const quests = mergeQuests(safeJsonParse(player.quests, [] as QuestUpdate[]), updates.quests);
+  const reduced = reduceCommittedPlayerState({
+    player: hydratePlayer(player),
+    acceptedConsequences: {
+      state_updates: updates,
+      director_updates: null,
+      memory_updates: []
+    }
+  });
+
+  return persistPlayerState(reduced.player);
+}
+
+export function persistPlayerState(player: Player): Player | null {
+  const db = getDb();
+  const existing = db.prepare("SELECT id FROM players WHERE id = ?").get(player.id) as { id: string } | undefined;
+
+  if (!existing) return null;
 
   db.prepare(
     `UPDATE players
-     SET location = ?, inventory = ?, flags = ?, quests = ?
+     SET location = ?, summary = ?, director_state = ?, inventory = ?, flags = ?, quests = ?
      WHERE id = ?`
-  ).run(updates.location || player.location, JSON.stringify(inventory), JSON.stringify(flags), JSON.stringify(quests), playerId);
+  ).run(
+    player.location,
+    player.summary,
+    JSON.stringify(player.director_state),
+    JSON.stringify(player.inventory),
+    JSON.stringify(player.flags),
+    JSON.stringify(player.quests),
+    player.id
+  );
 
-  return hydratePlayer({
+  return {
     ...player,
-    location: updates.location || player.location,
-    inventory: JSON.stringify(inventory),
-    flags: JSON.stringify(flags),
-    quests: JSON.stringify(quests)
-  });
+    inventory: [...player.inventory],
+    flags: [...player.flags],
+    quests: player.quests.map((quest) => ({ ...quest })),
+    director_state: {
+      ...player.director_state,
+      completed_beats: [...player.director_state.completed_beats]
+    }
+  };
 }
 
 export function updateDirectorState(playerId: string, directorState: DirectorState): DirectorState | null {
@@ -237,21 +263,6 @@ export function updateSummary(playerId: string, memoryUpdates: string[]): string
 
   db.prepare("UPDATE players SET summary = ? WHERE id = ?").run(summary, playerId);
   return summary;
-}
-
-function mergeList(existing: string[], addList: string[] = [], removeList: string[] = []): string[] {
-  const set = new Set(existing);
-  addList.forEach((item) => set.add(item));
-  removeList.forEach((item) => set.delete(item));
-  return Array.from(set);
-}
-
-function mergeQuests(existing: QuestUpdate[], updates: QuestUpdate[] = []): QuestUpdate[] {
-  const byId = new Map(existing.map((quest) => [quest.id, quest]));
-  updates.forEach((quest) => {
-    byId.set(quest.id, quest);
-  });
-  return Array.from(byId.values());
 }
 
 function hydratePlayer(player: PlayerRow): Player {

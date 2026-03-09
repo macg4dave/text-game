@@ -1,79 +1,14 @@
 import OpenAI from "openai";
 import { config } from "../core/config.js";
 import type { TurnResult } from "../core/types.js";
+import { TURN_RESPONSE_SCHEMA, assertTurnResponseSchemaContract } from "./turn-schema.js";
 
 const client = new OpenAI({
   apiKey: config.ai.apiKey,
   ...(config.ai.baseUrl ? { baseURL: config.ai.baseUrl } : {})
 });
 
-const RESPONSE_SCHEMA = {
-  name: "game_turn_proposal",
-  strict: true,
-  schema: {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      narrative: {
-        type: "string",
-        description: "Narration that stays compatible with committed STATE_PACK facts and any still-uncommitted proposals."
-      },
-      player_options: {
-        type: "array",
-        items: { type: "string" },
-        minItems: 0,
-        maxItems: 6,
-        description: "Short player-facing options that fit the narrated situation."
-      },
-      state_updates: {
-        type: "object",
-        description:
-          "Transitional legacy field name. These are candidate state consequences only; the server decides what becomes committed truth.",
-        additionalProperties: false,
-        properties: {
-          location: { type: "string" },
-          inventory_add: { type: "array", items: { type: "string" } },
-          inventory_remove: { type: "array", items: { type: "string" } },
-          flags_add: { type: "array", items: { type: "string" } },
-          flags_remove: { type: "array", items: { type: "string" } },
-          quests: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                id: { type: "string" },
-                status: { type: "string" },
-                summary: { type: "string" }
-              },
-              required: ["id", "status", "summary"]
-            }
-          }
-        },
-        required: ["location", "inventory_add", "inventory_remove", "flags_add", "flags_remove", "quests"]
-      },
-      director_updates: {
-        type: "object",
-        description:
-          "Transitional legacy field name. This contains compact candidate pacing or progress consequences, not authoritative director state.",
-        additionalProperties: false,
-        properties: {
-          end_goal_progress: { type: "string" }
-        },
-        required: ["end_goal_progress"]
-      },
-      memory_updates: {
-        type: "array",
-        items: { type: "string" },
-        minItems: 0,
-        maxItems: 8,
-        description:
-          "Transitional legacy field name. These are candidate memory facts for the server to accept or reject. Do not encode scene or world structures here."
-      }
-    },
-    required: ["narrative", "player_options", "state_updates", "director_updates", "memory_updates"]
-  }
-} as const;
+assertTurnResponseSchemaContract();
 
 export async function generateTurn({
   model,
@@ -102,7 +37,7 @@ export async function generateTurn({
     temperature: 0.8,
     response_format: {
       type: "json_schema",
-      json_schema: RESPONSE_SCHEMA
+      json_schema: TURN_RESPONSE_SCHEMA
     },
     messages: [
       {

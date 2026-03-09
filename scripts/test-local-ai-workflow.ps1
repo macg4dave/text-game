@@ -176,6 +176,21 @@ function Test-SceneSchema {
   Add-Pass "Structured scene response parsed successfully."
 }
 
+function Test-TurnSchemaGuardrails {
+  Push-Location $repoRoot
+  try {
+    $output = & docker compose run --rm --no-deps app npx tsx scripts/validate-turn-schema.ts 2>&1
+    if ($LASTEXITCODE -ne 0) {
+      Add-Failure ("Turn schema guardrail check failed: {0}" -f (($output | ForEach-Object { "$_" }) -join " "))
+      return
+    }
+
+    Add-Pass "Turn schema guardrail check passed."
+  } finally {
+    Pop-Location
+  }
+}
+
 function Test-GameTurnSchema {
   param($Config)
 
@@ -298,6 +313,12 @@ try {
   Test-LocalGpuProfileSelection
 } catch {
   Add-Failure ("Local GPU profile selection test failed: {0}" -f $_.Exception.Message)
+}
+
+try {
+  Test-TurnSchemaGuardrails
+} catch {
+  Add-Failure ("Turn schema guardrail test failed: {0}" -f $_.Exception.Message)
 }
 
 if ($SelectionOnly) {

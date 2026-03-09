@@ -3,17 +3,19 @@ import test from "node:test";
 import {
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
   COMMITTED_EVENT_SCHEMA_VERSION,
+  MEMORY_CLASS_RULES,
   TURN_OUTPUT_SCHEMA_VERSION,
   type CanonicalEventPayload,
   type CanonicalTurnEventPayload,
   type DirectorSpec,
+  type MemoryCandidate,
   type Player,
   type QuestSpec,
-  type StateUpdates,
   type TurnResult
 } from "../core/types.js";
 import { SYSTEM_PROMPT } from "../ai/prompt.js";
-import { validateCanonicalTurnEvent } from "../rules/validator.js";
+import { TURN_RESPONSE_SCHEMA, validateTurnResponseSchemaContract } from "../ai/turn-schema.js";
+import { validateCanonicalTurnEvent, validateMemoryCandidate } from "../rules/validator.js";
 import { createCommittedTurnEventPayload } from "../server/http-contract.js";
 import { createTurnService } from "./turn.js";
 
@@ -91,12 +93,81 @@ test("system prompt frames model-emitted consequences as proposals instead of co
   assert.match(SYSTEM_PROMPT, /do not present .* committed/i);
 });
 
+test("system prompt separates intent, simulation plausibility, and pacing guidance", () => {
+  assert.match(SYSTEM_PROMPT, /interpret what the player is trying to do/i);
+  assert.match(SYSTEM_PROMPT, /plausible off-beat actions may succeed|off-beat actions may succeed/i);
+  assert.match(SYSTEM_PROMPT, /implausible actions may fail .* simulation|simulation reasons/i);
+  assert.match(SYSTEM_PROMPT, /current beat .* framing|pacing/i);
+  assert.doesNotMatch(SYSTEM_PROMPT, /beat appears achieved, you may propose the beat's unlock flag/i);
+});
+
+test("turn response schema contract stays compact and proposal-oriented", () => {
+  assert.deepEqual(validateTurnResponseSchemaContract(), { ok: true, errors: [] });
+});
+
+test("turn response schema descriptions keep simulation and pacing responsibilities distinct", () => {
+  const stateUpdatesDescription = TURN_RESPONSE_SCHEMA.schema.properties.state_updates.description;
+  const directorUpdatesDescription = TURN_RESPONSE_SCHEMA.schema.properties.director_updates.description;
+  const narrativeDescription = TURN_RESPONSE_SCHEMA.schema.properties.narrative.description;
+
+  assert.match(stateUpdatesDescription, /simulation|world consequence/i);
+  assert.match(stateUpdatesDescription, /not .* beat|not .* pacing/i);
+  assert.match(directorUpdatesDescription, /pacing|framing/i);
+  assert.match(directorUpdatesDescription, /not .* plausibility|not .* permission/i);
+  assert.match(narrativeDescription, /plausible|accepted outcome/i);
+});
+
+test("turn response schema guardrails reject scene and mixed-authority field creep", () => {
+  const schema = JSON.parse(JSON.stringify(TURN_RESPONSE_SCHEMA)) as typeof TURN_RESPONSE_SCHEMA & {
+    schema: { properties: Record<string, unknown> };
+  };
+
+  schema.schema.properties.scene = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      weather: { type: "string" }
+    }
+  };
+  (schema.schema.properties.state_updates as { properties: Record<string, unknown> }).properties.world_state = {
+    type: "object"
+  };
+  (schema.schema.properties.director_updates as { properties: Record<string, unknown> }).properties.current_beat_id = {
+    type: "string"
+  };
+
+  const result = validateTurnResponseSchemaContract(schema);
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /scene/i);
+  assert.match(result.errors.join(" "), /state_updates\.world_state/i);
+  assert.match(result.errors.join(" "), /director_updates\.current_beat_id/i);
+});
+
+test("memory admission rules keep soft flavor outside authoritative truth", () => {
+  const flavorCandidate: MemoryCandidate = {
+    content: "The market air smelled electric.",
+    memory_class: "soft_flavor",
+    authority: MEMORY_CLASS_RULES.soft_flavor.authority,
+    source: "narration"
+  };
+
+  const result = validateMemoryCandidate({
+    ...flavorCandidate,
+    authority: "authoritative",
+    source: "server_commit"
+  });
+
+  assert.deepEqual(validateMemoryCandidate(flavorCandidate), { ok: true, errors: [] });
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /soft_flavor/i);
+  assert.match(result.errors.join(" "), /narration-only/i);
+});
+
 test("turn service executes the gameplay pipeline outside the server layer", async () => {
   const events: Array<{ playerId: string; role: string; content: string }> = [];
   const committedEvents: string[] = [];
   const memoriesAdded: Array<{ playerId: string; content: string; embedding?: number[] }> = [];
-  const updatedDirectorStates: string[] = [];
-  const summaryUpdates: string[][] = [];
+  const persistedPlayers: Player[] = [];
   let capturedModel = "";
   let capturedInput = "";
   let capturedShortHistory: string[] = [];
@@ -172,19 +243,12 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
     getShortHistory() {
       return ["PLAYER: look around"];
     },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    },
     sanitizeTurnResult(result) {
       return result as TurnResult;
-    },
-    updateDirectorState(playerId) {
-      updatedDirectorStates.push(playerId);
-      return null;
-    },
-    updatePlayerState() {
-      return null;
-    },
-    updateSummary(_playerId, memoryUpdates) {
-      summaryUpdates.push(memoryUpdates);
-      return null;
     },
     validateStateUpdates() {
       return { ok: true, errors: [] };
@@ -220,8 +284,17 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
     events.map((event) => event.role),
     ["player", "narrator"]
   );
-  assert.deepEqual(summaryUpdates, [["The signal lantern hummed when touched."]]);
-  assert.equal(updatedDirectorStates.length, 1);
+  assert.equal(persistedPlayers.length, 1);
+  assert.equal(
+    persistedPlayers[0]?.summary,
+    "You arrived at the market.\nThe signal lantern hummed when touched."
+  );
+  assert.deepEqual(persistedPlayers[0]?.flags, ["market_seen", "signal_seen"]);
+  assert.equal(persistedPlayers[0]?.director_state.story_beats_remaining, 2);
+  assert.equal(
+    persistedPlayers[0]?.director_state.end_goal_progress,
+    "The signal now points toward the tower."
+  );
   assert.deepEqual(committedEvents, ["accepted"]);
   assert.deepEqual(memoriesAdded, [
     {
@@ -280,17 +353,11 @@ test("turn service returns a 400 outcome when turn output validation fails", asy
     getShortHistory() {
       return [];
     },
+    persistPlayerState() {
+      return null;
+    },
     sanitizeTurnResult(result) {
       return result as TurnResult;
-    },
-    updateDirectorState() {
-      return null;
-    },
-    updatePlayerState() {
-      return null;
-    },
-    updateSummary() {
-      return null;
     },
     validateStateUpdates() {
       return { ok: true, errors: [] };
@@ -331,7 +398,68 @@ test("turn service returns a 400 outcome when turn output validation fails", asy
   );
 });
 
-test("turn service commits only server-accepted state changes before storing narrator text", async () => {
+test("turn service returns a 500 outcome when model execution throws unexpectedly", async () => {
+  const player = createPlayer();
+  const service = createTurnService({
+    addCommittedTurnEvent() {},
+    addEvent() {},
+    addMemories() {},
+    applyDirectorRules({ directorState }) {
+      return directorState;
+    },
+    async generateTurn() {
+      throw new Error("model gateway timeout");
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState() {
+      return null;
+    },
+    sanitizeTurnResult(result) {
+      return result as TurnResult;
+    },
+    validateStateUpdates() {
+      return { ok: true, errors: [] };
+    },
+    validateTurnOutput() {
+      return { ok: true, errors: [] };
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "inspect the lantern",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createDirectorSpec(),
+    questSpec: createQuestSpec()
+  });
+
+  assert.equal(outcome.ok, false);
+  if (outcome.ok) {
+    return;
+  }
+
+  assert.equal(outcome.statusCode, 500);
+  assert.equal(outcome.error, "Turn failed");
+  assert.equal(outcome.reason, "unexpected");
+  assert.equal(outcome.detail, "model gateway timeout");
+});
+
+test("turn service persists only server-accepted state changes into the authoritative player snapshot", async () => {
   const player = createPlayer();
   const refreshedPlayer: Player = {
     ...player,
@@ -341,7 +469,7 @@ test("turn service commits only server-accepted state changes before storing nar
     quests: player.quests
   };
   const callOrder: string[] = [];
-  let committedUpdates: StateUpdates | null = null;
+  let persistedPlayer: Player | null = null;
   const committedEventStatuses: string[] = [];
 
   const service = createTurnService({
@@ -401,17 +529,10 @@ test("turn service commits only server-accepted state changes before storing nar
     getShortHistory() {
       return [];
     },
-    updateDirectorState() {
-      callOrder.push("updateDirectorState");
-      return null;
-    },
-    updatePlayerState(_playerId, updates) {
-      callOrder.push("updatePlayerState");
-      committedUpdates = updates;
-      return null;
-    },
-    updateSummary() {
-      return null;
+    persistPlayerState(nextPlayer) {
+      callOrder.push("persistPlayerState");
+      persistedPlayer = nextPlayer;
+      return nextPlayer;
     },
     validateStateUpdates() {
       return { ok: true, errors: [] };
@@ -435,22 +556,43 @@ test("turn service commits only server-accepted state changes before storing nar
     return;
   }
 
-  assert.deepEqual(committedUpdates, {
+  assert.deepEqual(persistedPlayer, {
+    ...player,
     location: "Sky Bridge",
-    inventory_add: ["signal shard", "bridge pass"],
-    inventory_remove: ["signal shard"],
-    flags_add: ["signal_seen"],
-    flags_remove: ["market_seen"],
+    summary: "You arrived at the market.",
+    inventory: ["bridge pass"],
+    flags: ["signal_seen"],
     quests: [
       {
         id: "intro-signal",
         status: "complete",
         summary: "The bridge crossing ended the quest."
       }
-    ]
+    ],
+    director_state: {
+      ...player.director_state,
+      story_beats_remaining: 2,
+      end_goal_progress: "You now have a clear route toward the tower."
+    }
   });
-  assert.deepEqual(outcome.turnOutput.state_updates, committedUpdates);
-  assert.deepEqual(callOrder, ["event:player", "event:narrator", "updatePlayerState", "updateDirectorState", "committedEvent"]);
+  assert.deepEqual(
+    outcome.turnOutput.state_updates,
+    {
+      location: "Sky Bridge",
+      inventory_add: ["signal shard", "bridge pass"],
+      inventory_remove: ["signal shard"],
+      flags_add: ["signal_seen"],
+      flags_remove: ["market_seen"],
+      quests: [
+        {
+          id: "intro-signal",
+          status: "complete",
+          summary: "The bridge crossing ended the quest."
+        }
+      ]
+    }
+  );
+  assert.deepEqual(callOrder, ["event:player", "event:narrator", "persistPlayerState", "committedEvent"]);
   assert.deepEqual(committedEventStatuses, ["accepted"]);
 });
 
@@ -496,17 +638,11 @@ test("turn output can be translated into a canonical replay event without treati
     getShortHistory() {
       return [];
     },
+    persistPlayerState() {
+      return null;
+    },
     sanitizeTurnResult(result) {
       return result as TurnResult;
-    },
-    updateDirectorState() {
-      return null;
-    },
-    updatePlayerState() {
-      return null;
-    },
-    updateSummary() {
-      return null;
     },
     validateStateUpdates() {
       return { ok: true, errors: [] };

@@ -94,6 +94,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Preserve player agency by separating attempt interpretation, simulation resolution, and pacing decisions instead of collapsing them into one model or director step.
 - Plausibility and failure should be decided by simulation rules or server adjudication, not by beat order alone.
 - Director rules should frame and capitalize on accepted outcomes after simulation, including when the player goes off the expected path.
+- Prompt text, JSON schema descriptions, and validator-facing contract language must keep `state_updates` aligned to candidate simulation consequences and `director_updates` aligned to pacing or framing only.
 - Tests for turn-pipeline or director changes should include at least one off-beat but plausible action that succeeds without forced beat advancement, and at least one implausible action that fails for simulation reasons rather than hidden pacing reasons.
 
 ## Memory Authority Policy
@@ -101,6 +102,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Memory classes must be explicit and carry clear admission and retrieval rules rather than using one undifferentiated `fact` bucket.
 - Only authority-relevant memory classes may participate in state-sensitive retrieval or downstream decision support, and even those memories must not override committed state.
 - Flavor-oriented memories may support narration and continuity, but they must stay non-authoritative and be safe to drop, trim, or ignore without changing truth.
+- Hard canon and quest progression memory must remain server-commit derived, relationship and world-discovery memory may admit trusted summary derivation, and soft flavor memory must never be marked authoritative.
 - Memory or retrieval changes should include tests or fixtures that prove flavor memories cannot smuggle new authoritative facts into gameplay decisions.
 
 ## NPC Memory Significance Policy
@@ -127,6 +129,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Validators for turn-output payloads must reject extra scene, world, beat, pacing, or other design-shaped fields instead of silently tolerating schema creep.
 - Do not encode gameplay rules, beat policy, quest semantics, or world-simulation logic into model schema shape when those concepts can live in validators, adjudication, reducers, or content specs.
 - Treat new model-facing fields as requiring a transport justification. If the reason for a field is really game design or engine behavior, the change belongs outside the schema.
+- Schema guardrail coverage must inspect the request-side JSON schema contract itself, not only returned payload validation, so scene or mixed-authority field creep fails before live model calls.
 - Schema or prompt changes should include at least one deterministic check that rejects mixed-authority or over-modeled payloads before they reach authoritative mutation.
 
 ## AI Test-First Change Policy
@@ -143,6 +146,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - If fully automated verification is not yet possible, add the smallest deterministic fixture or scripted harness step that proves the contract and record the limitation in [BACKLOG.md](/g:/text-game/BACKLOG.md).
 - AI-related changes are not complete unless the changed behavior is covered by a test, fixture, or scripted harness path that another agent can re-run.
 - Authority-boundary changes are not complete unless the test, fixture, or harness path proves at least one rejected model proposal does not leak into committed state, replay data, or player-facing narrative.
+- Compact-schema changes should keep a rerunnable deterministic guardrail path, such as a focused unit test plus a `scripts/test-local-ai-workflow.ps1 -SelectionOnly` contract check, so request-side schema drift is caught without relying on provider behavior.
 
 ## Telemetry Contract
 

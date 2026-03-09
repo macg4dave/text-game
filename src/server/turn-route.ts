@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { RequestHandler, Response } from "express";
+import type { Request, RequestHandler, Response } from "express";
 import type { Logger } from "../core/logging.js";
 import type {
   DirectorSpec,
@@ -8,7 +8,7 @@ import type {
   TurnOutputPayload
 } from "../core/types.js";
 import { getOrCreatePlayer, updateDirectorState } from "../state/game.js";
-import { createTurnExecutionTrace, turnService } from "../state/turn.js";
+import { createTurnExecutionTrace, turnService, type TurnService } from "../state/turn.js";
 import { parseTurnInput, validateTurnResponse } from "../rules/validator.js";
 import type { RuntimePreflightService } from "./runtime-preflight.js";
 import { normalizeDirectorState } from "./player-state.js";
@@ -41,6 +41,9 @@ interface TurnRouteDependencies {
   embeddingModel: string;
   getDirectorSpec: () => DirectorSpec;
   getQuestSpec: () => QuestSpec;
+  getOrCreatePlayer?: typeof getOrCreatePlayer;
+  updateDirectorState?: typeof updateDirectorState;
+  turnExecutionService?: TurnService;
 }
 
 export function createTurnHandler({
@@ -51,9 +54,12 @@ export function createTurnHandler({
   model,
   embeddingModel,
   getDirectorSpec,
-  getQuestSpec
+  getQuestSpec,
+  getOrCreatePlayer: getOrCreatePlayerForRoute = getOrCreatePlayer,
+  updateDirectorState: updateDirectorStateForRoute = updateDirectorState,
+  turnExecutionService = turnService
 }: TurnRouteDependencies): RequestHandler {
-  return async (req, res) => {
+  return async (req: Request, res: Response) => {
     const requestId = crypto.randomUUID();
     const startedAt = Date.now();
     let trace = createTurnExecutionTrace();
@@ -115,15 +121,15 @@ export function createTurnHandler({
         });
       }
 
-      const player = getOrCreatePlayer({ playerId: turnInput.value.player_id, name: turnInput.value.player_name });
+      const player = getOrCreatePlayerForRoute({ playerId: turnInput.value.player_id, name: turnInput.value.player_name });
       const directorSpec = getDirectorSpec();
       const normalized = normalizeDirectorState(player, directorSpec);
       if (normalized.changed) {
-        updateDirectorState(player.id, normalized.director);
+        updateDirectorStateForRoute(player.id, normalized.director);
         player.director_state = normalized.director;
       }
 
-      const execution = await turnService.executeTurn({
+      const execution = await turnExecutionService.executeTurn({
         player,
         input: turnInput.value.input,
         model,

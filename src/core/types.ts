@@ -211,15 +211,32 @@ export interface DirectorUpdateProposal {
 
 export type DirectorUpdates = DirectorUpdateProposal;
 
+export const TURN_LAYER_HANDOFF = {
+  interpreted_attempt:
+    "Interpret what the player is trying to do from the input and state pack without deciding committed truth or beat advancement.",
+  simulation_consequences:
+    "state_updates are candidate plausible world consequences of the attempted action. They must not use beat order as permission logic.",
+  pacing_framing:
+    "director_updates and narrative react to the attempted outcome for pacing and framing only. They must not decide plausibility or become authoritative truth."
+} as const;
+
+export type TurnLayerHandoff = typeof TURN_LAYER_HANDOFF;
+
 // Transitional v1 turn-output contract. The `*_updates` fields are proposal slots only.
 // The contract stays compact and transport-oriented: no scene graph, world model,
 // beat-state object, or other hidden gameplay schema belongs here.
 // The authoritative truth returned to clients lives in the versioned `player` snapshot.
 export interface TurnResult {
+  // Candidate player-facing framing of the attempted outcome. This must stay compatible
+  // with authoritative STATE_PACK facts and must not claim commitment that the server has not made.
   narrative: string;
+  // Candidate follow-up actions that fit the framed situation without encoding world rules or commitment.
   player_options: string[];
+  // Candidate simulation consequences of the player's attempted action.
   state_updates: StateUpdateProposal;
+  // Candidate pacing or framing reaction after the attempted outcome.
   director_updates: DirectorUpdateProposal;
+  // Candidate memory facts for later server-side admission.
   memory_updates: string[];
 }
 
@@ -363,6 +380,19 @@ export interface CanonicalPlayerCreatedEventPayload extends CanonicalEventBase {
 }
 
 export type CanonicalEventPayload = CanonicalTurnEventPayload | CanonicalPlayerCreatedEventPayload;
+export type AcceptedTurnConsequences = CanonicalEventCommittedChanges;
+
+export interface DeterministicStateReducerInput {
+  player: Player;
+  acceptedConsequences: AcceptedTurnConsequences;
+  resolvedDirectorState?: DirectorState;
+}
+
+export interface DeterministicStateReducerResult {
+  player: Player;
+  authoritativePlayer: AuthoritativePlayerState;
+  changed: boolean;
+}
 
 export interface PlayerRow {
   id: string;
@@ -393,6 +423,40 @@ export interface CommittedEventRow {
 export interface MemoryRow {
   content: string;
   embedding: string | null;
+}
+
+export const MEMORY_CLASS_RULES = {
+  hard_canon: {
+    authority: "authoritative",
+    allowed_sources: ["server_commit"]
+  },
+  quest_progress: {
+    authority: "authoritative",
+    allowed_sources: ["server_commit"]
+  },
+  relationship: {
+    authority: "supporting",
+    allowed_sources: ["server_commit", "summary"]
+  },
+  world_discovery: {
+    authority: "supporting",
+    allowed_sources: ["server_commit", "summary"]
+  },
+  soft_flavor: {
+    authority: "narration-only",
+    allowed_sources: ["summary", "narration"]
+  }
+} as const;
+
+export type MemoryClass = keyof typeof MEMORY_CLASS_RULES;
+export type MemoryAuthority = (typeof MEMORY_CLASS_RULES)[MemoryClass]["authority"];
+export type MemorySource = "server_commit" | "summary" | "narration";
+
+export interface MemoryCandidate {
+  content: string;
+  memory_class: MemoryClass;
+  authority: MemoryAuthority;
+  source: MemorySource;
 }
 
 export interface MemoryInsert {

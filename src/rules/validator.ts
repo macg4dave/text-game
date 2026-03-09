@@ -1,6 +1,7 @@
 import {
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
   COMMITTED_EVENT_SCHEMA_VERSION,
+  MEMORY_CLASS_RULES,
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
   type CanonicalEventPayload,
@@ -10,6 +11,7 @@ import {
   type AuthoritativePlayerState,
   type DirectorSpec,
   type DirectorState,
+  type MemoryCandidate,
   type QuestSpec,
   type QuestUpdate,
   type RuntimePreflightIssue,
@@ -129,6 +131,45 @@ export function validateStateUpdates(updates: unknown): ValidationResult<string>
     errors.push("state_updates.quests must be array.");
   } else {
     errors.push(...validateQuestUpdates(typedUpdates.quests, "state_updates.quests"));
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateMemoryCandidate(candidate: unknown): ValidationResult<string> {
+  const errors: string[] = [];
+  if (!candidate || typeof candidate !== "object") {
+    return { ok: false, errors: ["memory candidate must be an object."] };
+  }
+
+  const typedCandidate = candidate as Partial<MemoryCandidate> & Record<string, unknown>;
+  const allowedKeys = new Set(["content", "memory_class", "authority", "source"]);
+  for (const key of Object.keys(typedCandidate)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`${key} is not allowed in the memory candidate contract.`);
+    }
+  }
+
+  if (typeof typedCandidate.content !== "string" || !typedCandidate.content.trim()) {
+    errors.push("content must be a non-empty string.");
+  }
+
+  if (typeof typedCandidate.memory_class !== "string" || !(typedCandidate.memory_class in MEMORY_CLASS_RULES)) {
+    errors.push("memory_class must be one of hard_canon, quest_progress, relationship, world_discovery, or soft_flavor.");
+    return { ok: false, errors };
+  }
+
+  const rule = MEMORY_CLASS_RULES[typedCandidate.memory_class as keyof typeof MEMORY_CLASS_RULES];
+  const allowedSources = rule.allowed_sources as readonly string[];
+
+  if (typedCandidate.authority !== rule.authority) {
+    errors.push(`authority for ${typedCandidate.memory_class} must be ${rule.authority}.`);
+  }
+
+  if (typedCandidate.source !== "server_commit" && typedCandidate.source !== "summary" && typedCandidate.source !== "narration") {
+    errors.push("source must be server_commit, summary, or narration.");
+  } else if (!allowedSources.includes(typedCandidate.source)) {
+    errors.push(`source ${typedCandidate.source} is not allowed for ${typedCandidate.memory_class}.`);
   }
 
   return { ok: errors.length === 0, errors };

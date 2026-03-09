@@ -132,6 +132,7 @@ Exit gate:
 - A new game can be created and played for at least 10 scripted turns in a row.
 - Every turn writes an event that can be replayed deterministically.
 - Every turn writes a committed semantic event record that is sufficient to reconstruct authoritative state without depending on exact narrator prose.
+- A deterministic schema guardrail check rejects scene-ontology or mixed-authority field creep before prompt or validator changes expand the model contract.
 - Invalid or unsafe model output is rejected before state mutation.
 - Model-authored consequences remain proposals until the server accepts them, and rejected proposals cannot appear as committed story truth in the player-facing turn result.
 - Basic onboarding, tutorial guidance, and first-run troubleshooting are present in the player flow.
@@ -258,6 +259,7 @@ Exit gate:
 - Add memory retrieval and director control without increasing player-facing setup friction.
 - Separate freeform intent interpretation, simulation resolution, and pacing before later director-spec and quest-progression work hardens the wrong gameplay boundary.
 - Keep the turn-output schema compact so later validator, memory, and director work extends server-owned logic instead of growing model contract complexity.
+- Add a deterministic schema-contract guardrail so later prompt or validator work fails loudly when it tries to smuggle gameplay design back into model fields.
 - Define memory classes and class-aware retrieval before Phase 2 memory work hardens one undifferentiated memory bucket.
 - Define NPC significance scoring, tier promotion, and partitioned recall before retrieval or summarization work hardens raw dialogue history into the memory design.
 - Define the memory storage hierarchy, per-bucket context budgets, and summary versioning before budget or telemetry work measures the wrong prompt shape.
