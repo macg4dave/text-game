@@ -8,7 +8,7 @@
 # default launcher path.
 #
 # The authoritative tier matrix lives in:
-# - scripts/local-gpu-profile-matrix.json
+# - launcher/assets/local-gpu-profile-matrix.json
 #
 # active_profile_id: local-gpu-8gb
 #

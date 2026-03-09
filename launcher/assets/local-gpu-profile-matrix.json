@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "defaultProfileId": "local-gpu-8gb",
+  "profiles": [
+    {
+      "id": "local-gpu-8gb",
+      "displayName": "Local GPU 8 GB",
+      "minVramGb": 8.0,
+      "maxVramGb": 11.9,
+      "recommendedChatModel": "gemma3:4b",
+      "recommendedEmbeddingRoute": {
+        "mode": "hosted",
+        "model": "text-embedding-3-small",
+        "aliasTarget": "game-embedding"
+      },
+      "ollamaPullModels": ["gemma3:4b"],
+      "fallbackProfileId": null,
+      "skuExamples": ["RTX 4060 Ti 8 GB", "RTX 5060 8 GB"],
+      "verificationStatus": "verified",
+      "notes": [
+        "Default launcher profile for the supported GPU-backed Docker path.",
+        "Hosted embeddings stay conservative at this tier."
+      ]
+    },
+    {
+      "id": "local-gpu-12gb",
+      "displayName": "Local GPU 12 GB",
+      "minVramGb": 12.0,
+      "maxVramGb": 19.9,
+      "recommendedChatModel": "gemma3:12b",
+      "recommendedEmbeddingRoute": {
+        "mode": "hosted",
+        "model": "text-embedding-3-small",
+        "aliasTarget": "game-embedding"
+      },
+      "ollamaPullModels": ["gemma3:12b"],
+      "fallbackProfileId": "local-gpu-8gb",
+      "skuExamples": ["RTX 4070 12 GB", "RTX 4070 Super 12 GB"],
+      "verificationStatus": "heuristic",
+      "notes": [
+        "Use this tier for manual larger-model experiments once the default profile is stable.",
+        "Fallback to the 8 GB tier if startup reliability drops."
+      ]
+    },
+    {
+      "id": "local-gpu-20gb-plus",
+      "displayName": "Local GPU 20 GB+",
+      "minVramGb": 20.0,
+      "maxVramGb": null,
+      "recommendedChatModel": "gemma3:27b",
+      "recommendedEmbeddingRoute": {
+        "mode": "local",
+        "model": "embeddinggemma",
+        "aliasTarget": "game-embedding"
+      },
+      "ollamaPullModels": ["gemma3:27b", "embeddinggemma"],
+      "fallbackProfileId": "local-gpu-12gb",
+      "skuExamples": ["RTX 4090 24 GB", "RTX 6000 Ada 48 GB"],
+      "verificationStatus": "heuristic",
+      "notes": [
+        "This tier unlocks local embeddings when the extra VRAM is available.",
+        "Fallback to the 12 GB tier if local embedding latency or stability is poor."
+      ]
+    }
+  ]
+}

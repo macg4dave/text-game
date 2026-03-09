@@ -19,7 +19,7 @@ use crate::test_local_ai_workflow::TestLocalAiWorkflowOptions;
 #[derive(Parser, Debug, PartialEq, Eq)]
 #[command(name = "SunRay")]
 #[command(about = "Rust launcher and automation harness for text-game")]
-#[command(long_about = "SunRay is the Rust command surface replacing legacy PowerShell automation one script at a time. It orchestrates the existing Docker, Node, npm, browser, and Electron flows without replacing those runtimes.")]
+#[command(long_about = "SunRay is the supported Rust command surface for launcher, harness, smoke, and validation work. It orchestrates the existing Docker, Node, npm, browser, and Electron flows without replacing those runtimes.")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -27,7 +27,7 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug, PartialEq, Eq)]
 pub enum Commands {
-    /// Launcher and Docker preflight parity target for scripts/start-dev.ps1.
+    /// Start the supported launcher and Docker preflight flow.
     StartDev {
         /// Skip opening the browser after the app becomes ready.
         #[arg(long)]
@@ -36,19 +36,19 @@ pub enum Commands {
         #[arg(long)]
         rebuild: bool,
     },
-    /// Local AI harness parity target for scripts/test-local-ai-workflow.ps1.
+    /// Run the local AI workflow regression harness.
     TestLocalAiWorkflow {
         /// Run only deterministic contract checks and skip live provider smoke.
         #[arg(long)]
         selection_only: bool,
     },
-    /// Browser setup smoke parity target for scripts/test-setup-browser-smoke.ps1.
+    /// Run the targeted browser setup smoke harness.
     TestSetupBrowserSmoke,
-    /// GPU matrix validator parity target for scripts/validate-local-gpu-profile-matrix.ps1.
+    /// Validate the launcher-owned local GPU profile matrix.
     ValidateLocalGpuProfileMatrix,
-    /// LiteLLM config validator parity target for scripts/validate-litellm-default-config.ps1.
+    /// Validate the default LiteLLM config wiring.
     ValidateLitellmDefaultConfig,
-    /// Electron prototype wrapper parity target for scripts/start-desktop-prototype.ps1.
+    /// Start the Electron desktop prototype wrapper flow.
     StartDesktopPrototype,
 }
 

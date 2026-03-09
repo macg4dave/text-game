@@ -176,7 +176,7 @@ fn confirm_docker_tooling(repo_root: &Path) -> Result<()> {
             )
             .with_recovery([
                 "Update Docker Desktop or Docker Engine so the Compose plugin is available.",
-                "Open a new PowerShell window after the update, confirm `docker compose version` works, then rerun the launcher.",
+                "Open a new terminal window after the update, confirm `docker compose version` works, then rerun the launcher.",
             ])
             .with_details(json!({
                 "compose_output": combine_capture_output(&compose_version)
@@ -284,8 +284,8 @@ fn confirm_local_gpu_support() -> Result<()> {
                     "This launcher only supports the GPU-backed Docker Ollama path, and `nvidia-smi` was not available on the host.",
                 )
                 .with_recovery([
-                    "Install or repair the NVIDIA driver stack until `nvidia-smi` works in PowerShell.",
-                    "Open a new PowerShell window and rerun this launcher after `nvidia-smi` reports your GPU.",
+                    "Install or repair the NVIDIA driver stack until `nvidia-smi` works in a normal terminal session.",
+                    "Open a new terminal window and rerun this launcher after `nvidia-smi` reports your GPU.",
                 ])
                 .with_details(json!({"check": "nvidia-smi"})),
             );

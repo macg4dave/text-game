@@ -19,7 +19,7 @@ function createSetupStatus() {
       provider: "LiteLLM",
       title: "Supported MVP AI path",
       summary: "Use the launcher.",
-      launcher: "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1",
+      launcher: "cargo run --manifest-path launcher/Cargo.toml -- start-dev",
       services: ["Docker Desktop", "LiteLLM sidecar", "GPU-backed Ollama service"]
     },
     preflight: {
@@ -56,7 +56,7 @@ test("runRecoveryAction copies the supported launcher command", async () => {
     }
   });
 
-  assert.equal(copiedText, "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1");
+  assert.equal(copiedText, "cargo run --manifest-path launcher/Cargo.toml -- start-dev");
   assert.deepEqual(statuses, ["Launcher command copied"]);
   assert.deepEqual(entries, ["Launcher command copied"]);
 });
@@ -75,6 +75,6 @@ test("runRecoveryAction copies the GPU repair checklist with the launcher path",
   });
 
   assert.match(copiedText, /GPU-backed repair checklist/i);
-  assert.match(copiedText, /scripts\/start-dev\.ps1|scripts\\start-dev\.ps1/i);
+  assert.match(copiedText, /cargo run --manifest-path launcher\/Cargo\.toml -- start-dev|cargo run --manifest-path launcher\\Cargo\.toml -- start-dev/i);
   assert.match(copiedText, /Retry the setup check without clearing the saved browser session/i);
 });

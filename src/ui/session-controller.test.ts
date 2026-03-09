@@ -22,7 +22,7 @@ function createSetupPayload(status: "ready" | "action-required" = "ready") {
         provider: "LiteLLM",
         title: "Supported MVP AI path",
         summary: "Use the launcher.",
-        launcher: "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1",
+        launcher: "cargo run --manifest-path launcher/Cargo.toml -- start-dev",
         services: ["Docker Desktop", "LiteLLM sidecar", "GPU-backed Ollama service"]
       },
       preflight: {

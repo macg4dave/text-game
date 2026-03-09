@@ -17,7 +17,7 @@ This guide uses Ollama because it has an official Docker image, works well with 
 
 ## GPU Tier Matrix
 
-The authoritative local-GPU matrix for this repo lives in [scripts/local-gpu-profile-matrix.json](/g:/text-game/scripts/local-gpu-profile-matrix.json).
+The authoritative local-GPU matrix for this repo lives in [launcher/assets/local-gpu-profile-matrix.json](/g:/text-game/launcher/assets/local-gpu-profile-matrix.json).
 
 Current first-pass profiles:
 
@@ -37,7 +37,7 @@ This is the first-class developer override path for Windows:
 
 1. Install Docker Desktop and keep it on the Linux container backend.
 2. Make sure WSL2 is enabled for Docker Desktop.
-3. Install NVIDIA drivers on the host and confirm `nvidia-smi` works in PowerShell.
+3. Install NVIDIA drivers on the host and confirm `nvidia-smi` works in a normal terminal session.
 4. Copy `.env.example` to `.env` if you have not already.
 5. Pull the default models into the repo-managed Docker `ollama` service:
 
@@ -49,7 +49,7 @@ docker compose exec ollama ollama pull embeddinggemma
 1. Start the default GPU-backed stack:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
 Raw Docker equivalent:
@@ -198,7 +198,7 @@ Then open `http://localhost:3000`.
 On Windows, you can use the launcher instead:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
 What the current startup checks will tell you on the local GPU path:
@@ -216,7 +216,7 @@ If you are using the direct `AI_PROVIDER=ollama` fallback instead of LiteLLM, th
 Use this harness whenever you change prompts, schemas, model defaults, or adapter request shapes:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1
+cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow
 ```
 
 What it checks:
@@ -227,8 +227,8 @@ What it checks:
 
 Script-maintenance note:
 
-- keep shared PowerShell behavior in `scripts/lib/shared.ps1`
-- keep `scripts/test-local-ai-workflow.ps1` focused on AI-contract checks and reporting rather than duplicating launcher helper logic
+- keep shared launcher behavior in focused Rust modules under `launcher/src/`
+- keep `SunRay test-local-ai-workflow` focused on AI-contract checks and reporting rather than duplicating launcher helper logic
 
 Recommended loop:
 
@@ -241,7 +241,7 @@ Recommended loop:
 When you change the GPU tier matrix or the active local-GPU config, run this first:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1
+cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix
 ```
 
 ## Smoke Test Checklist

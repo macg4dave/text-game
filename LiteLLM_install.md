@@ -344,7 +344,7 @@ docker compose up --build
 ### Windows launcher
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
 ## Optional larger local-model path

@@ -97,7 +97,7 @@ export interface PreflightPanelViewModel {
 const DEFAULT_SUPPORTED_TITLE = "Supported MVP AI path";
 const DEFAULT_SUPPORTED_SUMMARY =
   "Use the Windows launcher with Docker Desktop so the app, LiteLLM, and the GPU-backed Ollama route start together.";
-const DEFAULT_LAUNCHER = "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1";
+const DEFAULT_LAUNCHER = "cargo run --manifest-path launcher/Cargo.toml -- start-dev";
 const DEFAULT_SERVICES = ["Docker Desktop", "LiteLLM sidecar", "GPU-backed Ollama service"];
 
 interface RecoveryActionContext {

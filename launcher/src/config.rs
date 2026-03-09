@@ -237,10 +237,7 @@ fn parse_port(value: &str) -> u16 {
 
 pub fn resolve_workspace_root_from(start_dir: &Path) -> Result<PathBuf, SunrayError> {
 	for candidate in start_dir.ancestors() {
-		if candidate.join("package.json").exists()
-			&& candidate.join("sunray_backlog.md").exists()
-			&& candidate.join("launcher").join("Cargo.toml").exists()
-		{
+		if is_workspace_root(candidate) {
 			return Ok(candidate.to_path_buf());
 		}
 	}
@@ -250,6 +247,20 @@ pub fn resolve_workspace_root_from(start_dir: &Path) -> Result<PathBuf, SunrayEr
 	})
 }
 
+pub fn launcher_assets_dir(repo_root: &Path) -> PathBuf {
+	repo_root.join("launcher").join("assets")
+}
+
+pub fn local_gpu_profile_matrix_path(repo_root: &Path) -> PathBuf {
+	launcher_assets_dir(repo_root).join("local-gpu-profile-matrix.json")
+}
+
+fn is_workspace_root(candidate: &Path) -> bool {
+	candidate.join("package.json").exists()
+		&& candidate.join("BACKLOG.md").exists()
+		&& candidate.join("launcher").join("Cargo.toml").exists()
+}
+
 #[cfg(test)]
 mod tests {
 	use std::collections::BTreeSet;
@@ -257,7 +268,10 @@ mod tests {
 
 	use crate::env::RepoEnv;
 
-	use super::{command_contracts, resolve_repo_ai_config, resolve_workspace_root_from};
+	use super::{
+		command_contracts, local_gpu_profile_matrix_path, resolve_repo_ai_config,
+		resolve_workspace_root_from,
+	};
 
 	#[test]
 	fn command_contracts_keep_unique_names_and_scripts() {
@@ -278,7 +292,8 @@ mod tests {
 			.expect("workspace root should resolve from launcher/src");
 
 		assert!(root.join("package.json").exists());
-		assert!(root.join("sunray_backlog.md").exists());
+		assert!(root.join("BACKLOG.md").exists());
+		assert!(local_gpu_profile_matrix_path(&root).ends_with(Path::new("launcher").join("assets").join("local-gpu-profile-matrix.json")));
 	}
 
 	#[test]

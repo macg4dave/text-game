@@ -156,12 +156,12 @@ Current build/run contract:
 
 ## Script Structure Guidance
 
-- Active migration direction: automation is moving into `launcher/` as the Rust executable `SunRay`, rooted at `launcher/Cargo.toml`.
+- Automation lives in `launcher/` as the Rust executable `SunRay`, rooted at `launcher/Cargo.toml`.
 - New automation entrypoints should be Rust subcommands, not `.ps1`, `.sh`, or `.bat` files.
 - Shared automation behavior should live in Rust modules inside that tooling runtime, with JSON or fixture assets beside it as needed.
 - Rust automation may invoke Docker, npm, Node, Electron, and other existing tools as external processes, but this does not change the app runtime boundary.
-- Until `T65` closes, existing PowerShell entrypoints are legacy only and should not receive new behavior.
-- Migrate one script at a time: match existing behavior in `SunRay`, then delete the legacy script.
+- Existing PowerShell entrypoints are no longer part of the supported runtime surface and should not be revived.
+- Keep launcher fixtures, validation assets, and shared automation helpers inside `launcher/` so the Rust tooling runtime owns its full support surface.
 
 ## Launcher Boundary
 

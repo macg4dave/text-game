@@ -27,7 +27,7 @@ export async function runRecoveryAction(actionId: string, handlers: RecoveryActi
       const guidance = [
         "Use the conservative supported profile for the next launcher run:",
         "AI_PROFILE=local-gpu-small",
-        "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -Rebuild"
+        "cargo run --manifest-path launcher/Cargo.toml -- start-dev --rebuild"
       ].join("\n");
 
       await copyRecoveryText(guidance, "Smaller-profile guidance copied", handlers);
@@ -37,10 +37,10 @@ export async function runRecoveryAction(actionId: string, handlers: RecoveryActi
       const checklist = [
         "GPU-backed repair checklist:",
         "1. Start Docker Desktop and wait for the Linux engine.",
-        "2. Confirm nvidia-smi works in PowerShell.",
+        "2. Confirm nvidia-smi works in a normal terminal.",
         "3. Re-run the supported launcher path.",
         "4. Retry the setup check without clearing the saved browser session.",
-        handlers.setupStatus?.supported_path?.launcher || "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1"
+        handlers.setupStatus?.supported_path?.launcher || "cargo run --manifest-path launcher/Cargo.toml -- start-dev"
       ].join("\n");
 
       await copyRecoveryText(checklist, "GPU repair checklist copied", handlers);

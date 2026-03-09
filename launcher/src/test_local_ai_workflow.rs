@@ -8,7 +8,10 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::config::{resolve_repo_ai_config, resolve_workspace_root_from, RepoAiConfig};
+use crate::config::{
+    local_gpu_profile_matrix_path, resolve_repo_ai_config, resolve_workspace_root_from,
+    RepoAiConfig,
+};
 use crate::env::load_repo_env;
 use crate::process::ProcessInvocation;
 
@@ -144,7 +147,7 @@ pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
 }
 
 fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport) -> Result<()> {
-    let matrix_path = repo_root.join("scripts").join("local-gpu-profile-matrix.json");
+    let matrix_path = local_gpu_profile_matrix_path(repo_root);
     let matrix = load_local_gpu_profile_matrix(&matrix_path)?;
 
     let auto_small = resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(10.0));
@@ -248,7 +251,8 @@ fn test_turn_schema_guardrails(repo_root: &Path, report: &mut HarnessReport) -> 
             "app",
             "npx",
             "tsx",
-            "scripts/validate-turn-schema.ts",
+            "--test",
+            "src/state/turn.test.ts",
         ])
         .in_dir(repo_root)
         .capture()?;

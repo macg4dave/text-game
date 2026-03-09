@@ -70,7 +70,7 @@ Recommended VS Code extensions for this repo:
 
 - Rust Analyzer
 - Docker
-- PowerShell only if you need to inspect the legacy script surface during `T65`
+- PowerShell if you need Windows-specific shell inspection or troubleshooting
 
 The supported validation and runtime path still stays in Docker even if you use the host install for editor support.
 
@@ -138,7 +138,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 
 This starts the normal app, LiteLLM, and Ollama stack and reserves NVIDIA GPU access for the Ollama service. The app and LiteLLM containers themselves do not need GPU access.
 
-The authoritative local-GPU profile matrix for manual larger-model tuning still lives in [scripts/local-gpu-profile-matrix.json](/g:/text-game/scripts/local-gpu-profile-matrix.json). T02g defines three VRAM tiers keyed by detected memory first: `local-gpu-8gb`, `local-gpu-12gb`, and `local-gpu-20gb-plus`.
+The authoritative local-GPU profile matrix for manual larger-model tuning now lives in [launcher/assets/local-gpu-profile-matrix.json](/g:/text-game/launcher/assets/local-gpu-profile-matrix.json). T02g defines three VRAM tiers keyed by detected memory first: `local-gpu-8gb`, `local-gpu-12gb`, and `local-gpu-20gb-plus`.
 
 On Windows, the launcher wraps the same compiled Docker path and opens the browser for you:
 
@@ -146,11 +146,11 @@ On Windows, the launcher wraps the same compiled Docker path and opens the brows
 cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
-Migration note as of 2026-03-09:
+Launcher note as of 2026-03-09:
 
-- the current `.ps1` launcher and harness commands are legacy entrypoints
-- `T65` is replacing the entire PowerShell automation surface with the Rust executable `SunRay` under `launcher/`
-- do not add new PowerShell, Bash, or batch automation in this repo; extend the planned Rust tooling surface instead
+- `SunRay` under `launcher/` is now the supported launcher and automation surface
+- do not add new PowerShell, Bash, or batch automation in this repo; extend the Rust tooling surface instead
+- remaining launcher cleanup work is about Rust-native structure and asset ownership, not restoring shell wrappers
 
 ## Database Reset And Recovery
 
@@ -326,14 +326,13 @@ Useful flags:
 
 ## Script Layout
 
-Active migration direction:
+Current automation direction:
 
 - the supported automation target is the Rust executable `SunRay` rooted at `launcher/Cargo.toml`
-- the target `SunRay` command surface mirrors the current legacy entrypoints: `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype`
-- `T65a` establishes one Rust binary with that subcommand surface plus shared modules for env loading, logging, config, error shaping, and process execution
-- the current `.ps1` files are temporary legacy shims until `T65` lands and should not gain new behavior
-- Docker, npm, Node, and Electron remain the underlying tools; the migration only replaces the shell orchestration layer around them
-- migration rule: each legacy script must first reach parity in `SunRay` and then be deleted before that migration slice is considered done
+- the supported `SunRay` command surface is `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype`
+- launcher-owned static assets such as the local GPU matrix now live under `launcher/assets/`
+- Docker, npm, Node, and Electron remain the underlying tools; `SunRay` orchestrates them instead of replacing them
+- new launcher behavior should land as Rust modules and assets, not as shell wrappers or copied shell logic
 
 `SunRay` boundaries:
 
@@ -344,18 +343,9 @@ Active migration direction:
 - not a replacement for Electron
 - not a rewrite of the app server
 
-Current legacy entrypoints being replaced:
-
-- `scripts/test-local-ai-workflow.ps1` - local AI contract harness
-- `scripts/test-setup-browser-smoke.ps1` - targeted launch-screen setup smoke harness for blocked and recovered browser states
-- `scripts/start-desktop-prototype.ps1` - Electron prototype wrapper
-- `scripts/validate-local-gpu-profile-matrix.ps1` - local GPU matrix consistency check
-- `scripts/validate-litellm-default-config.ps1` - default LiteLLM config consistency check
-- `scripts/lib/*.ps1` - shared PowerShell helper surface scheduled for removal
-
 When you add automation behavior, extend `launcher/SunRay` rather than adding another shell helper or wrapper.
 
-You can inspect the current Rust command surface with `cargo run --manifest-path launcher/Cargo.toml -- --help` or `npm run sunray -- --help`. The `start-dev` launcher path now runs through `SunRay`; the remaining PowerShell scripts stay temporary legacy paths until their parity slices land.
+You can inspect the current Rust command surface with `cargo run --manifest-path launcher/Cargo.toml -- --help` or `npm run sunray -- --help`.
 
 The current Rust launcher respects `PORT` from your shell session or `.env`. If that port is already taken by another local service, the launcher falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
 
@@ -756,7 +746,7 @@ Common fixes:
 - if LiteLLM reports upstream credential failure, fix the provider key behind LiteLLM or repoint the upstream route to a reachable local model
 - if LiteLLM or Ollama reports different model names than the ones in `.env`, update the configured chat and embedding model vars to match
 - if the GPU-backed Docker path reports a missing local model, pull the required Ollama model and retry the launcher
-- if the launcher reports missing GPU tooling, install or repair the NVIDIA driver stack until `nvidia-smi` works in PowerShell
+- if the launcher reports missing GPU tooling, install or repair the NVIDIA driver stack until `nvidia-smi` works in a normal terminal session
 - if the launcher or runtime reports low disk space, free up space on the drive that contains the app `data/` folder before starting another session
 - if the launcher or runtime reports an unwritable app-data path, fix the folder permissions or move the repo to a writable location before retrying
 - if the launcher or runtime reports an unreadable or corrupted saved-game database, restore the latest copy from `data/backups/` or move the damaged DB out of `data/` before retrying

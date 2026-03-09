@@ -5,7 +5,7 @@ const SUPPORTED_MVP_PATH = {
   provider: "LiteLLM",
   title: "Supported MVP AI path",
   summary: "Use the Windows launcher with Docker Desktop so the app, LiteLLM, and the GPU-backed Ollama route start together.",
-  launcher: "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1",
+  launcher: "cargo run --manifest-path launcher/Cargo.toml -- start-dev",
   services: ["Docker Desktop", "LiteLLM sidecar", "GPU-backed Ollama service"]
 } as const;
 
@@ -36,4 +36,3 @@ export function createSetupStatusPayload(config: AppConfig, preflight: RuntimePr
     }
   };
 }
-

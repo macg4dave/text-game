@@ -4,9 +4,9 @@
 
 ## Current contract
 
-- `SunRay` is the replacement target for the legacy `.ps1` automation surface.
-- `SunRay` must reach parity with each legacy script before that script is deleted.
-- `SunRay` is one binary with parity-focused subcommands, not a pile of wrapper aliases.
+- `SunRay` is the supported automation surface for this repo.
+- `SunRay` is one binary with focused subcommands, not a pile of wrapper aliases.
+- Launcher-owned assets and fixtures should live under `launcher/assets/`.
 - `SunRay` is not a webview shell.
 - `SunRay` is not an installer.
 - `SunRay` is not an updater.
@@ -16,23 +16,24 @@
 
 ## Command map
 
-| Subcommand | Legacy parity target | Backlog slice | Current status |
-| --- | --- | --- | --- |
-| `start-dev` | `scripts/start-dev.ps1` | `T65b` | Implemented in Rust; legacy script deleted |
-| `test-local-ai-workflow` | `scripts/test-local-ai-workflow.ps1` | `T65c` | Implemented in Rust; awaiting manual legacy-script deletion |
-| `test-setup-browser-smoke` | `scripts/test-setup-browser-smoke.ps1` | `T65e` | Implemented in Rust; awaiting manual legacy-script deletion |
-| `validate-local-gpu-profile-matrix` | `scripts/validate-local-gpu-profile-matrix.ps1` | `T65d` | Implemented in Rust; awaiting manual legacy-script deletion |
-| `validate-litellm-default-config` | `scripts/validate-litellm-default-config.ps1` | `T65d` | Implemented in Rust; awaiting manual legacy-script deletion |
-| `start-desktop-prototype` | `scripts/start-desktop-prototype.ps1` | `T65e` | Implemented in Rust; awaiting manual legacy-script deletion |
+| Subcommand | Backlog slice | Current role |
+| --- | --- | --- |
+| `start-dev` | `T65b` | Supported launcher and Docker preflight flow |
+| `test-local-ai-workflow` | `T65c` | Deterministic AI-contract checks plus optional live smoke |
+| `test-setup-browser-smoke` | `T65e` | Targeted setup browser smoke harness |
+| `validate-local-gpu-profile-matrix` | `T65d` | Launcher-owned GPU profile matrix validation |
+| `validate-litellm-default-config` | `T65d` | Default LiteLLM config validation |
+| `start-desktop-prototype` | `T65e` | Electron prototype wrapper |
 
 ## Shared module layout
 
 - `src/lib.rs` - public CLI surface and command-dispatch skeleton
-- `src/config.rs` - command inventory and workspace-root discovery
+- `src/config.rs` - command inventory, workspace-root discovery, and asset-path helpers
 - `src/env.rs` - shared `.env` loading helpers
 - `src/logging.rs` - shared logging bootstrap
 - `src/error.rs` - reusable launcher-facing error types
 - `src/process.rs` - external-process invocation helpers and command rendering
+- `assets/local-gpu-profile-matrix.json` - launcher-owned local GPU selection contract
 
 ## How to inspect the command surface
 
@@ -54,10 +55,3 @@ Or use the repo convenience scripts:
 - `npm run sunray:start-desktop-prototype`
 
 `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype` now run through Rust.
-
-## Migration rule
-
-- Migrate one legacy script at a time.
-- Match behavior in `SunRay` first.
-- Delete the legacy script in the same slice after parity validation.
-- Do not add new `.ps1`, `.sh`, or `.bat` automation.
