@@ -62,11 +62,26 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 
 ## Script Maintainability Policy
 
-- Reusable PowerShell logic belongs under `scripts/lib/`.
-- Entry scripts should orchestrate shared helpers rather than redefine them.
-- Cross-script concerns such as dotenv loading, config precedence, Docker invocation, readiness polling, and common error formatting should have one shared implementation whenever practical.
+- Active migration direction: repo automation is moving into `launcher/` as the Rust executable `SunRay`, rooted at `launcher/Cargo.toml`.
+- New launcher, harness, smoke-test, and validation automation must be implemented in Rust, not in PowerShell, Bash, batch files, or other shell-script entrypoints.
+- Shared automation behavior should live in Rust modules or crates rather than in shell helper libraries.
+- Rust commands may invoke Docker, npm, Node, Electron, or other existing tools, but those dependencies are not part of the script-runtime rewrite unless a backlog item says otherwise.
+- Cross-command concerns such as dotenv loading, config precedence, Docker invocation, readiness polling, and common error formatting should have one shared Rust implementation whenever practical.
 - Script output should stay easy to debug: prefer consistent step logging, clear failure messages, and one canonical place to change shared behavior.
-- Treat mixed orchestration and implementation as a design defect. If an entry script starts owning reusable retry policy, environment resolution, port probing, readiness logic, or other shared behavior, move that logic into `scripts/lib/`.
+- Treat mixed orchestration and implementation as a design defect. If a Rust command starts owning reusable retry policy, environment resolution, port probing, readiness logic, or other shared behavior, move that logic into shared Rust modules instead of another command file.
+- Until `T65` closes, existing `.ps1` files are legacy compatibility surfaces only and must not gain new behavior.
+- Migration rule: for each legacy script, first reach behavior parity in `launcher/SunRay`, then delete that legacy script before the migration slice can be marked complete.
+
+## Launcher Boundary Policy
+
+- `SunRay` is an automation launcher and harness runtime only.
+- `SunRay` is not a webview shell.
+- `SunRay` is not an installer.
+- `SunRay` is not an updater.
+- `SunRay` is not a package manager.
+- `SunRay` is not a replacement for Electron.
+- `SunRay` is not a rewrite of the Node or TypeScript app runtime.
+- `SunRay` may orchestrate the existing browser, Docker, npm, Node, and Electron flows, but it must not absorb their product responsibilities.
 
 ## Responsibility Boundary Policy
 
@@ -141,12 +156,12 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
   - a unit test for pure logic
   - an integration test using fixtures
   - a golden replay fixture
-  - an extension to `scripts/test-local-ai-workflow.ps1` for provider-compatible contract checks
+  - an extension to the Rust local AI workflow harness under `launcher/` for provider-compatible contract checks
 - The preferred loop is: define or tighten the expectation, run it to observe the current failure or gap, make the smallest implementation change, then re-run the focused check plus the relevant broader suite.
 - If fully automated verification is not yet possible, add the smallest deterministic fixture or scripted harness step that proves the contract and record the limitation in [BACKLOG.md](/g:/text-game/BACKLOG.md).
 - AI-related changes are not complete unless the changed behavior is covered by a test, fixture, or scripted harness path that another agent can re-run.
 - Authority-boundary changes are not complete unless the test, fixture, or harness path proves at least one rejected model proposal does not leak into committed state, replay data, or player-facing narrative.
-- Compact-schema changes should keep a rerunnable deterministic guardrail path, such as a focused unit test plus a `scripts/test-local-ai-workflow.ps1 -SelectionOnly` contract check, so request-side schema drift is caught without relying on provider behavior.
+- Compact-schema changes should keep a rerunnable deterministic guardrail path, such as a focused unit test plus the `launcher/SunRay` local AI workflow harness selection-only contract check, so request-side schema drift is caught without relying on provider behavior.
 
 ## Telemetry Contract
 

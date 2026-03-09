@@ -8,8 +8,8 @@ Kickoff-relative timing is used on purpose. "Week 1" means the first week active
 
 - Roadmap baseline date: 2026-03-08
 - Delivery status: pre-MVP
-- Phase status: Phase 0 closed, Phase 1 delivery work is now the active focus
-- Planning status: rebaselined around end-user-first, double-click-friendly delivery, with runtime budget controls scheduled after the current playable-slice work
+- Phase status: Phase 0 closed, and Phase 1 remains the active delivery phase
+- Planning status: rebaselined around end-user-first, double-click-friendly delivery, with `T65` now acting as a cross-cutting `launcher/SunRay` blocker before other Phase 1 backlog execution resumes
 
 ## Primary Product Principle
 
@@ -227,6 +227,7 @@ Exit gate:
 ## Sequencing Rules
 
 - No phase may close with unresolved P1 items assigned to that phase in [BACKLOG.md](/g:/text-game/BACKLOG.md).
+- No non-`T65*` backlog task may start or resume while the `launcher/SunRay` migration remains open in [BACKLOG.md](/g:/text-game/BACKLOG.md).
 - A player path that still requires terminal usage, manual env editing, or hidden service restarts cannot count as end-user ready.
 - Save and load cannot be treated as stable until schema compatibility rules are documented and tested.
 - Packaging work must not force provider-specific gameplay logic into the app runtime.
@@ -245,6 +246,8 @@ Exit gate:
 
 ### Now
 
+- Complete `T65` so every current `scripts/*.ps1` responsibility moves into `launcher/SunRay` before other backlog work resumes.
+- Keep the launcher refactor scoped to automation only: replace shell orchestration, not Docker, Electron, the installer path, or the Node gameplay runtime.
 - Ship the versioned turn pipeline through the supported launched app.
 - Lock the proposal-only authority boundary before more turn, replay, and save work deepens the Phase 1 contract.
 - Lock a compact model schema boundary before turn validation and pipeline work harden a smart-scene contract into the engine surface.
@@ -279,6 +282,7 @@ Exit gate:
 
 | Risk | Owner | Mitigation | Review Trigger |
 | --- | --- | --- | --- |
+| Shell-script automation has become a delivery bottleneck and is now the wrong long-term runtime for launcher, harness, and smoke tooling. | Tech lead | Finish `T65`, move all current `.ps1` responsibilities into `launcher/SunRay`, and block unrelated backlog work until the migration closes. | Any new task proposes adding or extending PowerShell or shell automation instead of the `SunRay` tooling surface |
 | The supported launch path still depends on AI setup that feels like developer work. | Tech lead | Pick one primary MVP AI path, add first-run connection tests, and write recovery steps in player language. | First clean-machine tester fails before reaching the first turn |
 | The Docker-managed LiteLLM default may conflict with packaging assumptions or fail on machines without working Docker or NVIDIA passthrough support. | Release lead | Keep the MVP packaged contract explicit: Docker Desktop plus NVIDIA support are required for AI startup, and GPU prerequisite failures must fall back to plain-language guidance instead of silent startup hangs. | First clean-machine launcher or packaged test fails before LiteLLM becomes ready |
 | The GPU-backed launcher path may choose models that exceed VRAM or perform badly on common cards. | AI systems lead | Define a VRAM-tier profile matrix, add conservative defaults, and let users override the detected profile when needed. | First out-of-memory or unusably slow local-GPU smoke test on a supported tier |
@@ -300,6 +304,7 @@ Exit gate:
 | Decision | Status | Owner | Rationale | Next Review |
 | --- | --- | --- | --- | --- |
 | Node.js + TypeScript app with lightweight browser asset compilation and SQLite | Locked | Tech lead | Keeps local development on direct TypeScript, keeps player-facing runtime paths on compiled server output, and adds compile-time safety without changing the runtime boundary. | After MVP |
+| Repo automation is moving to the `launcher/` Rust executable `SunRay`, and PowerShell or other shell-script orchestration is now legacy only until `T65` closes | Locked | Tech lead | The script surface has outgrown demo-grade shell wrappers; `SunRay` gives one structured implementation language for launcher, harness, smoke, and validation commands without rewriting Docker, Electron, installers, or the app runtime. | When `T65` closes |
 | Internal runtime stays web and HTTP based, but player-facing delivery is Windows-first and double-click oriented | Locked | Tech lead | Preserves one gameplay stack while hiding implementation details from players. | End of Phase 3 |
 | Electron is the Phase 0 packaging spike direction for Windows playtest builds | Locked | Release lead | Fits the current Node plus browser stack, reduces shell complexity versus Tauri, and provides a clearer bridge from launcher to portable build. | Start of T36 |
 | LiteLLM-managed gateway runs as a repo-managed Docker sidecar by default, with the GPU-backed Ollama path as the normal launcher contract and manual larger-model overrides still available behind the same boundary | Locked | AI systems lead | Keeps the player-facing setup centered on one provider-neutral gateway, removes manual proxy startup from the default path, and still allows hosted and local upstreams behind the same boundary. | End of Phase 2 |

@@ -10,13 +10,17 @@ Before starting substantial work, read:
 
 1. [ROADMAP.md](/g:/text-game/ROADMAP.md)
 2. [BACKLOG.md](/g:/text-game/BACKLOG.md)
-3. [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md)
-4. [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md)
-5. [ARCHITECTURE.md](/g:/text-game/ARCHITECTURE.md) if the task affects structure or runtime boundaries
+3. [sunray_backlog.md](/g:/text-game/sunray_backlog.md) if the task touches `launcher/`, `SunRay`, or migration of legacy launcher scripts
+4. [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md)
+5. [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md)
+6. [ARCHITECTURE.md](/g:/text-game/ARCHITECTURE.md) if the task affects structure or runtime boundaries
 
 ## Task Manager Usage
 
 - Treat [BACKLOG.md](/g:/text-game/BACKLOG.md) as the execution source of truth.
+- For any task that touches `launcher/`, `SunRay`, or migration of legacy launcher scripts, treat [sunray_backlog.md](/g:/text-game/sunray_backlog.md) as the execution source of truth instead.
+- For launcher work, keep detailed tasks, handoff notes, validation state, and decomposition in [sunray_backlog.md](/g:/text-game/sunray_backlog.md).
+- Only put launcher-related notes in [BACKLOG.md](/g:/text-game/BACKLOG.md) when the main project backlog needs a blocker, dependency, or high-level coordination marker.
 - Pick work from `## Ready Queue` unless the user explicitly assigns a different task.
 - Claim only one task at a time by changing its status to `In Progress`.
 - Use the matching detailed task card to determine scope, files, validation, and handoff requirements.
@@ -54,6 +58,7 @@ Before starting substantial work, read:
 - If user-visible scope or behavior changes, update [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md).
 - If the delivery plan or sequencing changes, update [ROADMAP.md](/g:/text-game/ROADMAP.md).
 - If task status, validation state, or dependencies change, update [BACKLOG.md](/g:/text-game/BACKLOG.md).
+- If the change is launcher-specific, update [sunray_backlog.md](/g:/text-game/sunray_backlog.md) for all detailed task tracking, and only mirror blocker-level or dependency-level coordination in [BACKLOG.md](/g:/text-game/BACKLOG.md) when the main backlog truly needs it.
 
 ## Validation Rules
 
@@ -98,13 +103,11 @@ Before starting substantial work, read:
 
 ## Script Structure Rules
 
-- Keep entry scripts under `scripts/` small and orchestration-focused.
-- Move reusable PowerShell functions into `scripts/lib/*.ps1` so launcher, harness, and packaging scripts can share one implementation.
-- Do not duplicate dotenv parsing, config lookup, Docker wrappers, port probing, HTTP readiness checks, or shared logging across scripts unless a task explicitly requires a one-off behavior.
-- Prefer one debugging surface per concern: fix the shared helper instead of papering over the same issue in multiple scripts.
-- Treat mixed orchestration and implementation as a split trigger. If a script does more than parse inputs, call shared helpers, wait for readiness, and report status, move the reusable logic into `scripts/lib/`.
-- If a script owns retry policy, environment resolution, port probing, or readiness behavior that another script could reuse, move that behavior into `scripts/lib/` instead of keeping it inline.
-- Keep script entrypoints focused on intent and sequencing. Shared setup, transport, and policy logic should live in helpers that can be tested or reused independently.
+- Launcher automation now belongs under `launcher/` in the Rust executable `SunRay`.
+- If touching launcher work, use [sunray_backlog.md](/g:/text-game/sunray_backlog.md) for detailed planning and keep it updated in the same session.
+- Do not add new PowerShell, Bash, or batch launcher automation.
+- Migrate one legacy launcher script at a time: match behavior in `SunRay`, validate parity, then delete the legacy script.
+- Keep `SunRay` focused on orchestration. It is not a webview shell, installer, updater, package manager, Electron replacement, or app-runtime rewrite.
 
 ## Responsibility Heuristics
 

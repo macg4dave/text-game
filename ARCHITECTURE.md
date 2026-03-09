@@ -156,9 +156,21 @@ Current build/run contract:
 
 ## Script Structure Guidance
 
-- Shared PowerShell behavior should live under `scripts/lib/`.
-- Entry scripts under `scripts/` should stay thin and orchestration-focused.
-- Cross-script concerns such as dotenv parsing, config precedence, Docker helpers, port probing, HTTP readiness checks, and shared error formatting should be centralized when practical to improve debugging.
+- Active migration direction: automation is moving into `launcher/` as the Rust executable `SunRay`, rooted at `launcher/Cargo.toml`.
+- New automation entrypoints should be Rust subcommands, not `.ps1`, `.sh`, or `.bat` files.
+- Shared automation behavior should live in Rust modules inside that tooling runtime, with JSON or fixture assets beside it as needed.
+- Rust automation may invoke Docker, npm, Node, Electron, and other existing tools as external processes, but this does not change the app runtime boundary.
+- Until `T65` closes, existing PowerShell entrypoints are legacy only and should not receive new behavior.
+- Migrate one script at a time: match existing behavior in `SunRay`, then delete the legacy script.
+
+## Launcher Boundary
+
+- `launcher/SunRay` is a process orchestrator for the existing runtime surfaces.
+- `launcher/SunRay` is not a webview shell and must not embed or replace the browser UI.
+- `launcher/SunRay` is not an installer, updater, or package manager.
+- `launcher/SunRay` is not a replacement for Electron packaging.
+- `launcher/SunRay` is not a replacement for the Node server or the TypeScript gameplay stack.
+- If a responsibility would turn `SunRay` into a second app runtime instead of an automation entrypoint, it belongs elsewhere.
 
 ## Packaging Direction
 
@@ -167,8 +179,12 @@ The current packaging spike direction is an Electron shell over the existing com
 Reasoning:
 
 - it preserves one gameplay stack and keeps the browser/server split as an internal detail
-- it can ship the Node-based server with the desktop shell without adding a Rust toolchain
+- it can ship the Node-based server with the desktop shell without moving the app shell into a Rust desktop runtime
 - it is a better near-term fit than Tauri while the app still depends on a local Node server and SQLite runtime
+
+Clarification:
+
+- the repo may adopt a Rust toolchain for automation under `launcher/`; that tooling change does not change the Electron-versus-Tauri packaging decision for the shipped app runtime
 
 Implications for follow-on work:
 

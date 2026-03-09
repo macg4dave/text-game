@@ -148,10 +148,22 @@ Use one of the exact shapes below when adding new work.
 
 ## Ready Queue
 
-This table is the full execution board. Only rows with `Status` = `Ready` are startable without additional backlog work.
+This table is the full execution board. Only rows with `Status` = `Ready` are startable without additional backlog work unless a global blocker note below says otherwise.
+
+Global blocker as of 2026-03-09:
+
+- `T65` blocks all non-`T65*` implementation work. Do not start or resume unrelated backlog items until the Rust script-runtime migration is complete or the backlog is explicitly rebaselined again.
+- `T65` follows a strict parity-and-deletion rule: each legacy script must first reach behavior parity in `launcher/SunRay`, then that legacy script must be deleted before the next migration slice is considered complete.
 
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| T65 | Now | P1 | P1 | Rust script-runtime migration | In Progress | None | Manual planning-doc consistency review + child task validation |
+| T65a | Now | P1 | P1 | SunRay workspace and command contract | Ready | T65 | `cargo check --manifest-path launcher/Cargo.toml` + `cargo test --manifest-path launcher/Cargo.toml` + manual command-surface review |
+| T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Blocked | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
+| T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Blocked | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
+| T65d | Now | P1 | P1 | SunRay validator command migration | Blocked | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
+| T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Blocked | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
+| T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Blocked | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Done | T02 | `docker compose run --rm --no-deps app npm run test:config` + manual Docker Ollama smoke |
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
@@ -203,7 +215,7 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T58c | Later | P2 | P1 | Director framing and beat pacing policy | Blocked | T16, T58b | Schema validation check + integration test + replay fixture execution |
 | T51 | Next | P1 | P1 | Database storage and migration boundary split | Ready | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
 | T52 | Next | P1 | P1 | Validator contract module split | Ready | T06, T12c, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
-| T53 | Next | P1 | P1 | Launcher entrypoint and script library split | In Progress | T02h, T12c | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T53 | Next | P1 | P1 | Launcher entrypoint and script library split | Dropped | T02h, T12c | Superseded by `T65` |
 | T54 | Next | P1 | P2 | Setup view model and recovery policy split | Ready | T11a, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T62 | Next | P2 | P1 | NPC memory significance pipeline | Done | T59, T60 | Manual planning-doc consistency review |
 | T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Ready | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
@@ -3010,7 +3022,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T53 - Launcher Entrypoint And Script Library Split
 
-- Status: In Progress
+- Status: Dropped
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -3041,9 +3053,301 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - the supported launcher path still starts the GPU-backed Docker stack with the same recovery behavior
   - script changes are validated through the real launcher entrypoint, not only by reading helper code
 - Handoff Notes:
+  - dropped on 2026-03-09 because the repo is no longer taking the PowerShell-library-split direction
+  - superseded by `T65`, which replaces the shell-script stack with a Rust automation runtime instead of further investing in `scripts/lib/*.ps1`
   - anti-monolith audit on 2026-03-08 found `scripts/start-dev.ps1` owning console formatting, preflight issue shaping, storage checks, port collision handling, Docker detection, NVIDIA detection, container startup, app readiness, and browser launch
   - the same audit found `scripts/lib/shared.ps1` mixing dotenv parsing, HTTP checks, GPU profile logic, path probes, and repo AI config resolution
   - `T36b` and later packaging work should build on split helpers rather than extending either current script bucket
+
+### T65 - Rust Script-Runtime Migration
+
+- Status: In Progress
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Replace every current PowerShell-owned automation path in `scripts/` with the Rust launcher executable `SunRay` under `launcher/` before other backlog work resumes.
+- Scope:
+  - define `launcher/` as the home of the Rust crate and `SunRay` executable that absorbs the current launcher, harness, smoke-test, validation, and desktop-wrapper responsibilities now implemented as `.ps1`
+  - keep Docker, Electron, Node, npm, and TypeScript validation code as invoked dependencies where appropriate instead of rewriting those runtimes in this issue
+  - migrate one legacy script at a time by first matching behavior in `SunRay` and then deleting that script before the child task can close
+  - retire the PowerShell script-library direction and remove shell-based automation as an accepted execution path for new work
+  - keep the launcher boundary strict so `SunRay` does not drift into a webview shell, installer, package manager, or alternate app runtime
+  - update repo rules, docs, package entrypoints, and launcher-copy references so the Rust tooling contract becomes the only supported direction
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - ENGINEERING_STANDARDS.md
+  - ARCHITECTURE.md
+  - README.md
+  - package.json
+  - launcher/
+  - scripts/
+  - src/server/
+  - src/ui/
+- Do Not Touch:
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+  - packaging/electron/
+  - src/state/
+  - src/story/
+- Dependencies:
+  - None
+- Child Tasks:
+  - T65a
+  - T65b
+  - T65c
+  - T65d
+  - T65e
+  - T65f
+- Validation:
+  - Manual planning-doc consistency review
+  - Child task validation listed on each child card
+- Definition of Done:
+  - the parent issue is decomposed into implementation-ready child tasks
+  - affected planning docs are synchronized for the Rust-only script direction
+  - the parity-then-delete migration rule is explicit in the backlog and supporting rules
+  - non-migration work is explicitly blocked in backlog sequencing until this issue closes
+- Handoff Notes:
+  - user direction on 2026-03-09 is explicit: script automation moves to Rust, not to a better-organized PowerShell library
+  - the Rust executable lives under `launcher/` and is named `SunRay`
+  - scope is limited to what `scripts/` currently does; do not treat this issue as approval to replace Docker, Electron, or the Node app runtime
+  - preserve current launcher and harness behavior where possible, but do not preserve shell syntax or `scripts/lib/*.ps1` as part of the long-term contract
+  - `SunRay` is not a webview shell, not an installer, not a package manager, not a replacement for Electron, and not a rewrite of the app server
+
+### T65a - SunRay Workspace And Command Contract
+
+- Status: Ready
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Establish the `launcher/` Rust crate for the `SunRay` executable with one command surface that maps cleanly to every current PowerShell entrypoint.
+- Scope:
+  - add the Rust crate and dependency structure rooted at `launcher/Cargo.toml`
+  - reserve `launcher/` as the only home for the `SunRay` executable and its shared Rust modules
+  - define subcommands for `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype`
+  - add shared Rust modules for process execution, env loading, logging, error shaping, and reusable config or probe helpers
+  - document the command mapping, parity-then-delete migration rule, and `SunRay` non-goals without claiming the old `.ps1` files are still the desired architecture
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - package.json
+  - launcher/
+  - scripts/
+- Do Not Touch:
+  - src/server/
+  - src/ui/
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+  - packaging/electron/
+- Dependencies:
+  - T65
+- Validation:
+  - `cargo check --manifest-path launcher/Cargo.toml`
+  - `cargo test --manifest-path launcher/Cargo.toml`
+  - Manual review of the Rust command surface and its mapping to the current `.ps1` inventory
+- Definition of Done:
+  - `launcher/` contains the `SunRay` Rust crate with a stable top-level command surface
+  - new automation work no longer requires adding `.ps1`, `.bat`, or `.sh` entrypoints
+  - shared automation logic has one Rust-owned home instead of another shell helper bucket
+  - the repo records what `SunRay` is not before implementation details start sprawling
+- Handoff Notes:
+  - prefer preserving the current command names as Rust subcommands so later doc and UI-copy updates stay mechanical
+  - temporary legacy `.ps1` wrappers may exist during the migration, but no new behavior should be added to them
+
+### T65b - SunRay Launcher And Preflight Parity
+
+- Status: Blocked
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Move the current Windows launcher and its preflight or Docker orchestration behavior into the Rust tooling runtime without changing the supported Docker path itself.
+- Scope:
+  - replace `scripts/start-dev.ps1` behavior in Rust, including dotenv loading, Docker checks, GPU detection, port resolution, app readiness polling, and browser launch
+  - migrate reusable launcher concerns currently spread across `scripts/lib/*.ps1` into focused Rust modules
+  - preserve the current blocker, warning, and info recovery language unless a deliberate launcher-copy update is part of the migration
+  - keep the launcher invoking Docker Compose and the existing app runtime rather than reimplementing container behavior
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - package.json
+  - launcher/
+  - scripts/
+- Do Not Touch:
+  - src/state/
+  - src/story/
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+- Dependencies:
+  - T65a
+- Validation:
+  - `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`
+- Definition of Done:
+  - the supported launcher path runs through `SunRay` instead of PowerShell
+  - launcher preflight, GPU checks, port fallback, and readiness behavior remain available without shell helper files
+  - `scripts/start-dev.ps1` is deleted after parity is validated
+  - no new launcher logic lives in `.ps1`
+- Handoff Notes:
+  - keep the GPU-backed Docker LiteLLM plus Ollama contract intact
+  - do not rewrite Docker configuration as part of this task
+  - `SunRay` is still not a webview shell or alternate runtime host; it only orchestrates the existing app path
+
+### T65c - SunRay Local AI Workflow Harness Migration
+
+- Status: Blocked
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Replace the current local AI workflow PowerShell harness with a Rust command that keeps the same contract checks and provider-facing smoke semantics.
+- Scope:
+  - migrate `scripts/test-local-ai-workflow.ps1` into the Rust tooling crate, including selection-only mode and live-provider checks
+  - keep the compact-schema guardrail path wired into the Rust harness, whether by porting or invoking the existing validation helper behind the Rust command
+  - preserve the current local GPU profile-selection assertions and provider-config resolution behavior
+  - expose a stable Rust command that later AI tasks can use in validation instead of shell syntax
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - package.json
+  - launcher/
+  - scripts/
+- Do Not Touch:
+  - src/state/
+  - src/story/
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+- Dependencies:
+  - T65a
+- Validation:
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - Manual compatible-provider smoke when a local provider is available
+- Definition of Done:
+  - local AI regression checks run through `SunRay` instead of PowerShell
+  - selection-only schema-contract checks remain available for task validations
+  - future AI tasks can reference one Rust harness path without adding shell wrappers
+  - `scripts/test-local-ai-workflow.ps1` is deleted after parity is validated
+- Handoff Notes:
+  - keep the validation contract deterministic first; live provider smoke remains secondary to the focused contract checks
+  - do not silently drop current assertions just because the implementation language changes
+
+### T65d - SunRay Validator Command Migration
+
+- Status: Blocked
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Replace the standalone PowerShell validation commands in `scripts/` with Rust equivalents so config and matrix checks stop depending on shell parsing.
+- Scope:
+  - replace `scripts/validate-local-gpu-profile-matrix.ps1`
+  - replace `scripts/validate-litellm-default-config.ps1`
+  - centralize file-loading, JSON or YAML parsing, and failure-report formatting in the Rust tooling crate
+  - keep the validation coverage aligned with the current matrix and LiteLLM config expectations
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - launcher/
+  - scripts/
+- Do Not Touch:
+  - src/server/
+  - src/ui/
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+- Dependencies:
+  - T65a
+- Validation:
+  - `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix`
+  - `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config`
+- Definition of Done:
+  - both config validators run through `SunRay`
+  - validator output remains clear enough for manual repo consistency work
+  - no validator behavior depends on PowerShell text handling
+  - `scripts/validate-local-gpu-profile-matrix.ps1` and `scripts/validate-litellm-default-config.ps1` are deleted after parity is validated
+- Handoff Notes:
+  - keep validator scope narrow; this task is about parity, not a broader config redesign
+
+### T65e - SunRay Setup Smoke And Desktop Wrapper Migration
+
+- Status: Blocked
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: Release lead
+- Goal: Replace the remaining operational PowerShell wrappers with Rust commands so browser smoke and desktop prototype entrypoints match the new tooling runtime.
+- Scope:
+  - replace `scripts/test-setup-browser-smoke.ps1` with a Rust command that runs the same build, type-check, focused test, and client-build sequence
+  - replace `scripts/start-desktop-prototype.ps1` with a Rust command that starts the existing Electron prototype flow
+  - keep the commands orchestration-focused and let Docker, npm, and Electron remain the underlying executables
+  - align logging and error behavior with the rest of the Rust tooling crate
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - package.json
+  - launcher/
+  - scripts/
+- Do Not Touch:
+  - packaging/electron/
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+  - src/state/
+- Dependencies:
+  - T65a
+  - T65b
+- Validation:
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke`
+  - `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype`
+- Definition of Done:
+  - the remaining script entrypoints no longer depend on PowerShell
+  - smoke and prototype wrappers follow the same Rust logging and process conventions as the launcher
+  - Electron and browser smoke flows remain callable without introducing new shell scripts
+  - `scripts/test-setup-browser-smoke.ps1` and `scripts/start-desktop-prototype.ps1` are deleted after parity is validated
+- Handoff Notes:
+  - do not change Electron packaging direction here; this task only changes the orchestration layer around the existing prototype command
+  - `SunRay` is not replacing Electron and is not becoming a desktop shell
+
+### T65f - Shell Reference Cleanup And Script Deletion
+
+- Status: Blocked
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Remove shell-script references from the supported tooling path once `SunRay` has parity and update repo-visible launcher copy to the new contract.
+- Scope:
+  - update `package.json`, README guidance, backlog validation text used by still-open tasks, and any remaining launcher-copy references in `src/server/` or `src/ui/`
+  - remove obsolete `.ps1` entrypoints and `scripts/lib/*.ps1` after the Rust replacements are validated
+  - update test fixtures that currently assert PowerShell launcher strings so they point at the Rust command surface
+  - leave historical closeout notes intact where they are part of completed-task audit history, but stop using them as active guidance
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - package.json
+  - launcher/
+  - scripts/
+  - src/server/
+  - src/ui/
+- Do Not Touch:
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+  - packaging/electron/
+  - src/state/
+  - src/story/
+- Dependencies:
+  - T65b
+  - T65c
+  - T65d
+  - T65e
+- Validation:
+  - `cargo test --manifest-path launcher/Cargo.toml`
+  - Manual doc, launcher-copy, and recovery-copy consistency review
+- Definition of Done:
+  - supported docs and UI or server launcher references no longer point at PowerShell
+  - obsolete PowerShell files are removed from the active tooling path
+  - package and validation entrypoints reference `SunRay` under `launcher/` instead of shell scripts
+- Handoff Notes:
+  - this is the cleanup gate that actually retires the legacy `.ps1` surface; do not remove those files before parity work is validated
 
 ### T54 - Setup View Model And Recovery Policy Split
 

@@ -10,13 +10,17 @@ Before making substantial changes, read:
 
 1. [ROADMAP.md](/g:/text-game/ROADMAP.md)
 2. [BACKLOG.md](/g:/text-game/BACKLOG.md)
-3. [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md)
-4. [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md)
-5. [ARCHITECTURE.md](/g:/text-game/ARCHITECTURE.md) when the task affects architecture or boundaries
+3. [sunray_backlog.md](/g:/text-game/sunray_backlog.md) if the task touches `launcher/`, `SunRay`, or migration of legacy launcher scripts
+4. [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md)
+5. [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md)
+6. [ARCHITECTURE.md](/g:/text-game/ARCHITECTURE.md) when the task affects architecture or boundaries
 
 ## Task Manager Rules
 
 - Treat [BACKLOG.md](/g:/text-game/BACKLOG.md) as the execution source of truth.
+- For any task that touches `launcher/`, `SunRay`, or migration of legacy launcher scripts, treat [sunray_backlog.md](/g:/text-game/sunray_backlog.md) as the execution source of truth instead.
+- For launcher work, keep detailed tasks, handoff notes, validation state, and decomposition in [sunray_backlog.md](/g:/text-game/sunray_backlog.md).
+- Only put launcher-related notes in [BACKLOG.md](/g:/text-game/BACKLOG.md) when the main project backlog needs a blocker, dependency, or high-level coordination marker.
 - Select work from the `Ready Queue` unless the user explicitly assigns a different task.
 - Claim one task at a time by updating its status to `In Progress`.
 - Use the detailed task card for scope, files to touch, dependencies, validation, and handoff notes.
@@ -45,6 +49,7 @@ Before making substantial changes, read:
 ## Documentation Update Rules
 
 - Update [BACKLOG.md](/g:/text-game/BACKLOG.md) when task state, dependencies, or validation state changes.
+- If the change is launcher-specific, update [sunray_backlog.md](/g:/text-game/sunray_backlog.md) for all detailed task tracking, and only mirror blocker-level or dependency-level coordination in [BACKLOG.md](/g:/text-game/BACKLOG.md) when the main backlog truly needs it.
 - Update [ROADMAP.md](/g:/text-game/ROADMAP.md) when scope, sequencing, or phase definitions change.
 - Update [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md) when user-visible behavior or functional scope changes.
 - Update [README.md](/g:/text-game/README.md) when setup, scripts, or environment variables change.
@@ -81,16 +86,14 @@ Before making substantial changes, read:
 - Put new tests beside the owning module when practical, using `*.test.ts` in the same feature folder.
 - Edit browser source in `src/ui/app.ts`; do not add logic to `public/app.js`, and do not treat `public/app.ts` as an active authoring surface.
 
-## Script Formatting Rules
+## Launcher Rules
 
-- Keep top-level scripts such as files under `scripts/` thin and orchestration-focused.
-- Put reusable PowerShell logic in `scripts/lib/*.ps1` instead of copying functions between entry scripts.
-- Share dotenv loading, config resolution, Docker helpers, port probing, HTTP readiness checks, and common logging or preflight formatting whenever more than one script needs the same behavior.
-- Prefer one canonical helper function for each cross-script concern so debugging happens in one place.
-- When changing shared script behavior, update the helper first and then keep the entry script focused on intent, sequencing, and user-facing messages.
-- Favor structured, plain-language failure output that helps both end users and developers isolate the failing layer quickly.
-- Treat mixed orchestration and implementation as a split trigger. If a script does more than parse inputs, call shared helpers, wait for readiness, and report status, move the reusable logic into `scripts/lib/`.
-- If a script owns retry policy, environment resolution, port probing, or readiness behavior that another script could reuse, move that behavior into `scripts/lib/` instead of keeping it inline.
+- Launcher automation now belongs under `launcher/` in the Rust executable `SunRay`.
+- If touching launcher work, use [sunray_backlog.md](/g:/text-game/sunray_backlog.md) for detailed planning and keep it updated in the same session.
+- Do not add new PowerShell, Bash, or batch launcher automation.
+- Migrate one legacy launcher script at a time: match behavior in `SunRay`, validate parity, then delete the legacy script.
+- Shared launcher automation behavior should live in Rust modules under `launcher/`.
+- Keep `SunRay` focused on orchestration. It is not a webview shell, installer, updater, package manager, Electron replacement, or app-runtime rewrite.
 
 ## Responsibility Heuristics
 

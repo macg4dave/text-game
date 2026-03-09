@@ -68,8 +68,9 @@ If your machine already has a different system Node major installed, the repo wo
 
 Recommended VS Code extensions for this repo:
 
-- PowerShell
+- Rust Analyzer
 - Docker
+- PowerShell only if you need to inspect the legacy script surface during `T65`
 
 The supported validation and runtime path still stays in Docker even if you use the host install for editor support.
 
@@ -144,6 +145,12 @@ On Windows, the launcher wraps the same compiled Docker path and opens the brows
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
+
+Migration note as of 2026-03-09:
+
+- the current `.ps1` launcher and harness commands are legacy entrypoints
+- `T65` is replacing the entire PowerShell automation surface with the Rust executable `SunRay` under `launcher/`
+- do not add new PowerShell, Bash, or batch automation in this repo; extend the planned Rust tooling surface instead
 
 ## Database Reset And Recovery
 
@@ -293,7 +300,7 @@ The launcher:
 
 - checks Docker and Compose
 - confirms Docker is using the Linux container runtime required by the supported path
-- reuses shared PowerShell helper functions from `scripts/lib/shared.ps1` for dotenv parsing and HTTP readiness checks
+- currently relies on legacy PowerShell helper code for dotenv parsing and HTTP readiness checks until `T65` replaces that layer with Rust
 - reads `.env` when present
 - falls back to the GPU-backed LiteLLM defaults when `.env` is missing
 - uses the LiteLLM stack for the supported Docker launcher modes even if an older `.env` still contains a direct-provider experiment
@@ -319,18 +326,36 @@ Useful flags:
 
 ## Script Layout
 
-Script organization is now split between small entry scripts and shared helpers:
+Active migration direction:
+
+- the supported automation target is the Rust executable `SunRay` rooted at `launcher/Cargo.toml`
+- the target `SunRay` command surface mirrors the current legacy entrypoints: `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype`
+- the current `.ps1` files are temporary legacy shims until `T65` lands and should not gain new behavior
+- Docker, npm, Node, and Electron remain the underlying tools; the migration only replaces the shell orchestration layer around them
+- migration rule: each legacy script must first reach parity in `SunRay` and then be deleted before that migration slice is considered done
+
+`SunRay` boundaries:
+
+- not a webview shell
+- not an installer
+- not an updater
+- not a package manager
+- not a replacement for Electron
+- not a rewrite of the app server
+
+Current legacy entrypoints being replaced:
 
 - `scripts/start-dev.ps1` - launcher orchestration
 - `scripts/test-local-ai-workflow.ps1` - local AI contract harness
 - `scripts/test-setup-browser-smoke.ps1` - targeted launch-screen setup smoke harness for blocked and recovered browser states
 - `scripts/start-desktop-prototype.ps1` - Electron prototype wrapper
-- `scripts/lib/shared.ps1` - shared PowerShell helpers for dotenv parsing, config lookup, URI handling, and HTTP readiness checks
-- `scripts/lib/shared.ps1` now also owns the shared AI config-resolution logic used by both the launcher and the local AI harness
+- `scripts/validate-local-gpu-profile-matrix.ps1` - local GPU matrix consistency check
+- `scripts/validate-litellm-default-config.ps1` - default LiteLLM config consistency check
+- `scripts/lib/*.ps1` - shared PowerShell helper surface scheduled for removal
 
-When you add script behavior, prefer extending `scripts/lib/` if another script could reuse the same logic later. This keeps debugging centralized instead of scattering slightly different copies across multiple launchers.
+When you add automation behavior, extend `launcher/SunRay` rather than adding another shell helper or wrapper.
 
-The launcher respects `PORT` from your PowerShell session or `.env`. If that port is already taken by another local service, the launcher now falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
+The current legacy launcher respects `PORT` from your shell session or `.env`. If that port is already taken by another local service, the launcher falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
 
 ## Default LiteLLM Gateway Path
 
@@ -493,11 +518,11 @@ The browser UI includes:
 
 For a Windows-only local model setup, use [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md).
 
-For local AI regression checks, run `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`.
+For local AI regression checks, the current legacy command is `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` until `T65` lands.
 
-For the launch-screen setup smoke harness, run `powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1`.
+For the launch-screen setup smoke harness, the current legacy command is `powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1` until `T65` lands.
 
-For local GPU matrix consistency checks, run `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1`.
+For local GPU matrix consistency checks, the current legacy command is `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1` until `T65` lands.
 
 ## Setup Browser Smoke Harness
 
@@ -656,7 +681,7 @@ Use a test-first loop as the default workflow for prompt, schema, adapter, retri
 
 1. Add or tighten a test, fixture, replay case, or harness assertion that captures the desired behavior.
 2. Run `npm run type-check` and that focused check first so the missing behavior or coverage gap is visible.
-3. Run `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` before changing AI behavior when a compatible local provider is available.
+3. Run the current legacy local AI harness command, `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1`, before changing AI behavior when a compatible local provider is available, and expect this to move to the Rust tooling runtime under `T65`.
 4. Make the smallest change.
 5. Re-run `npm run type-check`, then re-run the focused check, then re-run the same local AI harness immediately after the change.
 6. Only move on to broader app testing after the type-check, focused check, and harness all pass.
