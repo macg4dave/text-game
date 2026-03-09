@@ -2,6 +2,10 @@ import type {
   AssistApiResponse,
   PlayerState,
   RuntimePreflightPayload,
+  SaveSlotActionApiResponse,
+  SaveSlotLoadApiResponse,
+  SaveSlotsApiResponse,
+  SaveSlotSummary,
   SetupStatusPayload,
   StateApiResponse,
   TurnApiResponse
@@ -19,6 +23,8 @@ export interface SessionControllerContext {
   getActiveFatalUiError: () => FatalUiErrorState | null;
   getPlayerNameInput: () => string;
   setPlayerNameInput: (value: string) => void;
+  getSaveSlotLabelInput: () => string;
+  setSaveSlotLabelInput: (value: string) => void;
   getTurnInput: () => string;
   setTurnInput: (value: string) => void;
   rememberPlayerName: () => void;
@@ -42,8 +48,11 @@ export interface SessionControllerContext {
 export function createSessionController(context: SessionControllerContext) {
   return {
     loadSetupStatus,
+    loadSaveSlots,
     ensurePlayer,
     startGameFlow,
+    saveCurrentToSlot,
+    loadSaveSlot,
     requestAssist,
     submitTurn,
     refreshSession,
@@ -76,6 +85,12 @@ export function createSessionController(context: SessionControllerContext) {
     context.render();
   }
 
+  function updateSaveSlotData(data: { slots?: SaveSlotSummary[] } | undefined): void {
+    context.state.saveSlots = Array.isArray(data?.slots) ? data.slots : [];
+    context.state.saveSlotsError = null;
+    context.render();
+  }
+
   async function loadSetupStatus({ force = false } = {}): Promise<void> {
     const suffix = force ? "?refresh=1" : "";
     const result = await context.fetchJson<SetupStatusPayload>(`/api/setup/status${suffix}`);
@@ -86,6 +101,15 @@ export function createSessionController(context: SessionControllerContext) {
     context.state.setupStatus = result.data.setup;
     context.state.setupError = null;
     context.render();
+  }
+
+  async function loadSaveSlots(): Promise<void> {
+    const result = await context.fetchJson<SaveSlotsApiResponse>("/api/save-slots");
+    if (!result.ok || !Array.isArray(result.data?.slots)) {
+      throw new Error(context.formatErrorMessage(result.data, `Save slots request failed (${result.status})`));
+    }
+
+    updateSaveSlotData(result.data);
   }
 
   async function ensurePlayer({ force = false, showStatus = false } = {}): Promise<PlayerState | null> {
@@ -148,6 +172,7 @@ export function createSessionController(context: SessionControllerContext) {
     if (clearSavedPlayerId) {
       context.storage.removeItem("playerId");
       context.state.playerId = "";
+      context.state.currentSaveSlotId = null;
     }
 
     context.state.player = null;
@@ -201,6 +226,112 @@ export function createSessionController(context: SessionControllerContext) {
     } catch (error) {
       context.addEntry("System", error instanceof Error ? error.message : "Session start failed.", "system");
       context.setStatus(mode === "resume" ? "Resume failed" : "Start failed", "error");
+    } finally {
+      context.setPending(false);
+      if (context.state.player && !hasFatalBlocker()) {
+        context.focusInput();
+      }
+    }
+  }
+
+  async function saveCurrentToSlot(slotId?: string): Promise<void> {
+    if (context.state.pending || hasFatalBlocker() || !context.state.hasEnteredFlow) {
+      return;
+    }
+
+    try {
+      context.setPending(true);
+      context.setStatus(slotId ? "Updating save slot" : "Saving game", "working");
+      const player = await ensurePlayer();
+      if (!player) {
+        context.setStatus("Setup required", "error");
+        return;
+      }
+
+      const result = await context.fetchJson<SaveSlotActionApiResponse>("/api/save-slots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playerId: context.state.playerId,
+          slotId,
+          label: context.getSaveSlotLabelInput().trim()
+        })
+      });
+
+      if (!result.ok || !result.data?.slot || !Array.isArray(result.data?.slots)) {
+        throw new Error(context.formatErrorMessage(result.data, `Save request failed (${result.status})`));
+      }
+
+      updateSaveSlotData(result.data);
+      context.state.currentSaveSlotId = result.data.slot.id;
+      if (!slotId) {
+        context.setSaveSlotLabelInput("");
+      }
+      context.addEntry("System", `Saved to \"${result.data.slot.label}\".`, "system");
+      context.setStatus("Game saved", "ok");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Save failed.";
+      context.state.saveSlotsError = message;
+      context.render();
+      context.addEntry("System", message, "system");
+      context.setStatus("Save failed", "error");
+    } finally {
+      context.setPending(false);
+    }
+  }
+
+  async function loadSaveSlot(slotId: string): Promise<void> {
+    if (context.state.pending || hasFatalBlocker()) {
+      return;
+    }
+
+    context.setPending(true);
+    context.setStatus("Loading save", "working");
+
+    try {
+      if (!isSetupReady(context.state)) {
+        await loadSetupStatus({ force: true });
+      }
+
+      if (!isSetupReady(context.state)) {
+        context.setStatus("Setup required", "error");
+        return;
+      }
+
+      const result = await context.fetchJson<SaveSlotLoadApiResponse>("/api/save-slots/load", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slotId })
+      });
+
+      if (!result.ok || !result.data?.slot || !result.data?.player || !Array.isArray(result.data?.slots)) {
+        throw new Error(context.formatErrorMessage(result.data, `Load request failed (${result.status})`));
+      }
+
+      context.state.hasEnteredFlow = true;
+      clearSessionView({ clearSavedPlayerId: true });
+      updateSaveSlotData(result.data);
+      context.state.currentSaveSlotId = result.data.slot.id;
+      context.state.playerId = result.data.player.id;
+      context.state.player = result.data.player;
+      context.storage.setItem("playerId", result.data.player.id);
+      if (!context.getPlayerNameInput().trim()) {
+        context.setPlayerNameInput(result.data.player.name);
+      }
+      context.rememberPlayerName();
+      await ensurePlayer({ force: true });
+      context.addEntry(
+        "Guide",
+        `Loaded \"${result.data.slot.label}\". ${result.data.player.name} is back in ${result.data.player.location}.`,
+        "system"
+      );
+      context.setStatus("Save loaded", "ok");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Load failed.";
+      context.state.saveSlotsError = message;
+      context.render();
+      context.addEntry("System", message, "system");
+      context.setStatus("Load failed", "error");
     } finally {
       context.setPending(false);
       if (context.state.player && !hasFatalBlocker()) {
@@ -349,6 +480,12 @@ export function createSessionController(context: SessionControllerContext) {
     context.setStatus("Checking supported setup", "working");
     try {
       await loadSetupStatus();
+      try {
+        await loadSaveSlots();
+      } catch (error) {
+        context.state.saveSlotsError = error instanceof Error ? error.message : "Save slots unavailable.";
+        context.render();
+      }
       if (isSetupReady(context.state)) {
         context.setStatus(hasSavedSession(context.state) ? "Resume or start new" : "Start a new game", "idle");
       } else {

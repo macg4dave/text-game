@@ -16,6 +16,10 @@ import {
   type QuestUpdate,
   type RuntimePreflightIssue,
   type RuntimePreflightReport,
+  type SaveSlotActionResponsePayload,
+  type SaveSlotLoadResponsePayload,
+  type SaveSlotSummary,
+  type SaveSlotsResponsePayload,
   type SetupStatusPayload,
   type StateResponsePayload,
   type StateUpdates,
@@ -481,6 +485,48 @@ export function validateSetupStatusResponse(payload: unknown): ValidationResult<
   return { ok: errors.length === 0, errors };
 }
 
+export function validateSaveSlotsResponse(payload: unknown): ValidationResult<string> {
+  if (!payload || typeof payload !== "object") {
+    return { ok: false, errors: ["save slots response must be an object."] };
+  }
+
+  const candidate = payload as Partial<SaveSlotsResponsePayload> & Record<string, unknown>;
+  if (!Array.isArray(candidate.slots)) {
+    return { ok: false, errors: ["slots must be an array."] };
+  }
+
+  const errors: string[] = [];
+  candidate.slots.forEach((slot, index) => {
+    errors.push(...validateSaveSlotSummary(slot).map((error) => `slots[${index}].${error}`));
+  });
+
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateSaveSlotActionResponse(payload: unknown): ValidationResult<string> {
+  if (!payload || typeof payload !== "object") {
+    return { ok: false, errors: ["save slot action response must be an object."] };
+  }
+
+  const candidate = payload as Partial<SaveSlotActionResponsePayload> & Record<string, unknown>;
+  const baseValidation = validateSaveSlotsResponse(candidate);
+  const slotErrors = validateSaveSlotSummary(candidate.slot).map((error) => `slot.${error}`);
+  const errors = [...baseValidation.errors, ...slotErrors];
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateSaveSlotLoadResponse(payload: unknown): ValidationResult<string> {
+  if (!payload || typeof payload !== "object") {
+    return { ok: false, errors: ["save slot load response must be an object."] };
+  }
+
+  const candidate = payload as Partial<SaveSlotLoadResponsePayload> & Record<string, unknown>;
+  const baseValidation = validateSaveSlotActionResponse(candidate);
+  const playerValidation = prefixValidationErrors(validateAuthoritativePlayerState(candidate.player), "player.");
+  const errors = [...baseValidation.errors, ...playerValidation.errors];
+  return { ok: errors.length === 0, errors };
+}
+
 export function validateQuestSpec(spec: unknown): ValidationResult<string> {
   const errors: string[] = [];
   if (!spec || typeof spec !== "object") {
@@ -643,6 +689,38 @@ function validateSetupSupportedPath(path: unknown): string[] {
     errors.push("services must be an array.");
   } else if (candidate.services.some((service) => typeof service !== "string")) {
     errors.push("services must contain only strings.");
+  }
+
+  return errors;
+}
+
+function validateSaveSlotSummary(slot: unknown): string[] {
+  if (!slot || typeof slot !== "object") {
+    return ["must be an object."];
+  }
+
+  const candidate = slot as Partial<SaveSlotSummary> & Record<string, unknown>;
+  const errors: string[] = [];
+  ["schema_version", "id", "label", "player_id", "source_schema_version", "saved_at", "updated_at"].forEach((field) => {
+    if (typeof candidate[field] !== "string") {
+      errors.push(`${field} must be a string.`);
+    }
+  });
+
+  if (!(candidate.player_name === null || typeof candidate.player_name === "string")) {
+    errors.push("player_name must be a string or null.");
+  }
+
+  if (!(candidate.location === null || typeof candidate.location === "string")) {
+    errors.push("location must be a string or null.");
+  }
+
+  if (!(candidate.status === "ready" || candidate.status === "corrupted" || candidate.status === "incompatible")) {
+    errors.push("status must be ready, corrupted, or incompatible.");
+  }
+
+  if (!(candidate.detail === null || typeof candidate.detail === "string")) {
+    errors.push("detail must be a string or null.");
   }
 
   return errors;

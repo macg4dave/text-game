@@ -57,6 +57,8 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - NPC memory persistence must be tiered and significance-gated. Stable identity such as names should be cheap to persist, while richer relationship or history recall should require cumulative importance and player re-engagement.
 - NPC memory, world memory, and player journal memory must remain separate stores or classes of recall, and durable canon must be stored as structured facts or summaries rather than as raw dialogue prose.
 - Web UI with text log, turn input, session controls, suggestion chips, and a local debug panel.
+- The main player flow must expose named save slots so players can create, overwrite, inspect, and load checkpoints without browsing files or using a terminal.
+- Save-slot errors must use plain language that distinguishes missing, incompatible, or corrupted saves well enough for non-technical players to recover.
 - The setup flow must offer a small set of safe end-user profiles plus validated advanced overrides for developer-oriented configuration changes.
 - The first-run setup flow must provide a safe connection test for the supported Docker-backed LiteLLM path before the first turn.
 - The default launcher path must use the GPU-backed Docker Ollama service and support VRAM-tier-based model recommendations or manual tier selection when detection is unavailable.
@@ -101,6 +103,9 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 
 - `/api/state` returns or creates a player.
 - `/api/state` returns a `player` envelope containing the versioned authoritative player-state payload when setup is ready.
+- `/api/save-slots` lists named save slots and their plain-language compatibility status.
+- `/api/save-slots` accepts save requests for the current authoritative player state and can overwrite an existing slot when requested.
+- `/api/save-slots/load` loads a named slot into a fresh live session instead of mutating the stored checkpoint in place.
 - `/api/turn` accepts a versioned turn-input payload, runs a story turn, and returns the versioned turn-output payload plus the versioned authoritative player state.
 - `/api/turn` must preserve the authority boundary: model-proposed consequences must remain distinguishable from committed truth, and player-facing narrative must not claim quest, world, or memory changes the server did not accept.
 - Replay fidelity must come from committed event semantics and authoritative state transitions; preserving exact narrator prose is secondary to preserving deterministic outcomes.

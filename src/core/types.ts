@@ -18,6 +18,7 @@ export const TURN_INPUT_SCHEMA_VERSION = "turn-input/v1";
 export const TURN_OUTPUT_SCHEMA_VERSION = "turn-output/v1";
 export const AUTHORITATIVE_STATE_SCHEMA_VERSION = "authoritative-state/v1";
 export const COMMITTED_EVENT_SCHEMA_VERSION = "committed-event/v1";
+export const SAVE_SLOT_SCHEMA_VERSION = "save-slot/v1";
 export const DEFAULT_RULESET_VERSION = "story-rules/v1";
 
 export interface TurnInputPayload {
@@ -317,6 +318,35 @@ export interface TurnResponsePayload extends TurnOutputPayload {
   player: AuthoritativePlayerState;
 }
 
+export type SaveSlotStatus = "ready" | "corrupted" | "incompatible";
+
+export interface SaveSlotSummary {
+  schema_version: typeof SAVE_SLOT_SCHEMA_VERSION;
+  id: string;
+  label: string;
+  player_id: string;
+  player_name: string | null;
+  location: string | null;
+  source_schema_version: string;
+  saved_at: string;
+  updated_at: string;
+  status: SaveSlotStatus;
+  detail: string | null;
+}
+
+export interface SaveSlotsResponsePayload {
+  slots: SaveSlotSummary[];
+}
+
+export interface SaveSlotActionResponsePayload extends SaveSlotsResponsePayload {
+  slot: SaveSlotSummary;
+}
+
+export interface SaveSlotLoadResponsePayload extends SaveSlotsResponsePayload {
+  slot: SaveSlotSummary;
+  player: AuthoritativePlayerState;
+}
+
 export type CanonicalEventKind = "turn-resolution" | "player-created";
 export type CanonicalOutcomeStatus = "accepted" | "rejected";
 
@@ -410,6 +440,15 @@ export interface PlayerRow {
   inventory: string;
   flags: string;
   quests: string;
+}
+
+export interface SaveSlotRow {
+  id: string;
+  label: string;
+  player_id: string;
+  source_schema_version: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface EventRow {

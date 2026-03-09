@@ -374,6 +374,134 @@ button {
   padding: 16px;
 }
 
+.save-slots-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.save-slots-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.save-slots-header h3,
+.save-slots-header p {
+  margin: 0;
+}
+
+.save-slots-create-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.save-slot-label-field {
+  min-width: min(280px, 100%);
+}
+
+.save-slot-label-field input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(78, 58, 40, 0.16);
+  background: rgba(255, 255, 255, 0.88);
+  padding: 12px 14px;
+}
+
+.save-slots-create-row button {
+  min-width: 180px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent) 0%, #e29d57 100%);
+  color: #231104;
+  font-weight: 800;
+  box-shadow: 0 16px 28px rgba(201, 109, 50, 0.18);
+}
+
+.save-slot-error {
+  margin: 0;
+  color: var(--error);
+  font-weight: 700;
+}
+
+.save-slots-list {
+  display: grid;
+  gap: 12px;
+}
+
+.save-slot-empty,
+.save-slot-meta,
+.save-slot-detail,
+.save-slot-current {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.save-slot-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(78, 58, 40, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.save-slot-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.save-slot-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.save-slot-status[data-status="ready"] {
+  color: var(--ok);
+  border-color: rgba(31, 122, 71, 0.2);
+}
+
+.save-slot-status[data-status="corrupted"] {
+  color: var(--error);
+  border-color: rgba(163, 49, 43, 0.22);
+}
+
+.save-slot-status[data-status="incompatible"] {
+  color: var(--warn);
+  border-color: rgba(155, 93, 8, 0.24);
+}
+
+.save-slot-current {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.save-slot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.save-slot-actions button {
+  padding: 9px 14px;
+}
+
 .fatal-error-panel {
   margin-bottom: 18px;
   border-color: rgba(163, 49, 43, 0.24);
@@ -700,6 +828,20 @@ button {
   }
 
   .launch-actions button {
+    width: 100%;
+  }
+
+  .save-slots-create-row {
+    width: 100%;
+  }
+
+  .save-slot-label-field {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .save-slots-create-row button,
+  .save-slot-actions button {
     width: 100%;
   }
 

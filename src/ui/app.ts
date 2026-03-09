@@ -12,6 +12,7 @@ import { fetchJson, formatErrorMessage } from "./http-client.js";
 import { renderLaunchPanel as renderLaunchView } from "./launch-view.js";
 import { getStoredPlayerName, rememberPlayerName as persistPlayerName } from "./player-name.js";
 import { runRecoveryAction } from "./recovery-actions.js";
+import { renderSaveSlotsPanel as renderSaveSlotsView } from "./save-slots-view.js";
 import {
   getRuntimeConfigDiagnostics as selectRuntimeConfigDiagnostics,
   getRuntimeLocalGpuSelection as selectRuntimeLocalGpuSelection,
@@ -67,6 +68,12 @@ function initializeApp(): void {
   const launchResumeButtonEl = getElement<HTMLButtonElement>("launch-resume");
   const launchResumeNoteEl = getElement<HTMLElement>("launch-resume-note");
   const actionFieldEl = getElement<HTMLElement>("action-field");
+  const saveSlotsPanelEl = getElement<HTMLElement>("save-slots-panel");
+  const saveSlotsSummaryEl = getElement<HTMLElement>("save-slots-summary");
+  const saveSlotsErrorEl = getElement<HTMLElement>("save-slots-error");
+  const saveSlotsListEl = getElement<HTMLElement>("save-slots-list");
+  const saveSlotLabelEl = getElement<HTMLInputElement>("save-slot-label");
+  const saveSlotCreateButtonEl = getElement<HTMLButtonElement>("save-slot-create");
   const setupTitleEl = getElement<HTMLElement>("setup-title");
   const setupSummaryEl = getElement<HTMLElement>("setup-summary");
   const setupCheckButtonEl = getElement<HTMLButtonElement>("setup-check-button");
@@ -171,6 +178,29 @@ function initializeApp(): void {
     optionsEl.hidden = !showPlaySurface;
   }
 
+  function renderSaveSlots(): void {
+    renderSaveSlotsView(
+      {
+        panelEl: saveSlotsPanelEl,
+        summaryEl: saveSlotsSummaryEl,
+        errorEl: saveSlotsErrorEl,
+        listEl: saveSlotsListEl,
+        labelInputEl: saveSlotLabelEl,
+        createButtonEl: saveSlotCreateButtonEl
+      },
+      {
+        slots: state.saveSlots,
+        saveSlotsError: state.saveSlotsError,
+        setupStatus: state.setupStatus,
+        pending: state.pending,
+        fatalBlocked: Boolean(state.fatalError || activeFatalUiError),
+        hasEnteredFlow: state.hasEnteredFlow,
+        hasCurrentPlayer: Boolean(state.player),
+        currentSaveSlotId: state.currentSaveSlotId
+      }
+    );
+  }
+
   const sessionController = createSessionController({
     state,
     storage: localStorage,
@@ -178,6 +208,10 @@ function initializeApp(): void {
     getPlayerNameInput: () => nameEl.value,
     setPlayerNameInput(value) {
       nameEl.value = value;
+    },
+    getSaveSlotLabelInput: () => saveSlotLabelEl.value,
+    setSaveSlotLabelInput(value) {
+      saveSlotLabelEl.value = value;
     },
     getTurnInput: () => inputEl.value,
     setTurnInput(value) {
@@ -323,6 +357,7 @@ function initializeApp(): void {
     renderLaunchPanel();
     renderSetupWizard();
     renderPlaySurface();
+    renderSaveSlots();
     renderSessionSummary();
     renderPreflightPanel();
     renderDebugPanels();
@@ -421,6 +456,44 @@ function initializeApp(): void {
     });
   });
 
+  saveSlotCreateButtonEl.addEventListener("click", () => {
+    sessionController.saveCurrentToSlot().catch((error) => {
+      addEntry("System", error instanceof Error ? error.message : "Failed to save the current game.", "system");
+      setStatus("Save failed", "error");
+      setPending(false);
+    });
+  });
+
+  saveSlotsListEl.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    const slotId = target.dataset.saveSlotId;
+    const action = target.dataset.saveSlotAction;
+    if (!slotId || !action) {
+      return;
+    }
+
+    if (action === "load") {
+      sessionController.loadSaveSlot(slotId).catch((error) => {
+        addEntry("System", error instanceof Error ? error.message : "Failed to load the selected save.", "system");
+        setStatus("Load failed", "error");
+        setPending(false);
+      });
+      return;
+    }
+
+    if (action === "overwrite") {
+      sessionController.saveCurrentToSlot(slotId).catch((error) => {
+        addEntry("System", error instanceof Error ? error.message : "Failed to overwrite the selected save.", "system");
+        setStatus("Save failed", "error");
+        setPending(false);
+      });
+    }
+  });
+
   refreshSessionButtonEl.addEventListener("click", async () => {
     await sessionController.refreshSession();
   });
@@ -514,7 +587,17 @@ function renderAppFatalError(state: FatalUiErrorState): void {
 }
 
 function disableInteractiveControls(): void {
-  const ids = ["player-name", "player-input", "send-button", "refresh-session", "new-session", "launch-new-game", "launch-resume"];
+  const ids = [
+    "player-name",
+    "player-input",
+    "send-button",
+    "refresh-session",
+    "new-session",
+    "launch-new-game",
+    "launch-resume",
+    "save-slot-label",
+    "save-slot-create"
+  ];
 
   ids.forEach((id) => {
     const element = document.getElementById(id);
@@ -528,6 +611,12 @@ function disableInteractiveControls(): void {
   });
 
   Array.from(document.querySelectorAll("#options button")).forEach((button) => {
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = true;
+    }
+  });
+
+  Array.from(document.querySelectorAll("#save-slots-list button")).forEach((button) => {
     if (button instanceof HTMLButtonElement) {
       button.disabled = true;
     }

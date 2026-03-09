@@ -162,7 +162,7 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T07 | Next | P1 | P1 | Turn handler and model orchestration | Done | T06, T57a, T58a | `npm test` |
 | T07a | Next | P1 | P1 | LiteLLM default chat route for turn generation | Ready | T02f, T07 | Manual turn submission against LiteLLM |
 | T08 | Next | P1 | P1 | Deterministic state reducer | Done | T06, T57a, T58a | `npm test` |
-| T09 | Next | P1 | P1 | Event log persistence and replay | Ready | T04, T08, T57b, T59a | Replay fixture execution |
+| T09 | Next | P1 | P1 | Event log persistence and replay | Done | T04, T08, T57b, T59a | Replay fixture execution |
 | T10 | Next | P1 | P1 | Output validator and sanitizer | Done | T06, T57a, T61a | `npm test` |
 | T11 | Next | P1 | P1 | Minimal player UI loop | Done | T06 | `docker compose run --rm --no-deps app npm test` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + manual browser smoke test |
 | T11a | Now | P1 | P2 | Browser UI module decomposition groundwork | Done | T11, T12b | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/global-error.test.ts src/ui/http-client.test.ts src/ui/player-name.test.ts src/ui/session-data.test.ts src/ui/setup-view.test.ts src/ui/debug-view.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
@@ -180,7 +180,7 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T59a | Now | P1 | P1 | Canonical event schema and replay contract | Done | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/server/http-contract.test.ts src/rules/validator.test.ts` |
 | T60 | Next | P1 | P1 | Memory classes and authority policy | Done | T06, T57, T59 | Manual planning-doc consistency review |
 | T60a | Next | P1 | P1 | Memory class contract and admission rules | Done | T57a, T59a, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T60b | Later | P2 | P1 | Class-aware retrieval and summarization policy | Ready | T60a, T13, T62b, T63a | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
+| T60b | Later | P2 | P1 | Class-aware retrieval and summarization policy | Blocked | T60a, T13, T62b, T63a | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
 | T61 | Now | P1 | P1 | Compact turn schema boundary | Done | T06, T57 | Manual planning-doc consistency review |
 | T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Done | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Done | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
@@ -189,18 +189,18 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T11b | Next | P1 | P2 | Turn surface renderer extraction | Done | T11a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T12d | Next | P1 | P2 | First-run setup browser smoke harness | Done | T12b | Browser setup smoke path |
 | T12c | Next | P1 | P1 | Guided recovery actions and advanced setup details | Done | T12b, T01c, T02i, T04a, T02j | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/setup-status.test.ts src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
-| T29 | Next | P1 | P1 | Save slots UI | Ready | T08, T09 | Manual save/load check |
-| T34 | Next | P1 | P1 | Tutorial and first-run guidance | Ready | T11, T12 | Manual onboarding smoke test |
+| T29 | Next | P1 | P1 | Save slots UI | Done | T08, T09 | Manual save/load check |
+| T34 | Next | P1 | P1 | Tutorial and first-run guidance | Blocked | T11, T12 | Manual onboarding smoke test |
 | T64 | Now | P1 | P1 | MVP sample story arc definition and delivery slices | Done | None | Manual planning-doc consistency review |
 | T64a | Now | P1 | P1 | story_sample brief and acceptance criteria | Done | None | Manual planning-doc consistency review |
-| T64b | Next | P1 | P1 | story_sample authored content slice | Ready | T34, T57c | Manual story-arc smoke test |
-| T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Ready | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
+| T64b | Next | P1 | P1 | story_sample authored content slice | Blocked | T34, T57c | Manual story-arc smoke test |
+| T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Blocked | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
 | T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Done | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Done | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Done | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T59c | Next | P1 | P1 | Canonical player-creation replay bootstrap | Done | T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T58b | Later | P2 | P1 | Simulation-first consequence resolution | Ready | T58a, T57b, T07, T08 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
-| T58c | Later | P2 | P1 | Director framing and beat pacing policy | Ready | T16, T58b | Schema validation check + integration test + replay fixture execution |
+| T58c | Later | P2 | P1 | Director framing and beat pacing policy | Blocked | T16, T58b | Schema validation check + integration test + replay fixture execution |
 | T51 | Next | P1 | P1 | Database storage and migration boundary split | Ready | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
 | T52 | Next | P1 | P1 | Validator contract module split | Ready | T06, T12c, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T53 | Next | P1 | P1 | Launcher entrypoint and script library split | Ready | T02h, T12c | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
@@ -208,46 +208,46 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T62 | Next | P2 | P1 | NPC memory significance pipeline | Done | T59, T60 | Manual planning-doc consistency review |
 | T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Ready | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T63 | Next | P2 | P1 | Memory storage hierarchy and context-budget policy | Done | T59, T60, T61, T62 | Manual planning-doc consistency review |
-| T63a | Next | P2 | P1 | Live context hierarchy and retrieval budget contract | Ready | T60a, T61a, T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T63b | Next | P2 | P1 | Summary compression and versioned memory artifacts | Ready | T63a, T59b, T62b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
-| T63c | Next | P2 | P1 | Memory context observability and replay tooling | Ready | T63a, T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T63a | Next | P2 | P1 | Live context hierarchy and retrieval budget contract | Blocked | T60a, T61a, T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T63b | Next | P2 | P1 | Summary compression and versioned memory artifacts | Blocked | T63a, T59b, T62b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
+| T63c | Next | P2 | P1 | Memory context observability and replay tooling | Blocked | T63a, T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
-| T13 | Later | P2 | P1 | Embeddings pipeline | Ready | T07a, T60a, T62b | Manual embedding call verification |
+| T13 | Later | P2 | P1 | Embeddings pipeline | Blocked | T07a, T60a, T62b | Manual embedding call verification |
 | T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Ready | T02f | Manual embedding route verification |
-| T47 | Later | P2 | P1 | LiteLLM default route integration fixtures | Ready | T07a, T13a | LiteLLM route fixture run |
+| T47 | Later | P2 | P1 | LiteLLM default route integration fixtures | Blocked | T07a, T13a | LiteLLM route fixture run |
 | T55 | Later | P2 | P2 | Config env resolution and diagnostics split | Ready | T02h | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/core/config.test.ts` |
-| T14 | Later | P2 | P1 | Retrieval and top-k ranking | Ready | T13, T13a, T60b, T62c | Retrieval fixture check |
-| T15 | Later | P2 | P1 | Memory summarizer job | Ready | T09, T60b, T62c, T63b | `npm test` |
-| T62b | Later | P2 | P1 | NPC importance tiers and long-lived memory admission | Ready | T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
-| T62c | Later | P2 | P1 | Partitioned retrieval for NPC, world, journal, and scene context | Ready | T62b, T60b, T13 | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
+| T14 | Later | P2 | P1 | Retrieval and top-k ranking | Blocked | T13, T13a, T60b, T62c | Retrieval fixture check |
+| T15 | Later | P2 | P1 | Memory summarizer job | Blocked | T09, T60b, T62c, T63b | `npm test` |
+| T62b | Later | P2 | P1 | NPC importance tiers and long-lived memory admission | Blocked | T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
+| T62c | Later | P2 | P1 | Partitioned retrieval for NPC, world, journal, and scene context | Blocked | T62b, T60b, T13 | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
 | T16 | Later | P2 | P1 | Director spec format and versioning | Ready | T06, T58a | Schema validation check |
-| T17 | Later | P2 | P1 | Director enforcement in turn pipeline | Ready | T16, T58b | Integration test |
-| T18 | Later | P2 | P2 | Director reload endpoint | Ready | T16 | Manual reload verification |
-| T43 | Later | P2 | P1 | Budget config file and API contract | Ready | D01, T07a, T09, T13a, T63a | `npm test` + manual budget API round-trip |
-| T44 | Later | P2 | P2 | Budget controls UI | Ready | T11, T43 | Manual budget UI round-trip |
+| T17 | Later | P2 | P1 | Director enforcement in turn pipeline | Blocked | T16, T58b | Integration test |
+| T18 | Later | P2 | P2 | Director reload endpoint | Blocked | T16 | Manual reload verification |
+| T43 | Later | P2 | P1 | Budget config file and API contract | Blocked | D01, T07a, T09, T13a, T63a | `npm test` + manual budget API round-trip |
+| T44 | Later | P2 | P2 | Budget controls UI | Blocked | T11, T43 | Manual budget UI round-trip |
 | T46 | Later | P2 | P1 | Save schema compatibility rules and migration fixture | Ready | T06, T09, T29, T59b | Save migration fixture run |
 | T30 | Later | P2 | P2 | Save import and export | Ready | T29 | Import/export compatibility check |
 | T31 | Later | P3 | P2 | Optional save encryption | Ready | T29 | Encryption or decryption smoke test |
-| T32 | Later | P3 | P1 | Accessibility pass | Ready | T11, T34 | Accessibility checklist |
+| T32 | Later | P3 | P1 | Accessibility pass | Blocked | T11, T34 | Accessibility checklist |
 | T33 | Later | P3 | P2 | Theme and typography pass | Ready | T11 | Manual readability review |
 | T36b | Later | P3 | P1 | Packaged AI prerequisite detection and repair flow | Ready | T12c, T35a | Packaged prerequisite smoke test |
-| T36 | Later | P3 | P1 | Windows playtest build | Ready | T35a, T12c, T29, T36b | Build or install verification |
-| T38 | Later | P3 | P1 | Installer packaging | Ready | T36 | Installer smoke test |
-| T19 | Later | P4 | P1 | Quest schema and validation | Ready | T16 | Schema validation check |
-| T20 | Later | P4 | P1 | Quest state transitions | Ready | T19, T58b | `npm test` |
-| T21 | Later | P4 | P2 | Quest editor UI | Ready | T19 | Manual editor smoke test |
-| T22 | Later | P4 | P2 | World state inspector UI | Ready | T20 | Manual diff view check |
-| T23 | Later | P4 | P2 | Quest import and export | Ready | T19 | Import or export smoke test |
+| T36 | Later | P3 | P1 | Windows playtest build | Blocked | T35a, T12c, T29, T36b | Build or install verification |
+| T38 | Later | P3 | P1 | Installer packaging | Blocked | T36 | Installer smoke test |
+| T19 | Later | P4 | P1 | Quest schema and validation | Blocked | T16 | Schema validation check |
+| T20 | Later | P4 | P1 | Quest state transitions | Blocked | T19, T58b | `npm test` |
+| T21 | Later | P4 | P2 | Quest editor UI | Blocked | T19 | Manual editor smoke test |
+| T22 | Later | P4 | P2 | World state inspector UI | Blocked | T20 | Manual diff view check |
+| T23 | Later | P4 | P2 | Quest import and export | Blocked | T19 | Import or export smoke test |
 | T24 | Later | P4 | P1 | Core pipeline tests | Ready | T07, T08, T10, T59b | CI-equivalent test run |
 | T25 | Later | P4 | P1 | Fuzz tests for validator | Ready | T10 | Fuzz test run |
-| T26 | Later | P4 | P1 | Telemetry for tokens, latency, and cost | Ready | T07, T63c | Manual telemetry verification |
-| T45 | Later | P4 | P1 | Budget fixture enforcement and breach reporting | Ready | T09, T24, T26, T43, T59b | Fixture budget suite run |
+| T26 | Later | P4 | P1 | Telemetry for tokens, latency, and cost | Blocked | T07, T63c | Manual telemetry verification |
+| T45 | Later | P4 | P1 | Budget fixture enforcement and breach reporting | Blocked | T09, T24, T26, T43, T59b | Fixture budget suite run |
 | T27 | Later | P4 | P2 | Audit log export | Ready | T09 | Export smoke test |
 | T28 | Later | P4 | P2 | Model failure fallback | Ready | T07, T10 | Timeout or failure simulation |
 | T36a | Later | P5 | P2 | macOS feasibility check | Ready | T35 | Feasibility note |
-| T37 | Later | P5 | P2 | Auto-update channel | Ready | T38 | Update flow verification |
+| T37 | Later | P5 | P2 | Auto-update channel | Blocked | T38 | Update flow verification |
 | T39 | Later | P5 | P3 | Linux build | Ready | T35 | Build verification if supported |
-| T40 | Later | P5 | P1 | Release checklist | Ready | T36, T38 | Checklist walkthrough |
+| T40 | Later | P5 | P1 | Release checklist | Blocked | T36, T38 | Checklist walkthrough |
 
 ## Active Task Protocol
 
@@ -635,7 +635,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T64b - story_sample Authored Content Slice
 
-- Status: Ready
+- Status: Blocked
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -667,10 +667,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - keep the slice narrow; this task is not the general quest-authoring system
   - coordinate with `T64c` so the authored branch coverage is stable enough for a golden walkthrough fixture
+  - blocked on 2026-03-09 because `T34` is blocked pending completion of onboarding validation in `T12`
 
 ### T64c - Baseline Story Arc Walkthrough And Golden Replay Fixture
 
-- Status: Ready
+- Status: Blocked
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -703,6 +704,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - keep the fixture grounded in committed semantics; exact prose may vary as long as the accepted outcome is stable
   - prefer one canonical success path first; broader branch coverage can come later once the baseline replay target is stable
+  - blocked on 2026-03-09 because `T64b` cannot start until `T34` is unblocked and the authored content slice exists
 
 ### T58 - Player Agency And Pacing Boundary
 
@@ -844,7 +846,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T58c - Director Framing And Beat Pacing Policy
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -1164,7 +1166,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T60b - Class-Aware Retrieval And Summarization Policy
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -1205,6 +1207,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - coordinate with budget work so any class-aware retrieval expansion is measurable rather than hand-waved
   - incorporate NPC-tier and partitioned-memory policy from `T62` so retrieval does not flatten transcript, NPC memory, world memory, player journal memory, and scene context into one ranking pool
   - align this policy with `T63a` so live context stays a small budgeted slice instead of becoming a second full-history prompt
+  - blocked on 2026-03-09 because `T13`, `T62b`, and `T63a` are not ready, so class-aware retrieval would be built on unstable memory and context dependencies
 
 ### T61 - Compact Turn Schema Boundary
 
@@ -1434,7 +1437,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T62b - NPC Importance Tiers And Long-Lived Memory Admission
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -1480,7 +1483,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T62c - Partitioned Retrieval For NPC, World, Journal, And Scene Context
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -1570,7 +1573,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T63a - Live Context Hierarchy And Retrieval Budget Contract
 
-- Status: Ready
+- Status: Blocked
 - Queue: Next
 - Phase: P2
 - Priority: P1
@@ -1613,7 +1616,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T63b - Summary Compression And Versioned Memory Artifacts
 
-- Status: Ready
+- Status: Blocked
 - Queue: Next
 - Phase: P2
 - Priority: P1
@@ -1657,7 +1660,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T63c - Memory Context Observability And Replay Tooling
 
-- Status: Ready
+- Status: Blocked
 - Queue: Next
 - Phase: P2
 - Priority: P1
@@ -1908,9 +1911,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - src/server/index.ts
 - Do Not Touch:
   - data/spec/
-  - src/ai.ts
-  - src/assist.ts
-  - src/db.ts
+  - src/ai/service.ts
+  - src/utils/assist.ts
+  - src/core/db.ts
 - Dependencies:
   - T06
 - Validation:
@@ -2217,7 +2220,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T29 - Save Slots UI
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -2232,17 +2235,21 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - README.md
   - REQUIREMENTS.md
   - public/index.html
-  - public/app.ts
+  - src/ui/
   - public/styles.css
-  - src/db.ts
-  - src/server.ts
+  - src/core/
+  - src/state/
+  - src/server/
+  - src/rules/
 - Do Not Touch:
   - data/spec/
-  - src/ai.ts
+  - src/ai/
 - Dependencies:
   - T08
   - T09
 - Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - targeted save-slot tests
   - manual save or load check
 - Definition of Done:
   - save slots are accessible from the main UI
@@ -2250,10 +2257,13 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - the supported player path can save and resume without manual file handling
 - Handoff Notes:
   - keep slot naming and recovery wording plain because packaged builds will amplify confusion here
+  - completed on 2026-03-09 with `/api/save-slots` list/save/load handlers, snapshot cloning in `src/state/save-slots.ts`, and a dedicated save-slot panel in the main UI
+  - validation run: `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/save-slots.test.ts src/server/save-slots-route.test.ts src/ui/save-slots-view.test.ts src/ui/session-controller.test.ts`, `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts`
+  - manual smoke on 2026-03-09 saved and loaded a named slot through the running compiled app container, confirming slot creation and fresh-session load cloning
 
 ### T34 - Tutorial And First-Run Guidance
 
-- Status: Ready
+- Status: Blocked
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -2267,12 +2277,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - BACKLOG.md
   - REQUIREMENTS.md
   - public/index.html
-  - public/app.ts
+  - src/ui/app.ts
   - public/styles.css
 - Do Not Touch:
   - data/spec/
-  - src/ai.ts
-  - src/db.ts
+  - src/ai/service.ts
+  - src/core/db.ts
 - Dependencies:
   - T11
   - T12
@@ -2284,6 +2294,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - tutorial and recovery guidance do not hide save or repair actions
 - Handoff Notes:
   - keep this focused on clarity, not lore dumping
+  - blocked on 2026-03-09 because `T12` is still in `Review`, so the onboarding surface is not fully validated as a stable base for tutorial follow-up work
+  - task card path updated on 2026-03-09 to use the current browser authoring surface `src/ui/app.ts` instead of the legacy `public/app.ts` note
 
 ### T02c - Windows Local AI Smoke-Test Path
 
@@ -2303,13 +2315,13 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - README.md
   - REQUIREMENTS.md
   - .env.example
-  - src/config.ts
+  - src/core/config.ts
   - setup_local_a.i.md
   - src/core/config.test.ts
 - Do Not Touch:
   - public/
   - data/spec/
-  - src/server.ts (legacy path note; do not add new server logic outside `src/server/index.ts`)
+  - src/server/index.ts
 - Dependencies:
   - T02
 - Validation:
@@ -2352,8 +2364,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Do Not Touch:
   - public/
   - data/spec/
-  - src/server.ts
-  - src/ai.ts
+  - src/server/index.ts
+  - src/ai/service.ts
 - Dependencies:
   - T02c
 - Validation:
@@ -2403,7 +2415,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T43 - Budget Config File And API Contract
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -2451,7 +2463,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T47 - LiteLLM Default Route Integration Fixtures
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -2489,7 +2501,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T44 - Budget Controls UI
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P2
@@ -2570,7 +2582,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T45 - Budget Fixture Enforcement And Breach Reporting
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P4
 - Priority: P1
@@ -2647,7 +2659,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T26 - Telemetry For Tokens, Latency, And Cost
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P4
 - Priority: P1
@@ -2722,7 +2734,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T36 - Windows Playtest Build
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P3
 - Priority: P1
@@ -2757,10 +2769,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - keep this task focused on the playable Windows build and clean-machine validation, not on repackaging the AI gateway
   - prerequisite and repair messaging for Docker and LiteLLM belongs in `T36b`
+  - blocked on 2026-03-09 because `T36b` remains unfinished
 
 ### T38 - Installer Packaging
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P3
 - Priority: P1
@@ -3217,7 +3230,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T09 - Event Log Persistence And Replay
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -3251,6 +3264,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - keep `T59a` and `T59b` as the contract-setting slices so this task focuses on the runtime persistence and replay path
+  - completed on 2026-03-09 as a backlog closeout after confirming the runtime work already landed through `T59a`, `T59b`, `T59c`, `T57b`, and `T57c`
+  - canonical turn and player-created events now persist through `src/state/game.ts` into the `committed_events` table introduced in `src/core/db.ts`, while transcript rows remain supplementary in the legacy `events` table for UX and short-history needs
+  - deterministic replay is implemented in `src/state/replay.ts` and reconstructs authoritative player state from committed semantic events without rerunning model generation or depending on exact narrator prose
+  - the rerunnable replay validation path is `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts`, with additional regression coverage in `src/state/replay.test.ts`
+  - validation on 2026-03-09 confirmed `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts` passes alongside `docker compose run --rm --no-deps app npm run type-check` and `docker compose run --rm --no-deps app npm test`
 
 ### T10 - Output Validator And Sanitizer
 
@@ -3325,7 +3343,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T13 - Embeddings Pipeline
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -3393,7 +3411,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T14 - Retrieval And Top-K Ranking
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -3429,7 +3447,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T15 - Memory Summarizer Job
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -3499,7 +3517,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T17 - Director Enforcement In Turn Pipeline
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -3533,7 +3551,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T18 - Director Reload Endpoint
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P2
 - Priority: P2
@@ -3565,7 +3583,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T19 - Quest Schema And Validation
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P4
 - Priority: P1
@@ -3597,7 +3615,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T20 - Quest State Transitions
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P4
 - Priority: P1
@@ -3630,7 +3648,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T21 - Quest Editor UI
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P4
 - Priority: P2
@@ -3661,7 +3679,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T22 - World State Inspector UI
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P4
 - Priority: P2
@@ -3692,7 +3710,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T23 - Quest Import And Export
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P4
 - Priority: P2
@@ -3888,7 +3906,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T32 - Accessibility Pass
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P3
 - Priority: P1
@@ -3917,6 +3935,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - preserve existing player-flow structure while improving accessibility defects
+  - blocked on 2026-03-09 because `T34` is blocked pending completion of onboarding validation in `T12`
 
 ### T33 - Theme And Typography Pass
 
@@ -3983,7 +4002,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T37 - Auto-Update Channel
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P5
 - Priority: P2
@@ -4046,7 +4065,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T40 - Release Checklist
 
-- Status: Ready
+- Status: Blocked
 - Queue: Later
 - Phase: P5
 - Priority: P1

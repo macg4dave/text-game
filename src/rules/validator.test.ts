@@ -10,6 +10,8 @@ import {
   type CanonicalPlayerCreatedEventPayload,
   type CanonicalTurnEventPayload,
   type AuthoritativePlayerState,
+  type SaveSlotActionResponsePayload,
+  type SaveSlotLoadResponsePayload,
   type SetupStatusPayload,
   type StateResponsePayload,
   type TurnResponsePayload,
@@ -20,6 +22,8 @@ import {
   validateCanonicalTurnEvent,
   validateAuthoritativePlayerState,
   validateMemoryCandidate,
+  validateSaveSlotActionResponse,
+  validateSaveSlotLoadResponse,
   validateSetupStatusResponse,
   validateStateResponse,
   validateTurnResponse,
@@ -663,4 +667,85 @@ test("validateSetupStatusResponse accepts a guided setup envelope", () => {
   };
 
   assert.deepEqual(validateSetupStatusResponse(payload), { ok: true, errors: [] });
+});
+
+test("validateSaveSlotActionResponse accepts a ready slot list plus the saved slot summary", () => {
+  const payload: SaveSlotActionResponsePayload = {
+    slot: {
+      schema_version: "save-slot/v1",
+      id: "slot-1",
+      label: "Bridge Checkpoint",
+      player_id: "player-snapshot-1",
+      player_name: "Avery",
+      location: "Rooftop Market",
+      source_schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      saved_at: "2026-03-09T00:00:00.000Z",
+      updated_at: "2026-03-09T00:00:00.000Z",
+      status: "ready",
+      detail: null
+    },
+    slots: [
+      {
+        schema_version: "save-slot/v1",
+        id: "slot-1",
+        label: "Bridge Checkpoint",
+        player_id: "player-snapshot-1",
+        player_name: "Avery",
+        location: "Rooftop Market",
+        source_schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+        saved_at: "2026-03-09T00:00:00.000Z",
+        updated_at: "2026-03-09T00:00:00.000Z",
+        status: "ready",
+        detail: null
+      }
+    ]
+  };
+
+  assert.deepEqual(validateSaveSlotActionResponse(payload), { ok: true, errors: [] });
+});
+
+test("validateSaveSlotLoadResponse rejects malformed slot summaries and player payloads", () => {
+  const result = validateSaveSlotLoadResponse({
+    slot: {
+      schema_version: "save-slot/v1",
+      id: "slot-1",
+      label: "Broken Slot",
+      player_id: "player-snapshot-1",
+      player_name: 42,
+      location: "Rooftop Market",
+      source_schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      saved_at: "2026-03-09T00:00:00.000Z",
+      updated_at: "2026-03-09T00:00:00.000Z",
+      status: "mystery",
+      detail: []
+    },
+    slots: [],
+    player: {
+      schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+      id: 99,
+      name: "Avery",
+      created_at: "2026-03-08T00:00:00.000Z",
+      location: "Rooftop Market",
+      summary: "You arrived.",
+      inventory: [],
+      flags: [],
+      quests: [],
+      director_state: {
+        end_goal: "Reach the tower",
+        current_act_id: "act-1",
+        current_act: "Arrival",
+        current_beat_id: "beat-1",
+        current_beat_label: "Find the signal",
+        story_beats_remaining: 3,
+        end_goal_progress: "You have started the search.",
+        completed_beats: []
+      }
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /slot\.player_name/i);
+  assert.match(result.errors.join(" "), /slot\.status/i);
+  assert.match(result.errors.join(" "), /slot\.detail/i);
+  assert.match(result.errors.join(" "), /player\.id/i);
 });

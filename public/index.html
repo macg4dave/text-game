@@ -98,6 +98,25 @@
             </details>
           </section>
 
+          <section class="panel-slab save-slots-panel" id="save-slots-panel" aria-live="polite">
+            <div class="save-slots-header">
+              <div>
+                <p class="stack-label">Save Slots</p>
+                <h3>Keep named checkpoints</h3>
+                <p id="save-slots-summary">No named saves yet.</p>
+              </div>
+              <div class="save-slots-create-row">
+                <label class="field save-slot-label-field">
+                  <span>Slot name</span>
+                  <input id="save-slot-label" placeholder="Bridge checkpoint" />
+                </label>
+                <button type="button" id="save-slot-create">Save Current Game</button>
+              </div>
+            </div>
+            <p class="save-slot-error" id="save-slots-error" hidden></p>
+            <div class="save-slots-list" id="save-slots-list"></div>
+          </section>
+
           <section class="log panel-slab" id="log" aria-live="polite"></section>
 
           <form class="input-form" id="input-form">

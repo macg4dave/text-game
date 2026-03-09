@@ -480,6 +480,7 @@ See `packaging/decision-memo.md` for the option comparison, save or log implicat
 The browser UI includes:
 
 - a first-screen onboarding panel with `Start New Game` and `Resume Last Game` actions instead of auto-starting a session on page load
+- a named save-slots panel in the main player flow so players can create checkpoints, overwrite them deliberately, and load them later without touching files
 - one short turn-loop explainer on the launch screen so players can begin without opening project docs
 - a first-run setup wizard on the launch screen with a retryable connection test for the supported Docker Desktop plus LiteLLM plus GPU-backed Ollama path
 - guided setup recovery cards that can retry checks, copy the supported launcher command, and expose smaller-profile or GPU repair checklists without clearing saves
@@ -524,6 +525,7 @@ Current approach:
 ## Key Files
 
 - `src/server/index.ts` - API server entrypoint and routing
+- `src/server/save-slots-route.ts` - save-slot list, save, and load HTTP handlers
 - `src/core/logging.ts` - structured server logging with levels and secret redaction
 - `src/server/runtime-preflight.ts` - cached startup probe and AI readiness checks
 - `src/server/host-preflight.ts` - runtime host and storage prerequisite checks for writable paths and disk headroom
@@ -536,9 +538,11 @@ Current approach:
 - `src/core/config/preflight.ts` - player-facing config preflight issue mapping and report helpers
 - `src/ai/service.ts` - OpenAI-compatible chat completions + JSON schema
 - `src/state/game.ts` - State, memory, director updates + retrieval scoring
+- `src/state/save-slots.ts` - named save-slot snapshot, overwrite, and load-by-clone behavior
 - `src/utils/assist.ts` - Local spellcheck + autocomplete
 - `src/rules/validator.ts` - Spec and update validation
 - `src/ui/app.ts` - browser TypeScript source
+- `src/ui/save-slots-view.ts` - save-slot panel rendering and button state
 - `public/app.js` - emitted browser asset loaded by `index.html`; do not hand-edit
 - `ROADMAP.md` - Roadmap, tracker, blockers
 - `AI_CONTROL.md` - Director/AI control system design

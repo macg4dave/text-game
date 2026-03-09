@@ -1,4 +1,4 @@
-import type { PlayerState, SessionDebugPayload, SetupStatus, TurnDebugPayload } from "./contracts.js";
+import type { PlayerState, SaveSlotSummary, SessionDebugPayload, SetupStatus, TurnDebugPayload } from "./contracts.js";
 import type { FatalUiErrorState } from "./global-error.js";
 
 export interface AppState {
@@ -9,6 +9,9 @@ export interface AppState {
   lastTurnDebug: TurnDebugPayload | null;
   setupStatus: SetupStatus | null;
   setupError: string | null;
+  saveSlots: SaveSlotSummary[];
+  saveSlotsError: string | null;
+  currentSaveSlotId: string | null;
   assistTimer: number | null;
   hasEnteredFlow: boolean;
   pending: boolean;
@@ -28,6 +31,9 @@ export function createInitialAppState(params: {
     lastTurnDebug: null,
     setupStatus: null,
     setupError: null,
+    saveSlots: [],
+    saveSlotsError: null,
+    currentSaveSlotId: null,
     assistTimer: null,
     hasEnteredFlow: false,
     pending: false,

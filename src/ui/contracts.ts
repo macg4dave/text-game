@@ -1,6 +1,10 @@
 import type {
   RuntimePreflightIssue as SharedRuntimePreflightIssue,
   RuntimePreflightReport as SharedRuntimePreflightPayload,
+  SaveSlotActionResponsePayload as SharedSaveSlotActionResponsePayload,
+  SaveSlotLoadResponsePayload as SharedSaveSlotLoadResponsePayload,
+  SaveSlotSummary as SharedSaveSlotSummary,
+  SaveSlotsResponsePayload as SharedSaveSlotsResponsePayload,
   SetupStatus as SharedSetupStatus,
   SetupStatusPayload as SharedSetupStatusPayload
 } from "../core/types.js";
@@ -12,7 +16,6 @@ export interface PlayerState {
   director_state?: {
     current_beat_label?: string;
   };
-  [key: string]: unknown;
 }
 
 export interface SessionDebugPayload {
@@ -33,6 +36,8 @@ export interface RuntimeConfigProfile {
 }
 
 export type SetupStatus = SharedSetupStatus;
+
+export type SaveSlotSummary = SharedSaveSlotSummary;
 
 export interface SetupStatusPayload extends SharedSetupStatusPayload {
   error?: string;
@@ -84,6 +89,21 @@ export interface TurnDebugPayload extends SessionDebugPayload {
 export interface StateApiResponse {
   player?: PlayerState | null;
   debug?: SessionDebugPayload;
+  error?: string;
+  detail?: string | string[];
+}
+
+export interface SaveSlotsApiResponse extends SharedSaveSlotsResponsePayload {
+  error?: string;
+  detail?: string | string[];
+}
+
+export interface SaveSlotActionApiResponse extends SharedSaveSlotActionResponsePayload {
+  error?: string;
+  detail?: string | string[];
+}
+
+export interface SaveSlotLoadApiResponse extends SharedSaveSlotLoadResponsePayload {
   error?: string;
   detail?: string | string[];
 }

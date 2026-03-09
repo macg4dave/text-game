@@ -84,6 +84,25 @@ const MIGRATIONS: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_committed_events_player_id ON committed_events(player_id, created_at);
       `);
     }
+  },
+  {
+    id: "004_save_slots",
+    description: "add named save slot metadata table",
+    apply(database) {
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS save_slots (
+          id TEXT PRIMARY KEY,
+          label TEXT NOT NULL,
+          player_id TEXT NOT NULL,
+          source_schema_version TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY(player_id) REFERENCES players(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_save_slots_updated_at ON save_slots(updated_at DESC, created_at DESC);
+      `);
+    }
   }
 ];
 

@@ -19,6 +19,7 @@ import { createRuntimePreflightService } from "./runtime-preflight.js";
 import { createGlobalProcessHandler } from "./global-handler.js";
 import { getErrorMessage, readRequestIdHeader } from "./request-utils.js";
 import { createSetupStatusHandler } from "./setup-route.js";
+import { createListSaveSlotsHandler, createLoadSaveSlotHandler, createSaveToSlotHandler } from "./save-slots-route.js";
 import { createStateHandler } from "./state-route.js";
 import { createTurnHandler } from "./turn-route.js";
 
@@ -83,6 +84,36 @@ app.get(
     buildSessionDebug,
     getRequestLogger,
     getDirectorSpec: () => directorSpec
+  })
+);
+
+app.get(
+  "/api/save-slots",
+  createListSaveSlotsHandler({
+    runtimePreflight,
+    ensureDatabaseReady,
+    hasStorageBlocker,
+    getRequestLogger
+  })
+);
+
+app.post(
+  "/api/save-slots",
+  createSaveToSlotHandler({
+    runtimePreflight,
+    ensureDatabaseReady,
+    hasStorageBlocker,
+    getRequestLogger
+  })
+);
+
+app.post(
+  "/api/save-slots/load",
+  createLoadSaveSlotHandler({
+    runtimePreflight,
+    ensureDatabaseReady,
+    hasStorageBlocker,
+    getRequestLogger
   })
 );
 
