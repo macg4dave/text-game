@@ -479,7 +479,7 @@ The packaged MVP does **not** bundle LiteLLM or Ollama yet. That may change late
 Prototype commands once Node.js and npm are available on the host:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-desktop-prototype.ps1
+cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype
 ```
 
 ```bash
@@ -522,9 +522,11 @@ For a Windows-only local model setup, use [setup_local_a.i.md](/g:/text-game/set
 
 For local AI regression checks, use `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow`.
 
-For the launch-screen setup smoke harness, the current legacy command is `powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1` until `T65` lands.
+For the launch-screen setup smoke harness, use `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke`.
 
-For local GPU matrix consistency checks, the current legacy command is `powershell -ExecutionPolicy Bypass -File scripts/validate-local-gpu-profile-matrix.ps1` until `T65` lands.
+For local GPU matrix consistency checks, use `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix`.
+
+For LiteLLM default-config consistency checks, use `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config`.
 
 ## Setup Browser Smoke Harness
 
@@ -533,7 +535,7 @@ The launch-screen setup wizard now has one lightweight, repeatable smoke path fo
 Run it with:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1
+cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke
 ```
 
 What it verifies:

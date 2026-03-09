@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -12,6 +13,7 @@ pub struct ProcessInvocation {
 	pub args: Vec<String>,
 	pub cwd: Option<PathBuf>,
 	pub env_overrides: BTreeMap<String, String>,
+	pub env_removals: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,6 +30,7 @@ impl ProcessInvocation {
 			args: Vec::new(),
 			cwd: None,
 			env_overrides: BTreeMap::new(),
+			env_removals: BTreeSet::new(),
 		}
 	}
 
@@ -54,6 +57,11 @@ impl ProcessInvocation {
 	{
 		self.env_overrides
 			.extend(envs.into_iter().map(|(key, value)| (key.into(), value.into())));
+		self
+	}
+
+	pub fn with_env_removed(mut self, key: impl Into<String>) -> Self {
+		self.env_removals.insert(key.into());
 		self
 	}
 
@@ -98,6 +106,10 @@ impl ProcessInvocation {
 
 		if !self.env_overrides.is_empty() {
 			command.envs(&self.env_overrides);
+		}
+
+		for key in &self.env_removals {
+			command.env_remove(key);
 		}
 
 		command
@@ -151,5 +163,11 @@ mod tests {
 	fn invocation_stores_env_overrides() {
 		let invocation = ProcessInvocation::new("cargo").with_env("PORT", "3100");
 		assert_eq!(invocation.env_overrides.get("PORT"), Some(&"3100".to_string()));
+	}
+
+	#[test]
+	fn invocation_stores_env_removals() {
+		let invocation = ProcessInvocation::new("npm").with_env_removed("ELECTRON_RUN_AS_NODE");
+		assert!(invocation.env_removals.contains("ELECTRON_RUN_AS_NODE"));
 	}
 }

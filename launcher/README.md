@@ -20,10 +20,10 @@
 | --- | --- | --- | --- |
 | `start-dev` | `scripts/start-dev.ps1` | `T65b` | Implemented in Rust; legacy script deleted |
 | `test-local-ai-workflow` | `scripts/test-local-ai-workflow.ps1` | `T65c` | Implemented in Rust; awaiting manual legacy-script deletion |
-| `test-setup-browser-smoke` | `scripts/test-setup-browser-smoke.ps1` | `T65e` | CLI scaffolded; behavior parity pending |
-| `validate-local-gpu-profile-matrix` | `scripts/validate-local-gpu-profile-matrix.ps1` | `T65d` | CLI scaffolded; behavior parity pending |
-| `validate-litellm-default-config` | `scripts/validate-litellm-default-config.ps1` | `T65d` | CLI scaffolded; behavior parity pending |
-| `start-desktop-prototype` | `scripts/start-desktop-prototype.ps1` | `T65e` | CLI scaffolded; behavior parity pending |
+| `test-setup-browser-smoke` | `scripts/test-setup-browser-smoke.ps1` | `T65e` | Implemented in Rust; awaiting manual legacy-script deletion |
+| `validate-local-gpu-profile-matrix` | `scripts/validate-local-gpu-profile-matrix.ps1` | `T65d` | Implemented in Rust; awaiting manual legacy-script deletion |
+| `validate-litellm-default-config` | `scripts/validate-litellm-default-config.ps1` | `T65d` | Implemented in Rust; awaiting manual legacy-script deletion |
+| `start-desktop-prototype` | `scripts/start-desktop-prototype.ps1` | `T65e` | Implemented in Rust; awaiting manual legacy-script deletion |
 
 ## Shared module layout
 
@@ -48,8 +48,12 @@ Or use the repo convenience scripts:
 - `npm run sunray:check`
 - `npm run sunray:test`
 - `npm run sunray:start-dev -- --no-browser`
+- `npm run sunray:test-setup-browser-smoke`
+- `npm run sunray:validate-local-gpu-profile-matrix`
+- `npm run sunray:validate-litellm-default-config`
+- `npm run sunray:start-desktop-prototype`
 
-`start-dev` is the first migrated launcher path. The remaining subcommands still expose the scaffolded contract until their parity slices land.
+`start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype` now run through Rust.
 
 ## Migration rule
 

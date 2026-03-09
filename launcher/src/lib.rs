@@ -3,15 +3,16 @@ pub mod env;
 pub mod error;
 pub mod logging;
 pub mod process;
+pub mod start_desktop_prototype;
 pub mod start_dev;
 pub mod test_local_ai_workflow;
-
-use std::env as std_env;
+pub mod test_setup_browser_smoke;
+pub mod validators;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
 
-use crate::config::{command_contracts, resolve_workspace_root_from, SunrayCommand};
+use crate::config::command_contracts;
 use crate::start_dev::StartDevOptions;
 use crate::test_local_ai_workflow::TestLocalAiWorkflowOptions;
 
@@ -65,42 +66,15 @@ pub fn run(cli: Cli) -> Result<()> {
         Commands::TestLocalAiWorkflow { selection_only } => {
             test_local_ai_workflow::run(TestLocalAiWorkflowOptions { selection_only })
         }
-        Commands::TestSetupBrowserSmoke => run_contract_stub(SunrayCommand::TestSetupBrowserSmoke, &[]),
+        Commands::TestSetupBrowserSmoke => test_setup_browser_smoke::run(),
         Commands::ValidateLocalGpuProfileMatrix => {
-            run_contract_stub(SunrayCommand::ValidateLocalGpuProfileMatrix, &[])
+            validators::run_validate_local_gpu_profile_matrix()
         }
         Commands::ValidateLitellmDefaultConfig => {
-            run_contract_stub(SunrayCommand::ValidateLitellmDefaultConfig, &[])
+            validators::run_validate_litellm_default_config()
         }
-        Commands::StartDesktopPrototype => run_contract_stub(SunrayCommand::StartDesktopPrototype, &[]),
+        Commands::StartDesktopPrototype => start_desktop_prototype::run(),
     }
-}
-
-fn run_contract_stub(command: SunrayCommand, parsed_flags: &[String]) -> Result<()> {
-    let current_dir = std_env::current_dir()?;
-    let repo_root = resolve_workspace_root_from(&current_dir).unwrap_or(current_dir);
-    let contract = command.contract();
-
-    println!("SunRay command contract ready: {}", contract.name);
-    println!("Summary: {}", contract.summary);
-    println!("Legacy parity target: {}", contract.legacy_script);
-    println!("Backlog slice: {}", contract.backlog_task);
-    println!("Workspace root: {}", repo_root.display());
-
-    if parsed_flags.is_empty() {
-        println!("Parsed flags: none");
-    } else {
-        println!("Parsed flags: {}", parsed_flags.join(", "));
-    }
-
-    println!();
-    println!("Status: CLI surface established; behavior parity is still pending.");
-    println!(
-        "Next step: implement {} in Rust, validate parity, then delete {}.",
-        contract.backlog_task, contract.legacy_script
-    );
-
-    Ok(())
 }
 
 pub fn cli_command_names() -> Vec<&'static str> {

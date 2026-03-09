@@ -139,8 +139,8 @@ Global blocker as of 2026-03-09:
 | T65a | Now | P1 | P1 | SunRay workspace and command contract | Done | T65 | `cargo check --manifest-path launcher/Cargo.toml` + `cargo test --manifest-path launcher/Cargo.toml` + manual command-surface review |
 | T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
 | T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Review | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
-| T65d | Now | P1 | P1 | SunRay validator command migration | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
-| T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Ready | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
+| T65d | Now | P1 | P1 | SunRay validator command migration | Review | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
+| T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Review | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
 | T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Blocked | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
 | T65g | Now | P1 | P2 | SunRay Copilot prompt scaffolding | Done | T65 | Manual instruction and prompt-file consistency review |
 
@@ -332,7 +332,7 @@ Global blocker as of 2026-03-09:
 
 ### T65d - SunRay Validator Command Migration
 
-- Status: Ready
+- Status: Review
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -365,10 +365,13 @@ Global blocker as of 2026-03-09:
   - `scripts/validate-local-gpu-profile-matrix.ps1` and `scripts/validate-litellm-default-config.ps1` are deleted after parity is validated
 - Handoff Notes:
   - keep validator scope narrow; this task is about parity, not a broader config redesign
+  - completed implementation on 2026-03-09 by adding `launcher/src/validators.rs` and routing both validator subcommands through Rust so `SunRay validate-local-gpu-profile-matrix` now checks the JSON matrix structure, LiteLLM local-GPU alias wiring, and Docker Compose default env alignment, while `SunRay validate-litellm-default-config` checks the default Docker Ollama alias targets in `litellm.config.yaml`
+  - validation on 2026-03-09 ran `cargo check --manifest-path launcher/Cargo.toml`, `cargo test --manifest-path launcher/Cargo.toml`, `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix`, and `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config`
+  - awaiting final manual removal of `scripts/validate-local-gpu-profile-matrix.ps1` and `scripts/validate-litellm-default-config.ps1` before this task can move from `Review` to `Done` because file deletion is being handled manually in this workspace
 
 ### T65e - SunRay Setup Smoke And Desktop Wrapper Migration
 
-- Status: Ready
+- Status: Review
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -404,6 +407,10 @@ Global blocker as of 2026-03-09:
 - Handoff Notes:
   - do not change Electron packaging direction here; this task only changes the orchestration layer around the existing prototype command
   - `SunRay` is not replacing Electron and is not becoming a desktop shell
+  - completed implementation on 2026-03-09 by adding `launcher/src/test_setup_browser_smoke.rs` and `launcher/src/start_desktop_prototype.rs`, routing both `SunRay` subcommands through Rust, and extending the shared process helper so inherited environment variables such as `ELECTRON_RUN_AS_NODE` can be cleared for child launches
+  - validation on 2026-03-09 ran `cargo check --manifest-path launcher/Cargo.toml`, `cargo test --manifest-path launcher/Cargo.toml`, and `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke`, which passed through the Rust path and exercised the Docker app build, browser-focused type-check, targeted setup smoke tests, and browser bundle rebuild
+  - `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` currently fails early in this workspace because `npm` was not available on `PATH` in the validating terminal, which matches the legacy wrapper's host prerequisite behavior; rerun that command in a host shell with Node.js 22 available to finish the live desktop wrapper check
+  - awaiting final manual removal of `scripts/test-setup-browser-smoke.ps1` and `scripts/start-desktop-prototype.ps1` before this task can move from `Review` to `Done` because file deletion is being handled manually in this workspace
 
 ### T65f - Shell Reference Cleanup And Script Deletion
 
