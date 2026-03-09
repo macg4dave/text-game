@@ -203,7 +203,7 @@ This table is the full execution board. Only rows with `Status` = `Ready` are st
 | T58c | Later | P2 | P1 | Director framing and beat pacing policy | Blocked | T16, T58b | Schema validation check + integration test + replay fixture execution |
 | T51 | Next | P1 | P1 | Database storage and migration boundary split | Ready | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
 | T52 | Next | P1 | P1 | Validator contract module split | Ready | T06, T12c, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
-| T53 | Next | P1 | P1 | Launcher entrypoint and script library split | Ready | T02h, T12c | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T53 | Next | P1 | P1 | Launcher entrypoint and script library split | In Progress | T02h, T12c | `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T54 | Next | P1 | P2 | Setup view model and recovery policy split | Ready | T11a, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T62 | Next | P2 | P1 | NPC memory significance pipeline | Done | T59, T60 | Manual planning-doc consistency review |
 | T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Ready | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
@@ -3010,7 +3010,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T53 - Launcher Entrypoint And Script Library Split
 
-- Status: Ready
+- Status: In Progress
 - Queue: Next
 - Phase: P1
 - Priority: P1
