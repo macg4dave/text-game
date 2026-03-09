@@ -17,12 +17,11 @@ Read these project files before making non-trivial `SunRay` changes:
 
 1. `ROADMAP.md`
 2. `BACKLOG.md`
-3. `sunray_backlog.md`
-4. `ENGINEERING_STANDARDS.md`
-5. `ARCHITECTURE.md`
-6. `launcher/README.md`
+3. `ENGINEERING_STANDARDS.md`
+4. `ARCHITECTURE.md`
+5. `launcher/README.md`
 
-Use `sunray_backlog.md` as the execution source of truth for launcher work.
+Use `BACKLOG.md` as the execution source of truth for launcher work.
 
 ## Current SunRay command surface
 
@@ -86,7 +85,7 @@ For AI-harness-related changes, define or tighten the deterministic test or harn
 
 When the supported Rust launcher surface changes:
 
-- update `sunray_backlog.md`
+- update `BACKLOG.md`
 - update `README.md` if user-facing commands or setup guidance changed
 - keep examples aligned with the current `SunRay` command surface
 

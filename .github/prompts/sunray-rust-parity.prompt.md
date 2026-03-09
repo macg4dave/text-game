@@ -11,7 +11,7 @@ Relevant repo facts
 -------------------
 - Rust crate: `launcher/Cargo.toml`
 - Launcher docs: `launcher/README.md`
-- Source of truth for launcher work: `sunray_backlog.md`
+- Source of truth for launcher work: `BACKLOG.md`
 - Legacy scripts live under `scripts/`
 - Shared legacy PowerShell helpers live under `scripts/lib/`
 - Shared Rust replacements should live under `launcher/src/`
@@ -57,7 +57,7 @@ Assistant instructions
    - `cargo test --manifest-path launcher/Cargo.toml`
    - `cargo run --manifest-path launcher/Cargo.toml -- <subcommand_name> ...`
 6. Only remove the legacy script after parity is validated.
-7. Update `sunray_backlog.md` and any affected docs in the same session.
+7. Update `BACKLOG.md` and any affected docs in the same session.
 
 Example prompts
 ---------------

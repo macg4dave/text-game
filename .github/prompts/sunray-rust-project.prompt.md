@@ -45,7 +45,7 @@ Task:
 
 Details:
 - What to change: <behavior, module, command, or helper to add/update>
-- Files to consider: <launcher/src/*.rs, launcher/Cargo.toml, launcher/README.md, README.md, sunray_backlog.md>
+- Files to consider: <launcher/src/*.rs, launcher/Cargo.toml, launcher/README.md, README.md, BACKLOG.md>
 - Tests/validation: <tests to add/update and command paths to run>
 - Constraints / do not modify: <boundaries that must remain unchanged>
 """

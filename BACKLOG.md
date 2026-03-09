@@ -200,7 +200,7 @@ No global blocker as of 2026-03-09:
 | T61 | Now | P1 | P1 | Compact turn schema boundary | Done | T06, T57 | Manual planning-doc consistency review |
 | T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Done | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Done | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T12 | Next | P1 | P1 | New game onboarding | Review | T06 | Manual new-game flow check |
+| T12 | Next | P1 | P1 | New game onboarding | In Progress | T06 | Manual new-game flow check |
 | T12b | Next | P1 | P1 | First-run setup wizard and connection test | Done | T02f, T11, T12 | Manual first-run flow check |
 | T11b | Next | P1 | P2 | Turn surface renderer extraction | Done | T11a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T12d | Next | P1 | P2 | First-run setup browser smoke harness | Done | T12b | Browser setup smoke path |
@@ -2050,7 +2050,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T12 - New Game Onboarding
 
-- Status: Review
+- Status: In Progress
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -2065,7 +2065,6 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - README.md
   - REQUIREMENTS.md
   - public/index.html
-  - public/app.js
   - src/ui/app.ts
   - public/styles.css
 - Do Not Touch:
@@ -2083,8 +2082,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - keep the first screen short enough that it still feels like an app launch, not a configuration checklist
   - updated on 2026-03-08 to add a browser-side onboarding gate in `src/ui/app.ts` so the page no longer auto-creates a session on load; instead it shows `Start New Game` and `Resume Last Game` actions before revealing the turn controls
   - the first-screen copy, toolbar labels, and input labels were rewritten in `public/index.html` and `public/styles.css` to remove more developer-facing wording from the initial player flow while keeping the existing debug panel intact
-  - validation on 2026-03-08 ran `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npm run build:client`, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, and HTTP smoke checks against `/` plus `/api/state` on the launched app
-  - the full interactive browser click-through for `Start New Game` and `Resume Last Game` was not completed cleanly in this session because the headless-browser automation attempt hung; leave this task in `Review` until a short manual browser check confirms both buttons reveal the expected flow end to end
+  - validation on 2026-03-08 ran `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npm run build:client`, `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`, and HTTP smoke checks against `/` plus `/api/state` on the launched app
+  - resumed on 2026-03-09 to finish the remaining onboarding validation work from the supported Rust launcher path and confirm both launch actions behave cleanly end to end
 
 ### T12b - First-Run Setup Wizard And Connection Test
 
@@ -2310,7 +2309,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - tutorial and recovery guidance do not hide save or repair actions
 - Handoff Notes:
   - keep this focused on clarity, not lore dumping
-  - blocked on 2026-03-09 because `T12` is still in `Review`, so the onboarding surface is not fully validated as a stable base for tutorial follow-up work
+  - blocked on 2026-03-09 because `T12` still needs final onboarding validation before the onboarding surface is a stable base for tutorial follow-up work
   - task card path updated on 2026-03-09 to use the current browser authoring surface `src/ui/app.ts` instead of the legacy `public/app.ts` note
 
 ### T02c - Windows Local AI Smoke-Test Path

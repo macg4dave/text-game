@@ -10,17 +10,14 @@ Before making substantial changes, read:
 
 1. [ROADMAP.md](/g:/text-game/ROADMAP.md)
 2. [BACKLOG.md](/g:/text-game/BACKLOG.md)
-3. [sunray_backlog.md](/g:/text-game/sunray_backlog.md) if the task touches `launcher/`, `SunRay`, or migration of legacy launcher scripts
-4. [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md)
-5. [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md)
-6. [ARCHITECTURE.md](/g:/text-game/ARCHITECTURE.md) when the task affects architecture or boundaries
+3. [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md)
+4. [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md)
+5. [ARCHITECTURE.md](/g:/text-game/ARCHITECTURE.md) when the task affects architecture or boundaries
 
 ## Task Manager Rules
 
 - Treat [BACKLOG.md](/g:/text-game/BACKLOG.md) as the execution source of truth.
-- For any task that touches `launcher/`, `SunRay`, or migration of legacy launcher scripts, treat [sunray_backlog.md](/g:/text-game/sunray_backlog.md) as the execution source of truth instead.
-- For launcher work, keep detailed tasks, handoff notes, validation state, and decomposition in [sunray_backlog.md](/g:/text-game/sunray_backlog.md).
-- Only put launcher-related notes in [BACKLOG.md](/g:/text-game/BACKLOG.md) when the main project backlog needs a blocker, dependency, or high-level coordination marker.
+- For any task that touches `launcher/`, `SunRay`, or migration of legacy launcher scripts, keep detailed tasks, handoff notes, validation state, and decomposition in [BACKLOG.md](/g:/text-game/BACKLOG.md).
 - Select work from the `Ready Queue` unless the user explicitly assigns a different task.
 - Claim one task at a time by updating its status to `In Progress`.
 - Use the detailed task card for scope, files to touch, dependencies, validation, and handoff notes.
@@ -49,7 +46,6 @@ Before making substantial changes, read:
 ## Documentation Update Rules
 
 - Update [BACKLOG.md](/g:/text-game/BACKLOG.md) when task state, dependencies, or validation state changes.
-- If the change is launcher-specific, update [sunray_backlog.md](/g:/text-game/sunray_backlog.md) for all detailed task tracking, and only mirror blocker-level or dependency-level coordination in [BACKLOG.md](/g:/text-game/BACKLOG.md) when the main backlog truly needs it.
 - Update [ROADMAP.md](/g:/text-game/ROADMAP.md) when scope, sequencing, or phase definitions change.
 - Update [REQUIREMENTS.md](/g:/text-game/REQUIREMENTS.md) when user-visible behavior or functional scope changes.
 - Update [README.md](/g:/text-game/README.md) when setup, scripts, or environment variables change.
@@ -89,7 +85,7 @@ Before making substantial changes, read:
 ## Launcher Rules
 
 - Launcher automation now belongs under `launcher/` in the Rust executable `SunRay`.
-- If touching launcher work, use [sunray_backlog.md](/g:/text-game/sunray_backlog.md) for detailed planning and keep it updated in the same session.
+- If touching launcher work, keep the matching launcher task cards in [BACKLOG.md](/g:/text-game/BACKLOG.md) updated in the same session.
 - Do not add new PowerShell, Bash, or batch launcher automation.
 - Migrate one legacy launcher script at a time: match behavior in `SunRay`, validate parity, then delete the legacy script.
 - Shared launcher automation behavior should live in Rust modules under `launcher/`.
