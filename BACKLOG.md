@@ -158,10 +158,10 @@ Global blocker as of 2026-03-09:
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T65 | Now | P1 | P1 | Rust script-runtime migration | In Progress | None | Manual planning-doc consistency review + child task validation |
-| T65a | Now | P1 | P1 | SunRay workspace and command contract | Ready | T65 | `cargo check --manifest-path launcher/Cargo.toml` + `cargo test --manifest-path launcher/Cargo.toml` + manual command-surface review |
-| T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Blocked | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
-| T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Blocked | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
-| T65d | Now | P1 | P1 | SunRay validator command migration | Blocked | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
+| T65a | Now | P1 | P1 | SunRay workspace and command contract | Done | T65 | `cargo check --manifest-path launcher/Cargo.toml` + `cargo test --manifest-path launcher/Cargo.toml` + manual command-surface review |
+| T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
+| T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
+| T65d | Now | P1 | P1 | SunRay validator command migration | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
 | T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Blocked | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
 | T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Blocked | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Done | T02 | `docker compose run --rm --no-deps app npm run test:config` + manual Docker Ollama smoke |

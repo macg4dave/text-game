@@ -136,12 +136,13 @@ Global blocker as of 2026-03-09:
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T65 | Now | P1 | P1 | Rust script-runtime migration | In Progress | None | Manual planning-doc consistency review + child task validation |
-| T65a | Now | P1 | P1 | SunRay workspace and command contract | Ready | T65 | `cargo check --manifest-path launcher/Cargo.toml` + `cargo test --manifest-path launcher/Cargo.toml` + manual command-surface review |
-| T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Blocked | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
-| T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Blocked | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
-| T65d | Now | P1 | P1 | SunRay validator command migration | Blocked | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
+| T65a | Now | P1 | P1 | SunRay workspace and command contract | Done | T65 | `cargo check --manifest-path launcher/Cargo.toml` + `cargo test --manifest-path launcher/Cargo.toml` + manual command-surface review |
+| T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
+| T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
+| T65d | Now | P1 | P1 | SunRay validator command migration | Ready | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
 | T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Blocked | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
 | T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Blocked | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
+| T65g | Now | P1 | P2 | SunRay Copilot prompt scaffolding | Done | T65 | Manual instruction and prompt-file consistency review |
 
 ## Task Cards
 
@@ -201,7 +202,7 @@ Global blocker as of 2026-03-09:
 
 ### T65a - SunRay Workspace And Command Contract
 
-- Status: Ready
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -239,10 +240,14 @@ Global blocker as of 2026-03-09:
 - Handoff Notes:
   - prefer preserving the current command names as Rust subcommands so later doc and UI-copy updates stay mechanical
   - temporary legacy `.ps1` wrappers may exist during the migration, but no new behavior should be added to them
+  - completed on 2026-03-09 by turning `launcher/` into a real Cargo-backed CLI scaffold with one `SunRay` binary, parity-focused subcommands, shared Rust modules for config/env/logging/error/process concerns, and launcher docs that map every legacy `.ps1` entrypoint to its owning `T65*` slice
+  - `package.json` now exposes `sunray`, `sunray:check`, `sunray:test`, and one npm convenience script per planned subcommand without claiming parity is already implemented
+  - validation on 2026-03-09 ran `cargo check --manifest-path launcher/Cargo.toml`, `cargo test --manifest-path launcher/Cargo.toml`, and manual command-surface review via `cargo run --manifest-path launcher/Cargo.toml -- --help` plus `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`
+  - Windows note: the workspace `launcher/target` directory on `G:` returned `Access is denied (os error 5)` for Cargo execution in this session, so validation succeeded by setting `CARGO_TARGET_DIR` to a temp path; keep that workaround in mind if the permission issue repeats
 
 ### T65b - SunRay Launcher And Preflight Parity
 
-- Status: Blocked
+- Status: Ready
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -280,7 +285,7 @@ Global blocker as of 2026-03-09:
 
 ### T65c - SunRay Local AI Workflow Harness Migration
 
-- Status: Blocked
+- Status: Ready
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -318,7 +323,7 @@ Global blocker as of 2026-03-09:
 
 ### T65d - SunRay Validator Command Migration
 
-- Status: Blocked
+- Status: Ready
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -433,13 +438,47 @@ Global blocker as of 2026-03-09:
 - Handoff Notes:
   - this is the cleanup gate that actually retires the legacy `.ps1` surface; do not remove those files before parity work is validated
 
+### T65g - SunRay Copilot Prompt Scaffolding
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Add project-specific Rust Copilot prompt assets so future `SunRay` work uses this repo's launcher boundaries, validation rules, and parity contract instead of generic Rust instructions.
+- Scope:
+  - add Rust-focused Copilot instruction and prompt files under `.github/` for `launcher/` work
+  - adapt useful structure from the user's Rust prompt repository to this repo's `SunRay` migration context
+  - keep the guidance specific to `SunRay` command parity, validation, and non-goals instead of copying generic Rust templates verbatim
+- Files to Touch:
+  - sunray_backlog.md
+  - .github/
+- Do Not Touch:
+  - src/state/
+  - src/story/
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+- Dependencies:
+  - T65
+- Validation:
+  - Manual instruction and prompt-file consistency review
+- Definition of Done:
+  - the repo contains reusable Rust Copilot assets tailored to `launcher/SunRay`
+  - the new guidance reflects current backlog, architecture, and validation rules for Rust launcher work
+  - future Rust changes can start from project-specific prompts instead of generic repository placeholders
+- Handoff Notes:
+  - created on 2026-03-09 in response to a direct user request to bring useful patterns from `macg4dave/My-RUST-copilot-promts` into this repo
+  - keep the prompt assets scoped to `SunRay` launcher work unless later Rust crates are added elsewhere in the repo
+  - completed on 2026-03-09 by adding `.github/instructions/sunray-rust.instructions.md` plus the prompt templates `.github/prompts/sunray-rust-project.prompt.md`, `.github/prompts/sunray-rust-parity.prompt.md`, and `.github/prompts/sunray-rust-refactor.prompt.md`
+  - the new assets adapt the user's generic Rust prompt structure to this repo's launcher-specific rules: `SunRay` command parity, Rust-only automation direction, Cargo validation commands, and strict non-goals around Docker, Electron, and the TypeScript runtime
+
 ## Immediate Open Decisions
 
 | ID | Decision | Needed By | Owner | Status |
 | --- | --- | --- | --- | --- |
-| S01 | Exact `SunRay` CLI syntax beyond the current parity-focused subcommands | Before `T65a` closes | Tech lead | Open |
-| S02 | Whether temporary `.ps1` wrappers are allowed during early parity work or should be skipped entirely | Before `T65b` starts | Tech lead | Open |
-| S03 | Whether `SunRay` should expose one binary with subcommands or one binary plus aliases or wrappers | Before `T65a` closes | Tech lead | Open |
+| S01 | Exact `SunRay` CLI syntax beyond the current parity-focused subcommands | Before `T65a` closes | Tech lead | Resolved on 2026-03-09: one parity-focused binary surface with `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype` |
+| S02 | Whether temporary `.ps1` wrappers are allowed during early parity work or should be skipped entirely | Before `T65b` starts | Tech lead | Resolved on 2026-03-09: existing `.ps1` entrypoints remain temporary legacy compatibility surfaces only until each parity slice deletes them, and they must not gain new behavior |
+| S03 | Whether `SunRay` should expose one binary with subcommands or one binary plus aliases or wrappers | Before `T65a` closes | Tech lead | Resolved on 2026-03-09: one `SunRay` binary with subcommands, not a parallel alias or wrapper surface |
 
 ## Agent Execution Rules
 

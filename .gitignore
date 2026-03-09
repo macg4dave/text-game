@@ -5,3 +5,7 @@ data/*.db-shm
 data/*.db-wal
 dist
 *.tsbuildinfo
+launcher/target/
+
+# Rust backup files created by rustfmt or editor save flows.
+**/*.rs.bk

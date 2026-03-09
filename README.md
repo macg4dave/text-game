@@ -330,6 +330,7 @@ Active migration direction:
 
 - the supported automation target is the Rust executable `SunRay` rooted at `launcher/Cargo.toml`
 - the target `SunRay` command surface mirrors the current legacy entrypoints: `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype`
+- `T65a` establishes one Rust binary with that subcommand surface plus shared modules for env loading, logging, config, error shaping, and process execution
 - the current `.ps1` files are temporary legacy shims until `T65` lands and should not gain new behavior
 - Docker, npm, Node, and Electron remain the underlying tools; the migration only replaces the shell orchestration layer around them
 - migration rule: each legacy script must first reach parity in `SunRay` and then be deleted before that migration slice is considered done
@@ -354,6 +355,8 @@ Current legacy entrypoints being replaced:
 - `scripts/lib/*.ps1` - shared PowerShell helper surface scheduled for removal
 
 When you add automation behavior, extend `launcher/SunRay` rather than adding another shell helper or wrapper.
+
+You can inspect the current Rust command surface with `cargo run --manifest-path launcher/Cargo.toml -- --help` or `npm run sunray -- --help`. At the current migration stage those subcommands report their mapping and backlog target; the PowerShell scripts remain the working behavior path until each parity slice lands.
 
 The current legacy launcher respects `PORT` from your shell session or `.env`. If that port is already taken by another local service, the launcher falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
 

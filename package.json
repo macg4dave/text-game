@@ -10,6 +10,15 @@
     "node": "22.x"
   },
   "scripts": {
+    "sunray": "cargo run --manifest-path launcher/Cargo.toml --",
+    "sunray:check": "cargo check --manifest-path launcher/Cargo.toml",
+    "sunray:test": "cargo test --manifest-path launcher/Cargo.toml",
+    "sunray:start-dev": "cargo run --manifest-path launcher/Cargo.toml -- start-dev",
+    "sunray:test-local-ai-workflow": "cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow",
+    "sunray:test-setup-browser-smoke": "cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke",
+    "sunray:validate-local-gpu-profile-matrix": "cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix",
+    "sunray:validate-litellm-default-config": "cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config",
+    "sunray:start-desktop-prototype": "cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype",
     "dev:windows": "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1",
     "build:server": "tsc -p tsconfig.server.json",
     "build:client": "esbuild src/ui/app.ts --bundle --format=iife --platform=browser --outfile=public/app.js",
