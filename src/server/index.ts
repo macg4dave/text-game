@@ -14,6 +14,7 @@ import { loadDirectorSpec, reloadDirectorSpec } from "../story/director.js";
 import { validateDirectorSpec, validateQuestSpec } from "../rules/validator.js";
 import { loadQuestSpec, reloadQuestSpec } from "../story/quest.js";
 import { buildRuntimeDebug, buildSessionDebug, buildTurnDebug, type TurnDebugParams } from "./debug.js";
+import { buildDesktopShellPrerequisiteIssues } from "./desktop-shell-preflight.js";
 import { buildStorageStartupIssue } from "./host-preflight.js";
 import { createRuntimePreflightService } from "./runtime-preflight.js";
 import { createGlobalProcessHandler } from "./global-handler.js";
@@ -34,7 +35,10 @@ let directorSpec = loadDirectorSpec();
 let questSpec: QuestSpec = loadQuestSpec();
 let dbStartupIssue: RuntimePreflightIssue | null = null;
 let dbInitialized = false;
-const runtimePreflight = createRuntimePreflightService(config, undefined, () => (dbStartupIssue ? [dbStartupIssue] : []));
+const runtimePreflight = createRuntimePreflightService(config, undefined, () => [
+  ...buildDesktopShellPrerequisiteIssues(config),
+  ...(dbStartupIssue ? [dbStartupIssue] : [])
+]);
 
 app.use(express.json());
 app.use((req: Request, res: Response, next: NextFunction) => {

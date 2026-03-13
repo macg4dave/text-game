@@ -3,7 +3,6 @@ pub mod env;
 pub mod error;
 pub mod logging;
 pub mod process;
-pub mod start_desktop_prototype;
 pub mod start_dev;
 pub mod test_local_ai_workflow;
 pub mod test_setup_browser_smoke;
@@ -11,6 +10,7 @@ pub mod validators;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
+use std::path::PathBuf;
 
 use crate::config::command_contracts;
 use crate::start_dev::StartDevOptions;
@@ -20,7 +20,7 @@ use crate::test_local_ai_workflow::{TestLocalAiWorkflowOptions, TestPlayerPerson
 #[command(name = "SunRay")]
 #[command(about = "Rust launcher and automation harness for text-game")]
 #[command(
-    long_about = "SunRay is the supported Rust command surface for launcher, harness, smoke, and validation work. It orchestrates the existing Docker, Node, npm, browser, and Electron flows without replacing those runtimes."
+    long_about = "SunRay is the supported Rust command surface for launcher, harness, smoke, and validation work. It orchestrates the existing Docker, Node, npm, and browser flows without replacing the app runtime."
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -42,6 +42,9 @@ pub enum Commands {
         /// Seed the live AI smoke persona picker for repeatable runs.
         #[arg(long)]
         persona_seed: Option<u64>,
+        /// Write a machine-readable validation report to the given JSON path.
+        #[arg(long)]
+        report_json: Option<PathBuf>,
     },
     /// Run the targeted browser setup smoke harness.
     TestSetupBrowserSmoke,
@@ -49,8 +52,6 @@ pub enum Commands {
     ValidateLocalGpuProfileMatrix,
     /// Validate the default LiteLLM config wiring.
     ValidateLitellmDefaultConfig,
-    /// Start the Electron desktop prototype wrapper flow.
-    StartDesktopPrototype,
 }
 
 pub fn run(cli: Cli) -> Result<()> {
@@ -63,10 +64,12 @@ pub fn run(cli: Cli) -> Result<()> {
             selection_only,
             persona,
             persona_seed,
+            report_json,
         }) => test_local_ai_workflow::run(TestLocalAiWorkflowOptions {
             selection_only,
             persona,
             persona_seed,
+            report_json,
         }),
         Some(Commands::TestSetupBrowserSmoke) => test_setup_browser_smoke::run(),
         Some(Commands::ValidateLocalGpuProfileMatrix) => {
@@ -75,7 +78,6 @@ pub fn run(cli: Cli) -> Result<()> {
         Some(Commands::ValidateLitellmDefaultConfig) => {
             validators::run_validate_litellm_default_config()
         }
-        Some(Commands::StartDesktopPrototype) => start_desktop_prototype::run(),
     }
 }
 
@@ -96,6 +98,7 @@ pub fn clap_command_names() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use clap::Parser;
+    use std::path::PathBuf;
 
     use crate::start_dev::StartDevOptions;
 
@@ -153,6 +156,7 @@ mod tests {
                     selection_only: true,
                     persona: None,
                     persona_seed: None,
+                    report_json: None,
                 }),
             }
         );
@@ -175,6 +179,29 @@ mod tests {
                     selection_only: false,
                     persona: Some(TestPlayerPersonaChoice::PracticalFixer),
                     persona_seed: Some(7),
+                    report_json: None,
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn test_local_ai_workflow_accepts_report_json_flag() {
+        let cli = Cli::parse_from([
+            "SunRay",
+            "test-local-ai-workflow",
+            "--selection-only",
+            "--report-json",
+            "reports/ai-manifest.json",
+        ]);
+        assert_eq!(
+            cli,
+            Cli {
+                command: Some(Commands::TestLocalAiWorkflow {
+                    selection_only: true,
+                    persona: None,
+                    persona_seed: None,
+                    report_json: Some(PathBuf::from("reports/ai-manifest.json")),
                 }),
             }
         );

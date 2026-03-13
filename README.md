@@ -343,9 +343,9 @@ Useful flags:
 Current automation direction:
 
 - the supported automation target is the Rust executable `SunRay` rooted at `launcher/Cargo.toml`
-- the supported `SunRay` command surface is `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype`
+- the supported `SunRay` command surface is `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, and `validate-litellm-default-config`
 - launcher-owned static assets such as the local GPU matrix now live under `launcher/assets/`
-- Docker, npm, Node, and Electron remain the underlying tools; `SunRay` orchestrates them instead of replacing them
+- Docker, npm, Node, and the browser remain the underlying runtime surfaces; `SunRay` orchestrates them instead of replacing them
 - new launcher behavior should land as Rust modules and assets, not as shell wrappers or copied shell logic
 
 `SunRay` boundaries:
@@ -354,7 +354,6 @@ Current automation direction:
 - not an installer
 - not an updater
 - not a package manager
-- not a replacement for Electron
 - not a rewrite of the app server
 
 When you add automation behavior, extend `launcher/SunRay` rather than adding another shell helper or wrapper.
@@ -455,60 +454,43 @@ Examples:
 - in default OpenAI-compatible mode, `AI_API_KEY` overrides `OPENAI_API_KEY`
 - runtime diagnostics and the browser setup panel now show which startup profile is active and which explicit env vars override it
 
-## Desktop Packaging Prototype
+## Launcher Distribution
 
-The current packaging spike uses Electron as a thin Windows-first shell around the existing compiled server and browser UI.
+The supported player-facing delivery path is a platform-native `SunRay` launcher binary plus the same Docker-backed runtime stack used everywhere else.
 
-### MVP packaged AI contract
+Current contract:
 
-For the MVP playtest path, the packaged app and the AI runtime are intentionally split:
+- every supported platform should ship a Rust launcher binary built on that platform
+- the launcher opens the browser UI and coordinates Docker-backed app, LiteLLM, and local-model services
+- no embedded desktop-shell runtime is part of the supported path
 
-- the Electron shell bundles the app window and compiled local game server
+### MVP launcher AI contract
+
+For the MVP playtest path, the launcher binary and the AI runtime are intentionally split:
+
+- the launcher binary is thin orchestration only
 - Docker Desktop remains a required Windows prerequisite for AI startup
-- LiteLLM continues to run as the repo-managed Docker sidecar instead of being embedded into the packaged shell
-- the GPU-backed Docker Ollama path is the default supported packaged setup contract
+- LiteLLM continues to run as the repo-managed Docker sidecar
+- the GPU-backed Docker Ollama path is the default supported launcher setup contract
 
-Why keep that split for now:
+What the launcher path should tell the player in plain language:
 
-- it preserves one AI contract across the Windows launcher, setup flow, and packaged shell
-- it avoids shipping and supporting two different LiteLLM ownership models during Phase 0
-- it keeps T36 focused on the playtest shell and first-run clarity instead of silently turning into a gateway repackaging project
+- if Docker Desktop is missing or not running: install or start Docker Desktop, then retry the launcher
+- if the LiteLLM sidecar did not become ready: the launcher and browser can start, but gameplay stays blocked until the AI service is healthy
+- if the machine cannot satisfy the GPU-backed path: install the required NVIDIA/WSL2 prerequisites first before retrying
+- if the launcher itself cannot start the local stack: show a plain startup error and point the player at the launcher log instead of blaming LiteLLM readiness
 
-What the packaged path should tell the player in plain language:
-
-- if Docker Desktop is missing or not running: install or start Docker Desktop, then retry the game
-- if the LiteLLM sidecar did not become ready: the game app opened, but the AI service is still starting or failed to start; retry after Docker is healthy
-- if the player machine cannot satisfy the GPU-backed path: install the required NVIDIA/WSL2 prerequisites first before retrying
-
-The packaged MVP does **not** bundle LiteLLM or Ollama yet. That may change later, but T36 should assume the supported AI startup contract is still Docker Desktop plus the repo-managed LiteLLM stack.
-
-Prototype commands once Node.js and npm are available on the host:
+Build the launcher artifact for the current platform with Cargo:
 
 ```powershell
-cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype
+cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml
 ```
 
-```bash
-npm run desktop:prototype:dev
-npm run desktop:prototype:dir
-```
+On Windows this produces `launcher/target/release/SunRay.exe`.
 
-What the prototype does:
+The same approach is intended for other supported platforms: build the native `SunRay` binary on that platform, keep the app runtime in Docker, and keep the browser UI as the presentation surface.
 
-- builds the existing TypeScript server and browser asset
-- stages `dist/`, `public/`, and `data/spec/` into Electron's writable user-data area
-- looks for `.env` beside the executable first, then in Electron user data, then in the repo root during development
-- starts the compiled local server with Electron's bundled runtime
-- waits for `/api/state` readiness and then opens the existing player UI in a native window
-
-Current prototype caveats:
-
-- this path is experimental and was added to de-risk packaging direction rather than replace the documented Docker launcher today
-- the MVP packaged playtest path still depends on Docker Desktop for AI startup; the app shell is bundled, but the AI gateway is not
-- code signing, icons, installer polish, and first-run config repair UX are still follow-on work
-- containerized packaging verification passed in this session with `docker compose run --rm app npm run desktop:prototype:dir`, and a host Windows dry run was completed on 2026-03-08; see `packaging/decision-memo.md` for the validation details
-
-See `packaging/decision-memo.md` for the option comparison, save or log implications, and the clean-machine smoke checklist.
+See `packaging/decision-memo.md` for the current launcher-first delivery rationale and playtest checklist.
 
 The browser UI includes:
 
@@ -692,7 +674,7 @@ Use a test-first loop as the default workflow for prompt, schema, adapter, retri
 
 1. Add or tighten a test, fixture, replay case, or harness assertion that captures the desired behavior.
 2. Run `npm run type-check` and that focused check first so the missing behavior or coverage gap is visible.
-3. Run `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow` before changing AI behavior when a compatible local provider is available. Use `--selection-only` when you only need the deterministic contract checks. For repeatable live AI smoke, you can add `--persona-seed <number>` or force one style with `--persona <curious-explorer|cautious-survivor|empathetic-talker|practical-fixer>`.
+3. Run `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow` before changing AI behavior when a compatible local provider is available. Use `--selection-only` when you only need the deterministic contract checks. For repeatable live AI smoke, you can add `--persona-seed <number>` or force one style with `--persona <curious-explorer|cautious-survivor|empathetic-talker|practical-fixer>`. Add `--report-json <path>` when you want a machine-readable review bundle with the exact command, scenario ids, and pass or fail summaries.
 4. Make the smallest change.
 5. Re-run `npm run type-check`, then re-run the focused check, then re-run the same local AI harness immediately after the change.
 6. Only move on to broader app testing after the type-check, focused check, and harness all pass.
@@ -705,6 +687,7 @@ When you are driving AI checks from VS Code, keep the loop boring and repeatable
 
 - Run the TypeScript-side focused validation from a Docker-backed terminal when the task touches `src/**`.
 - Run the deterministic guardrail first: `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Add a review bundle when another AI or human needs the same evidence without raw terminal logs: `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only --report-json launcher/tmp/ai-validation.json`
 - If the task changes live model-visible behavior and a compatible local provider is available, run one replayable live smoke next:
   - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona-seed 7`
   - or `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona practical-fixer`

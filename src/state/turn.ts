@@ -29,6 +29,7 @@ import { reconcileTurnPresentation } from "./presentation.js";
 import { reduceCommittedPlayerState } from "./reducer.js";
 import { sanitizeTurnResult } from "./turn-result.js";
 import { getCurrentBeat } from "../story/director.js";
+import { classifyTurnInput, freezesTurnProgress } from "../rules/turn-input-classification.js";
 import { validateStateUpdates, validateTurnOutput } from "../rules/validator.js";
 
 export interface TurnExecutionTrace {
@@ -150,6 +151,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
     }: ExecuteTurnParams): Promise<TurnExecutionOutcome> {
       const trace = createTurnExecutionTrace(input);
       trace.player = player;
+      const inputClassification = classifyTurnInput(input);
 
       try {
         deps.addEvent(player.id, "player", input);
@@ -266,7 +268,9 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
 
         const adjudication = deps.adjudicateTurnOutput({
           player,
-          turnOutput: trace.proposedResult,
+          turnOutput: freezesTurnProgress(inputClassification)
+            ? freezeTurnProgression(trace.proposedResult, player)
+            : trace.proposedResult,
           directorSpec,
           questSpec
         });
@@ -380,6 +384,24 @@ function createStatePack(player: Player, directorSpec: DirectorSpec, questSpec: 
       rules: directorSpec.rules
     },
     quest_spec: questSpec
+  };
+}
+
+function freezeTurnProgression(turnOutput: TurnOutputPayload, player: Player): TurnOutputPayload {
+  return {
+    ...turnOutput,
+    state_updates: {
+      location: player.location,
+      inventory_add: [],
+      inventory_remove: [],
+      flags_add: [],
+      flags_remove: [],
+      quests: []
+    },
+    director_updates: {
+      end_goal_progress: player.director_state.end_goal_progress
+    },
+    memory_updates: []
   };
 }
 

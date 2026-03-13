@@ -9,7 +9,7 @@ description: "Use for Rust work in launcher/SunRay, including subcommand design,
 
 Use these instructions for work in `launcher/` and the `SunRay` Rust executable.
 
-`SunRay` is the repo's Rust launcher and automation harness. It replaces legacy PowerShell orchestration a script at a time, but it does **not** replace the Node/TypeScript app runtime, Electron packaging, Docker configuration, or gameplay logic.
+`SunRay` is the repo's Rust launcher and automation harness. It replaces legacy PowerShell orchestration a script at a time, but it does **not** replace the Node/TypeScript app runtime, Docker configuration, or gameplay logic.
 
 ## Required grounding before substantial Rust changes
 
@@ -32,17 +32,15 @@ Preserve the current subcommand names unless the task explicitly changes the CLI
 - `test-setup-browser-smoke`
 - `validate-local-gpu-profile-matrix`
 - `validate-litellm-default-config`
-- `start-desktop-prototype`
 
 ## SunRay boundary rules
 
 - `SunRay` is an automation launcher and harness runtime only.
-- It may orchestrate Docker, npm, Node, browser launch, and Electron prototype flows.
+- It may orchestrate Docker, npm, Node, browser launch, and platform-native launcher build flows.
 - It is **not** a webview shell.
 - It is **not** an installer.
 - It is **not** an updater.
 - It is **not** a package manager.
-- It is **not** a replacement for Electron.
 - It is **not** a rewrite of the Node or TypeScript app runtime.
 
 If a change would move product/runtime responsibilities into Rust instead of orchestration responsibilities, stop and re-scope.

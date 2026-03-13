@@ -1,25 +1,27 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 use reqwest::blocking::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::config::{
     local_gpu_profile_matrix_path, resolve_repo_ai_config, resolve_workspace_root, RepoAiConfig,
 };
 use crate::env::load_repo_env;
+use crate::process::render_command_preview;
 use crate::start_dev::compose::docker_compose;
 use crate::start_dev::probes::wait_for_http_ready;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestLocalAiWorkflowOptions {
     pub selection_only: bool,
     pub persona: Option<TestPlayerPersonaChoice>,
     pub persona_seed: Option<u64>,
+    pub report_json: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -48,6 +50,15 @@ impl TestPlayerPersonaChoice {
             Self::PracticalFixer => "uses tools and direct problem-solving",
         }
     }
+
+    fn cli_name(self) -> &'static str {
+        match self {
+            Self::CuriousExplorer => "curious-explorer",
+            Self::CautiousSurvivor => "cautious-survivor",
+            Self::EmpatheticTalker => "empathetic-talker",
+            Self::PracticalFixer => "practical-fixer",
+        }
+    }
 }
 
 const TEST_PLAYER_PERSONAS: [TestPlayerPersonaChoice; 4] = [
@@ -66,6 +77,26 @@ struct TestPlayerPersonaSelection {
 #[derive(Debug, Default)]
 struct HarnessReport {
     failures: Vec<String>,
+    scenarios: Vec<HarnessScenarioResult>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+struct HarnessScenarioResult {
+    scenario_id: String,
+    status: String,
+    summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+struct HarnessManifest {
+    command: String,
+    selection_only: bool,
+    status: String,
+    summary: String,
+    persona: Option<String>,
+    persona_source: Option<String>,
+    persona_seed: Option<u64>,
+    scenarios: Vec<HarnessScenarioResult>,
 }
 
 impl HarnessReport {
@@ -98,7 +129,69 @@ impl HarnessReport {
         }
     }
 
-    fn finish(self) -> Result<()> {
+    fn record_scenario(&mut self, scenario_id: &str, result: Result<()>) {
+        match result {
+            Ok(()) => {
+                self.pass(format!("{scenario_id} passed."));
+                self.scenarios.push(HarnessScenarioResult {
+                    scenario_id: scenario_id.to_string(),
+                    status: "passed".to_string(),
+                    summary: "Scenario completed successfully.".to_string(),
+                });
+            }
+            Err(error) => {
+                let summary = error.to_string();
+                self.fail(format!("{scenario_id} failed: {summary}"));
+                self.scenarios.push(HarnessScenarioResult {
+                    scenario_id: scenario_id.to_string(),
+                    status: "failed".to_string(),
+                    summary,
+                });
+            }
+        }
+    }
+
+    fn build_manifest(
+        &self,
+        options: &TestLocalAiWorkflowOptions,
+        persona_selection: Option<TestPlayerPersonaSelection>,
+    ) -> HarnessManifest {
+        let status = if self.failures.is_empty() {
+            "passed"
+        } else {
+            "failed"
+        };
+        let summary = if self.failures.is_empty() {
+            format!(
+                "{} scenario(s) passed.",
+                self.scenarios
+                    .iter()
+                    .filter(|scenario| scenario.status == "passed")
+                    .count()
+            )
+        } else {
+            self.failures.join(" | ")
+        };
+
+        HarnessManifest {
+            command: command_preview(options),
+            selection_only: options.selection_only,
+            status: status.to_string(),
+            summary,
+            persona: persona_selection.map(|selection| selection.persona.cli_name().to_string()),
+            persona_source: persona_selection.map(|selection| selection.source.to_string()),
+            persona_seed: options.persona_seed,
+            scenarios: self.scenarios.clone(),
+        }
+    }
+
+    fn finish(
+        self,
+        options: &TestLocalAiWorkflowOptions,
+        persona_selection: Option<TestPlayerPersonaSelection>,
+    ) -> Result<()> {
+        maybe_write_manifest(options, &self.build_manifest(options, persona_selection))?;
+
         if self.failures.is_empty() {
             println!();
             println!("Local AI workflow regression harness passed.");
@@ -147,18 +240,15 @@ pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
     println!("Chat model: {}", config.chat_model);
     println!("Embedding model: {}", config.embedding_model);
 
-    if let Err(error) = test_local_gpu_profile_selection(&repo_root, &mut report) {
-        report.fail(format!("Local GPU profile selection test failed: {error}"));
-    }
-
-    if let Err(error) = test_turn_schema_guardrails(&repo_root, &mut report) {
-        report.fail(format!("Turn schema guardrail test failed: {error}"));
-    }
+    let local_gpu_profile_selection = test_local_gpu_profile_selection(&repo_root, &mut report);
+    report.record_scenario("local-gpu-profile-selection", local_gpu_profile_selection);
+    let turn_schema_guardrails = test_turn_schema_guardrails(&repo_root, &mut report);
+    report.record_scenario("turn-schema-guardrails", turn_schema_guardrails);
 
     let persona_selection = resolve_test_player_persona_selection(&options)?;
 
     if options.selection_only {
-        return report.finish();
+        return report.finish(&options, None);
     }
 
     println!(
@@ -170,7 +260,7 @@ pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
 
     if config.base_url.trim().is_empty() {
         report.fail("This harness needs a reachable AI base URL from the current provider config.");
-        return report.finish();
+        return report.finish(&options, Some(persona_selection));
     }
 
     let probe_url = readiness_probe_url(&config);
@@ -178,26 +268,55 @@ pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
         report.fail(format!(
             "Configured AI base URL did not respond before tests started: {probe_url}"
         ));
-        return report.finish();
+        return report.finish(&options, Some(persona_selection));
     }
 
     let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
 
-    if let Err(error) = test_embeddings(&client, &config, &mut report) {
-        report.fail(format!("Embeddings test failed: {error}"));
+    let embeddings_endpoint = test_embeddings(&client, &config, &mut report);
+    report.record_scenario("embeddings-endpoint", embeddings_endpoint);
+    let scene_schema = test_scene_schema(&client, &config, &mut report);
+    report.record_scenario("scene-schema", scene_schema);
+    let game_turn_schema =
+        test_game_turn_schema(&client, &config, persona_selection.persona, &mut report);
+    report.record_scenario("game-turn-schema", game_turn_schema);
+
+    report.finish(&options, Some(persona_selection))
+}
+
+fn command_preview(options: &TestLocalAiWorkflowOptions) -> String {
+    let mut args = vec!["test-local-ai-workflow".to_string()];
+    if options.selection_only {
+        args.push("--selection-only".to_string());
+    }
+    if let Some(persona) = options.persona {
+        args.push("--persona".to_string());
+        args.push(persona.cli_name().to_string());
+    }
+    if let Some(seed) = options.persona_seed {
+        args.push("--persona-seed".to_string());
+        args.push(seed.to_string());
+    }
+    if let Some(path) = &options.report_json {
+        args.push("--report-json".to_string());
+        args.push(path.display().to_string());
     }
 
-    if let Err(error) = test_scene_schema(&client, &config, &mut report) {
-        report.fail(format!("Structured scene test failed: {error}"));
+    render_command_preview("SunRay", &args)
+}
+
+fn maybe_write_manifest(options: &TestLocalAiWorkflowOptions, manifest: &HarnessManifest) -> Result<()> {
+    let Some(path) = &options.report_json else {
+        return Ok(());
+    };
+
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        fs::create_dir_all(parent)?;
     }
 
-    if let Err(error) =
-        test_game_turn_schema(&client, &config, persona_selection.persona, &mut report)
-    {
-        report.fail(format!("Full game_turn test failed: {error}"));
-    }
-
-    report.finish()
+    fs::write(path, serde_json::to_string_pretty(manifest)?)?;
+    println!("Wrote AI validation report: {}", path.display());
+    Ok(())
 }
 
 fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport) -> Result<()> {
@@ -703,11 +822,14 @@ fn find_profile_for_vram(matrix: &LocalGpuProfileMatrix, vram_gb: f64) -> Option
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::{
-        find_profile_for_vram, resolve_local_gpu_profile_selection,
+        command_preview, find_profile_for_vram, resolve_local_gpu_profile_selection,
         resolve_test_player_persona_selection, select_test_player_persona_from_seed,
-        LocalGpuProfile, LocalGpuProfileMatrix, TestLocalAiWorkflowOptions,
-        TestPlayerPersonaChoice, TEST_PLAYER_PERSONAS,
+        HarnessManifest, HarnessReport, HarnessScenarioResult, LocalGpuProfile,
+        LocalGpuProfileMatrix, TestLocalAiWorkflowOptions, TestPlayerPersonaChoice,
+        TestPlayerPersonaSelection, TEST_PLAYER_PERSONAS,
     };
 
     fn sample_matrix() -> LocalGpuProfileMatrix {
@@ -797,6 +919,7 @@ mod tests {
             selection_only: false,
             persona: Some(TestPlayerPersonaChoice::PracticalFixer),
             persona_seed: Some(0),
+            report_json: None,
         })
         .expect("persona selection");
 
@@ -810,10 +933,69 @@ mod tests {
             selection_only: false,
             persona: None,
             persona_seed: Some(2),
+            report_json: None,
         })
         .expect("persona selection");
 
         assert_eq!(selection.persona, TestPlayerPersonaChoice::EmpatheticTalker);
         assert_eq!(selection.source, "seeded selection");
+    }
+
+    #[test]
+    fn command_preview_includes_manifest_and_persona_flags() {
+        let preview = command_preview(&TestLocalAiWorkflowOptions {
+            selection_only: true,
+            persona: Some(TestPlayerPersonaChoice::PracticalFixer),
+            persona_seed: Some(7),
+            report_json: Some(PathBuf::from("reports/ai-manifest.json")),
+        });
+
+        assert_eq!(
+            preview,
+            "SunRay test-local-ai-workflow --selection-only --persona practical-fixer --persona-seed 7 --report-json reports/ai-manifest.json"
+        );
+    }
+
+    #[test]
+    fn manifest_records_command_persona_and_scenarios() {
+        let report = HarnessReport {
+            failures: Vec::new(),
+            scenarios: vec![HarnessScenarioResult {
+                scenario_id: "turn-schema-guardrails".to_string(),
+                status: "passed".to_string(),
+                summary: "Scenario completed successfully.".to_string(),
+            }],
+        };
+
+        let manifest = report.build_manifest(
+            &TestLocalAiWorkflowOptions {
+                selection_only: false,
+                persona: Some(TestPlayerPersonaChoice::EmpatheticTalker),
+                persona_seed: Some(11),
+                report_json: Some(PathBuf::from("reports/live.json")),
+            },
+            Some(TestPlayerPersonaSelection {
+                persona: TestPlayerPersonaChoice::EmpatheticTalker,
+                source: "explicit persona override",
+            }),
+        );
+
+        assert_eq!(
+            manifest,
+            HarnessManifest {
+                command: "SunRay test-local-ai-workflow --persona empathetic-talker --persona-seed 11 --report-json reports/live.json".to_string(),
+                selection_only: false,
+                status: "passed".to_string(),
+                summary: "1 scenario(s) passed.".to_string(),
+                persona: Some("empathetic-talker".to_string()),
+                persona_source: Some("explicit persona override".to_string()),
+                persona_seed: Some(11),
+                scenarios: vec![HarnessScenarioResult {
+                    scenario_id: "turn-schema-guardrails".to_string(),
+                    status: "passed".to_string(),
+                    summary: "Scenario completed successfully.".to_string(),
+                }],
+            }
+        );
     }
 }

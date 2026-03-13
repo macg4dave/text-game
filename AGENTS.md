@@ -129,7 +129,7 @@ Before starting substantial work, read:
 - If touching launcher work, keep the matching launcher task cards in [BACKLOG.md](/g:/text-game/BACKLOG.md) updated in the same session.
 - Do not add new PowerShell, Bash, or batch launcher automation.
 - Migrate one legacy launcher script at a time: match behavior in `SunRay`, validate parity, then delete the legacy script.
-- Keep `SunRay` focused on orchestration. It is not a webview shell, installer, updater, package manager, Electron replacement, or app-runtime rewrite.
+- Keep `SunRay` focused on orchestration. It is not a webview shell, installer, updater, package manager, or app-runtime rewrite.
 
 ## Responsibility Heuristics
 

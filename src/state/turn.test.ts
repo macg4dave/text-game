@@ -14,6 +14,7 @@ import {
   type TurnResult
 } from "../core/types.js";
 import { SYSTEM_PROMPT } from "../ai/prompt.js";
+import { buildTurnPromptSections } from "../ai/service.js";
 import { TURN_RESPONSE_SCHEMA, validateTurnResponseSchemaContract } from "../ai/turn-schema.js";
 import { validateCanonicalTurnEvent, validateMemoryCandidate } from "../rules/validator.js";
 import { createCommittedTurnEventPayload } from "../server/http-contract.js";
@@ -156,6 +157,35 @@ function createStorySampleQuestSpec(): QuestSpec {
   };
 }
 
+function createStorySamplePlayer(): Player {
+  return {
+    id: "player-ghostlight",
+    name: "Avery",
+    created_at: "2026-03-13T00:00:00.000Z",
+    location: "Rooftop Market",
+    summary: "The relay keeps barking fake evacuation orders.",
+    inventory: [],
+    flags: [],
+    quests: [
+      {
+        id: "ghostlight_relay",
+        status: "active",
+        summary: "Inspect the sparking market beacon in Rooftop Market"
+      }
+    ],
+    director_state: {
+      end_goal: "Quiet the Ghostlight Relay before it empties the district.",
+      current_act_id: "act-1",
+      current_act: "Market Rumors",
+      current_beat_id: "beat-1",
+      current_beat_label: "Confirm the relay is real",
+      story_beats_remaining: 4,
+      end_goal_progress: "No one has proved the relay is more than panic.",
+      completed_beats: []
+    }
+  };
+}
+
 test("system prompt frames model-emitted consequences as proposals instead of committed truth", () => {
   assert.match(SYSTEM_PROMPT, /propos/i);
   assert.match(SYSTEM_PROMPT, /do not present .* committed/i);
@@ -167,6 +197,32 @@ test("system prompt separates intent, simulation plausibility, and pacing guidan
   assert.match(SYSTEM_PROMPT, /implausible actions may fail .* simulation|simulation reasons/i);
   assert.match(SYSTEM_PROMPT, /current beat .* framing|pacing/i);
   assert.doesNotMatch(SYSTEM_PROMPT, /beat appears achieved, you may propose the beat's unlock flag/i);
+});
+
+test("system prompt treats clarification questions and raw internal tokens as non-progress inputs", () => {
+  assert.match(SYSTEM_PROMPT, /clarification|explain|what is|tell me about/i);
+  assert.match(SYSTEM_PROMPT, /do not .* auto-inspect|do not .* auto-use|do not .* unlock/i);
+  assert.match(SYSTEM_PROMPT, /raw internal tokens|snake_case|flag names/i);
+});
+
+test("turn prompt sections include clarification guidance for informational questions", () => {
+  const promptSections = buildTurnPromptSections({
+    statePack: {
+      player: {
+        location: "Rooftop Market",
+        flags: [],
+        inventory: [],
+        quests: []
+      }
+    },
+    shortHistory: ["PLAYER: hello?"],
+    memories: [],
+    input: "what is the market beacon?"
+  });
+
+  assert.match(promptSections, /TURN_INPUT_CLASSIFICATION/i);
+  assert.match(promptSections, /clarification/i);
+  assert.match(promptSections, /do not .* advance|do not .* unlock|do not .* inspect/i);
 });
 
 test("turn response schema contract stays compact and proposal-oriented", () => {
@@ -932,33 +988,177 @@ test("turn service accepts authored off-beat travel from quest prerequisites eve
   ]);
 });
 
-test("turn service rejects stage-skipping travel and progression before director framing can treat it as truth", async () => {
-  const player: Player = {
-    id: "player-ghostlight",
-    name: "Avery",
-    created_at: "2026-03-13T00:00:00.000Z",
-    location: "Rooftop Market",
-    summary: "The relay keeps barking fake evacuation orders.",
-    inventory: [],
-    flags: [],
-    quests: [
-      {
-        id: "ghostlight_relay",
-        status: "active",
-        summary: "Inspect the sparking market beacon in Rooftop Market"
+test("turn service blocks clarification-style inputs from unlocking quest progression", async () => {
+  const player = createStorySamplePlayer();
+  const committedEvents: CanonicalTurnEventPayload[] = [];
+  const persistedPlayers: Player[] = [];
+
+  const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent);
       }
-    ],
-    director_state: {
-      end_goal: "Quiet the Ghostlight Relay before it empties the district.",
-      current_act_id: "act-1",
-      current_act: "Market Rumors",
-      current_beat_id: "beat-1",
-      current_beat_label: "Confirm the relay is real",
-      story_beats_remaining: 4,
-      end_goal_progress: "No one has proved the relay is more than panic.",
-      completed_beats: []
+    },
+    addEvent() {},
+    addMemories() {},
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "The market beacon is the sparking loudspeaker throwing false evacuation orders across the stalls.",
+        player_options: ["Inspect the market beacon", "Ask who wired it"],
+        state_updates: {
+          location: "Rooftop Market",
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: ["beacon_inspected"],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "Next step: Ask Nila Vale where the relay draws power."
+        },
+        memory_updates: ["The beacon is tied to the Ghostlight Relay."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
     }
-  };
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "what is the market beacon?",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected the turn pipeline to persist the adjudicated state");
+  }
+
+  assert.deepEqual(persistedPlayer.flags, []);
+  assert.deepEqual(persistedPlayer.quests, player.quests);
+  assert.equal(persistedPlayer.director_state.end_goal_progress, player.director_state.end_goal_progress);
+  assert.equal(
+    outcome.turnOutput.narrative,
+    "You pause in Rooftop Market and take stock. The clearest lead is still to confirm the relay is real."
+  );
+  assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
+  assert.equal(committedEvents[0]?.committed.state_updates, null);
+  assert.equal(committedEvents[0]?.committed.director_updates, null);
+  assert.deepEqual(committedEvents[0]?.committed.memory_updates, []);
+});
+
+test("turn service blocks raw internal tokens from acting like valid story commands", async () => {
+  const player = createStorySamplePlayer();
+  const committedEvents: CanonicalTurnEventPayload[] = [];
+  const persistedPlayers: Player[] = [];
+
+  const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent);
+      }
+    },
+    addEvent() {},
+    addMemories() {},
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "The recessed panel clicks open beneath the beacon housing.",
+        player_options: ["Reach into the panel"],
+        state_updates: {
+          location: "Rooftop Market",
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: ["beacon_inspected"],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "Next step: Ask Nila Vale where the relay draws power."
+        },
+        memory_updates: ["The raw token somehow triggered the beacon."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "beacon_inspected",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected the turn pipeline to persist the adjudicated state");
+  }
+
+  assert.deepEqual(persistedPlayer.flags, []);
+  assert.deepEqual(persistedPlayer.quests, player.quests);
+  assert.equal(
+    outcome.turnOutput.narrative,
+    "You pause in Rooftop Market and take stock. The clearest lead is still to confirm the relay is real."
+  );
+  assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
+  assert.equal(committedEvents[0]?.committed.state_updates, null);
+  assert.equal(committedEvents[0]?.committed.director_updates, null);
+  assert.deepEqual(committedEvents[0]?.committed.memory_updates, []);
+});
+
+test("turn service rejects stage-skipping travel and progression before director framing can treat it as truth", async () => {
+  const player = createStorySamplePlayer();
 
   const committedEvents: CanonicalTurnEventPayload[] = [];
   const persistedPlayers: Player[] = [];

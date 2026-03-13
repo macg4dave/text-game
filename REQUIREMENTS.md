@@ -31,6 +31,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Player-facing narrative, options, quest progress, and memory facts shown after a turn must align to committed authoritative state rather than uncommitted model prose.
 - Turn handling must separate freeform intent interpretation, world simulation resolution, and story pacing or framing.
 - The model-facing turn contract must treat those layers distinctly: infer what the player is trying to do first, propose plausible world consequences second, and use director guidance only to frame or pace the aftermath.
+- Clarification-style questions and raw internal tokens submitted through the normal turn input must not auto-inspect, auto-use, or advance flags, quests, or director progress; they may answer in place, but committed state changes require an actual in-world attempt.
 - The player may attempt almost anything; implausible or failed actions should be resolved by simulation rules, not by the director acting as a hidden refusal gate.
 - Director and beat controls such as `required_flags`, `unlock_flags`, and `max_beats_per_turn` must shape pacing and framing after accepted outcomes, not replace simulation or plausibility checks.
 - Current beat, `required_flags`, and `unlock_flags` must not serve as the sole permission logic for an otherwise plausible action.
@@ -40,7 +41,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - The default AI setup uses a LiteLLM-managed gateway that can route to local AI or hosted providers behind the same app-facing contract.
 - Startup preflight must validate host prerequisites, AI readiness, writable paths, and save or migration safety before the first turn.
 - Preflight issues must be classified as blocker, warning, or info; blockers must stop the first turn and present plain-language recovery steps.
-- The same preflight contract must be reusable across launcher, API, browser UI, and packaged shell diagnostics.
+- The same preflight contract must be reusable across launcher, API, and browser UI diagnostics.
 - Each preflight issue must include one recommended next step for end users, while advanced diagnostics stay available behind an expandable details surface.
 - Memory system with summaries and embedding-based retrieval.
 - Memory must support explicit classes from the start, including hard canon facts, quest progression facts, relationship facts, world discoveries, and soft flavor recollections.

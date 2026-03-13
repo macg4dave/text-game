@@ -142,7 +142,7 @@ Do not assume:
 - SQLite state source of truth
 - server-side director enforcement
 - provider-neutral AI config with backward compatibility for existing `OPENAI_*` env vars
-- Electron is the preferred Windows packaging spike because it can wrap the existing local HTTP gameplay stack without moving game authority into the shell
+- Platform-native `SunRay` launcher binaries are the player-facing delivery surface; they coordinate Docker-backed services and open the browser UI without embedding a separate desktop shell
 
 ## TypeScript Note
 
@@ -166,7 +166,7 @@ Current build/run contract:
 - Automation lives in `launcher/` as the Rust executable `SunRay`, rooted at `launcher/Cargo.toml`.
 - New automation entrypoints should be Rust subcommands, not `.ps1`, `.sh`, or `.bat` files.
 - Shared automation behavior should live in Rust modules inside that tooling runtime, with JSON or fixture assets beside it as needed.
-- Rust automation may invoke Docker, npm, Node, Electron, and other existing tools as external processes, but this does not change the app runtime boundary.
+- Rust automation may invoke Docker, npm, Node, browser-launch helpers, and other existing tools as external processes, but this does not change the app runtime boundary.
 - Existing PowerShell entrypoints are no longer part of the supported runtime surface and should not be revived.
 - Keep launcher fixtures, validation assets, and shared automation helpers inside `launcher/` so the Rust tooling runtime owns its full support surface.
 
@@ -175,29 +175,28 @@ Current build/run contract:
 - `launcher/SunRay` is a process orchestrator for the existing runtime surfaces.
 - `launcher/SunRay` is not a webview shell and must not embed or replace the browser UI.
 - `launcher/SunRay` is not an installer, updater, or package manager.
-- `launcher/SunRay` is not a replacement for Electron packaging.
 - `launcher/SunRay` is not a replacement for the Node server or the TypeScript gameplay stack.
 - If a responsibility would turn `SunRay` into a second app runtime instead of an automation entrypoint, it belongs elsewhere.
 
-## Packaging Direction
+## Launcher Delivery Direction
 
-The current packaging spike direction is an Electron shell over the existing compiled server and browser UI.
+The supported delivery direction is platform-native `SunRay` launcher binaries that coordinate the existing compiled server and browser UI through Docker-backed runtime services.
 
 Reasoning:
 
 - it preserves one gameplay stack and keeps the browser/server split as an internal detail
-- it can ship the Node-based server with the desktop shell without moving the app shell into a Rust desktop runtime
-- it is a better near-term fit than Tauri while the app still depends on a local Node server and SQLite runtime
+- it keeps delivery aligned with the existing Rust launcher investment instead of introducing a second desktop-shell runtime
+- it avoids embedded-shell and cross-build wrapper requirements in the supported path; platform binaries are built with Cargo and the runtime services stay in Docker
 
 Clarification:
 
-- the repo may adopt a Rust toolchain for automation under `launcher/`; that tooling change does not change the Electron-versus-Tauri packaging decision for the shipped app runtime
+- the launcher binary is the supported entrypoint, not a bundled webview shell
+- Docker remains responsible for the app, LiteLLM, and local-model services; the launcher is responsible for orchestration and player-facing startup guidance
 
 Implications for follow-on work:
 
-- packaged runtime files should be staged into a writable user-data area instead of writing into install resources
 - setup and recovery flows should assume the player may never see a terminal
-- launcher-only and Docker paths remain useful development and support fallbacks, but they are no longer the preferred long-term packaged direction
+- every supported platform should have a Rust launcher artifact built on that platform, with the same Docker-managed runtime contract behind it
 
 ## Architecture Change Intake
 

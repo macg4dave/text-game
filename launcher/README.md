@@ -12,8 +12,8 @@
 - `SunRay` is not an installer.
 - `SunRay` is not an updater.
 - `SunRay` is not a package manager.
-- `SunRay` is not a replacement for Electron.
 - `SunRay` is not a rewrite of the Node or TypeScript app runtime.
+- Cross-platform release artifacts should be platform-native `SunRay` binaries that open the browser and coordinate Docker-backed runtime services.
 
 ## Command map
 
@@ -24,7 +24,6 @@
 | `test-setup-browser-smoke` | `T65e` | Targeted setup browser smoke harness |
 | `validate-local-gpu-profile-matrix` | `T65d` | Launcher-owned GPU profile matrix validation |
 | `validate-litellm-default-config` | `T65d` | Default LiteLLM config validation |
-| `start-desktop-prototype` | `T65e` | Electron prototype wrapper |
 
 ## Shared module layout
 
@@ -47,6 +46,7 @@ Use Cargo directly:
 - `cargo run --manifest-path launcher/Cargo.toml -- start-dev --rebuild`
 - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona practical-fixer`
 - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona-seed 7`
+- `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only --report-json launcher/tmp/ai-validation.json`
 
 Windows release builds from the supported command now produce `launcher/target/release/SunRay.exe`.
 Launching `SunRay.exe` directly now behaves like `SunRay.exe start-dev`.
@@ -61,8 +61,9 @@ Or use the repo convenience scripts:
 - `npm run sunray:test-setup-browser-smoke`
 - `npm run sunray:validate-local-gpu-profile-matrix`
 - `npm run sunray:validate-litellm-default-config`
-- `npm run sunray:start-desktop-prototype`
 
-`start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype` now run through Rust.
+`start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, and `validate-litellm-default-config` now run through Rust.
 
 The full `test-local-ai-workflow` smoke now picks one test-player persona before the live AI turn check starts. You can let it choose at runtime, force a specific persona with `--persona`, or make the choice repeatable with `--persona-seed`. The supported personas are `curious-explorer`, `cautious-survivor`, `empathetic-talker`, and `practical-fixer`.
+
+Use `--report-json <path>` when you want a machine-readable review bundle with the exact `SunRay` command, persona or seed details, overall pass or fail status, and stable per-scenario summaries.

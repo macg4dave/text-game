@@ -37,6 +37,7 @@ test("buildRecoveryActions adds launcher, smaller-profile, and GPU guidance for 
 
   assert.deepEqual(actions.map((action) => action.id), [
     "retry-setup-check",
+    "copy-docker-desktop-checklist",
     "copy-launcher-command",
     "copy-smaller-profile-guidance",
     "copy-gpu-repair-checklist"

@@ -1,4 +1,4 @@
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
 const path = require("node:path");
@@ -9,6 +9,8 @@ const WINDOW_TITLE = "Text Game Prototype";
 const DEFAULT_PORT = 3000;
 const READY_TIMEOUT_MS = 60000;
 const READY_POLL_MS = 500;
+const DOCKER_PROBE_TIMEOUT_MS = 10000;
+const GPU_PROBE_TIMEOUT_MS = 10000;
 
 let serverProcess = null;
 let logFilePath = "";
@@ -32,7 +34,7 @@ app.whenReady().then(async () => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     writeLog(`Startup failed: ${message}`);
-    dialog.showErrorBox(WINDOW_TITLE, message);
+    dialog.showErrorBox(WINDOW_TITLE, formatStartupFailureMessage(message));
     app.quit();
   }
 });
@@ -83,6 +85,7 @@ async function prepareRuntime() {
 
   const envFile = resolveEnvFile(appRoot);
   const envVars = envFile ? readDotEnvFile(envFile) : {};
+  const prerequisiteSnapshot = detectDesktopPrerequisites();
   const preferredPort = parsePort(envVars.PORT || process.env.PORT);
   const port = await findAvailablePort(preferredPort);
 
@@ -97,13 +100,14 @@ async function prepareRuntime() {
     runtimeRoot,
     envFile,
     envVars,
+    prerequisiteSnapshot,
     port,
     appUrl: `http://127.0.0.1:${port}/`,
-    readyUrl: `http://127.0.0.1:${port}/api/state?name=DesktopPrototype`
+    readyUrl: `http://127.0.0.1:${port}/api/setup/status`
   };
 }
 
-async function startServer({ runtimeRoot, envVars, port }) {
+async function startServer({ runtimeRoot, envVars, prerequisiteSnapshot, port }) {
   const serverEntry = path.join(runtimeRoot, "dist", "server", "index.js");
   if (!fs.existsSync(serverEntry)) {
     throw new Error(`Desktop prototype could not find ${serverEntry}. Run the build before launching the shell.`);
@@ -113,6 +117,10 @@ async function startServer({ runtimeRoot, envVars, port }) {
     ...process.env,
     ...envVars,
     PORT: String(port),
+    TEXT_GAME_DESKTOP_SHELL: "1",
+    TEXT_GAME_DESKTOP_DOCKER_STATE: prerequisiteSnapshot.dockerState,
+    TEXT_GAME_DESKTOP_GPU_STATE: prerequisiteSnapshot.gpuState,
+    TEXT_GAME_DESKTOP_PREREQ_NOTES: prerequisiteSnapshot.notes.join(" || "),
     ELECTRON_RUN_AS_NODE: "1"
   };
 
@@ -159,7 +167,7 @@ async function waitForServer(readyUrl, timeoutMs) {
     try {
       const response = await fetch(readyUrl);
       const body = await response.text();
-      if (response.ok && body.includes("\"player\"")) {
+      if (response.ok && body.includes("\"setup\"")) {
         writeLog(`Server ready at ${readyUrl}`);
         return;
       }
@@ -173,6 +181,96 @@ async function waitForServer(readyUrl, timeoutMs) {
   }
 
   throw new Error(`Desktop prototype timed out waiting for the local server. Last error: ${lastError}`);
+}
+
+function formatStartupFailureMessage(message) {
+  if (
+    message.includes("timed out waiting for the local server") ||
+    message.includes("exited before the Electron shell could open the game window")
+  ) {
+    const logHint = logFilePath ? `\n\nDesktop shell log: ${logFilePath}` : "";
+    return `${message}\n\nThis is a packaged-shell startup failure, not a LiteLLM readiness problem. If Docker Desktop or LiteLLM were the only blockers, the game window would still open and show the setup recovery panel.${logHint}`;
+  }
+
+  return message;
+}
+
+function detectDesktopPrerequisites() {
+  const dockerProbe = spawnSync("docker", ["info", "--format", "{{json .ServerVersion}}"], {
+    windowsHide: true,
+    encoding: "utf8",
+    timeout: DOCKER_PROBE_TIMEOUT_MS
+  });
+
+  const notes = [];
+  if (dockerProbe.error) {
+    if (dockerProbe.error.code === "ENOENT") {
+      notes.push("docker.exe was not found on PATH.");
+      return {
+        dockerState: "missing",
+        gpuState: "tooling-missing",
+        notes
+      };
+    }
+
+    notes.push(`Docker probe failed: ${dockerProbe.error.message}`);
+    return {
+      dockerState: "not-running",
+      gpuState: "tooling-missing",
+      notes
+    };
+  }
+
+  const dockerOutput = `${dockerProbe.stdout || ""}\n${dockerProbe.stderr || ""}`.trim();
+  if (dockerProbe.status !== 0) {
+    if (dockerOutput) {
+      notes.push(dockerOutput);
+    }
+
+    return {
+      dockerState: "not-running",
+      gpuState: "tooling-missing",
+      notes
+    };
+  }
+
+  if (dockerOutput) {
+    notes.push(`Docker probe succeeded: ${dockerOutput}`);
+  }
+
+  const gpuProbe = spawnSync("nvidia-smi", ["-L"], {
+    windowsHide: true,
+    encoding: "utf8",
+    timeout: GPU_PROBE_TIMEOUT_MS
+  });
+
+  if (gpuProbe.error) {
+    notes.push(`GPU probe failed: ${gpuProbe.error.message}`);
+    return {
+      dockerState: "running",
+      gpuState: "tooling-missing",
+      notes
+    };
+  }
+
+  if (gpuProbe.status !== 0) {
+    const gpuOutput = `${gpuProbe.stdout || ""}\n${gpuProbe.stderr || ""}`.trim();
+    if (gpuOutput) {
+      notes.push(gpuOutput);
+    }
+
+    return {
+      dockerState: "running",
+      gpuState: "tooling-missing",
+      notes
+    };
+  }
+
+  return {
+    dockerState: "running",
+    gpuState: "ready",
+    notes
+  };
 }
 
 function resolveAppRoot() {

@@ -58,6 +58,7 @@ Closed historical task cards moved out of the active backlog live in [BACKLOG_AR
 
 - Archive cutoff audited on 2026-03-08: closed task cards before `T05` were moved out of this file so future agents can focus on open work.
 - The main backlog should keep active, blocked, ready, and review items only unless a completed task still needs to stay visible for a near-term coordination reason.
+- If an active `Ready`, `Blocked`, or `Review` task still depends on a completed card, keep that completed dependency card in this file until the dependent work closes instead of leaving a dangling archive-only reference.
 
 ## End-User-First Priority Rules
 
@@ -162,7 +163,7 @@ No global blocker as of 2026-03-09:
 | T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
 | T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
 | T65d | Now | P1 | P1 | SunRay validator command migration | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
-| T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Review | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
+| T65e | Now | P1 | P1 | SunRay setup smoke migration | Done | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` |
 | T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Review | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
 | T66 | Next | P1 | P2 | SunRay Rust-native cleanup | Done | None | Manual planning-doc consistency review + child task validation |
 | T66a | Now | P1 | P2 | SunRay command contract cleanup | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- --no-browser` + manual launcher-doc consistency review |
@@ -170,9 +171,10 @@ No global blocker as of 2026-03-09:
 | T66c | Next | P1 | P2 | SunRay shared probe and smoke helper extraction | Done | T66b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` |
 | T66d | Now | P1 | P2 | SunRay Windows exe release path | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml` + manual launcher-doc consistency review |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Done | T02 | `docker compose run --rm --no-deps app npm run test:config` + manual Docker Ollama smoke |
-| T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
+| T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
-| T02h | Now | P0 | P1 | GPU-first Docker launcher default | Done | T02g | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/core/config.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` |
+| T02f | Now | P0 | P1 | Docker-first LiteLLM sidecar and GPU override | Done | None | `docker compose up --build` + `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
+| T02h | Now | P0 | P1 | GPU-first Docker launcher default | Done | T02g | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/core/config.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
 | T05 | Next | P0 | P2 | Error boundary and global handler | Done | None | `npm test` |
 | T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Done | T02f | Matrix review |
 | T06 | Next | P1 | P1 | Turn input, output, and state schemas | Done | T02 | `npm test` |
@@ -181,26 +183,26 @@ No global blocker as of 2026-03-09:
 | T08 | Next | P1 | P1 | Deterministic state reducer | Done | T06, T57a, T58a | `npm test` |
 | T09 | Next | P1 | P1 | Event log persistence and replay | Done | T04, T08, T57b, T59a | Replay fixture execution |
 | T10 | Next | P1 | P1 | Output validator and sanitizer | Done | T06, T57a, T61a | `npm test` |
-| T11 | Next | P1 | P1 | Minimal player UI loop | Done | T06 | `docker compose run --rm --no-deps app npm test` + `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` + manual browser smoke test |
+| T11 | Next | P1 | P1 | Minimal player UI loop | Done | T06 | `docker compose run --rm --no-deps app npm test` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` + manual browser smoke test |
 | T11a | Now | P1 | P2 | Browser UI module decomposition groundwork | Done | T11, T12b | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/global-error.test.ts src/ui/http-client.test.ts src/ui/player-name.test.ts src/ui/session-data.test.ts src/ui/setup-view.test.ts src/ui/debug-view.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
 | T48 | Now | P1 | P1 | Server route and turn pipeline extraction | Done | T06, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts` + `docker compose run --rm --no-deps app npm test` |
-| T49 | Now | P1 | P1 | App shell controller extraction | Done | T11a, T12c | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `powershell -ExecutionPolicy Bypass -File scripts/test-setup-browser-smoke.ps1` |
+| T49 | Now | P1 | P1 | App shell controller extraction | Done | T11a, T12c | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` |
 | T50 | Now | P1 | P1 | Runtime preflight service split | Done | T02h, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/runtime-preflight.test.ts src/server/setup-status.test.ts src/server/host-preflight.test.ts` |
 | T56 | Now | P1 | P2 | Future issue intake workflow | Done | None | Manual planning-doc consistency review |
 | T56a | Now | P1 | P2 | Backlog parent and child task pattern | Done | T56 | Manual backlog structure review |
 | T56b | Now | P1 | P2 | Cross-doc planning sync policy | Done | T56 | Manual roadmap, requirements, architecture, and standards consistency review |
 | T57 | Now | P1 | P1 | Authority-safe turn truth boundary | Done | T06 | Manual planning-doc consistency review |
-| T57a | Now | P1 | P1 | Proposal-only turn contract and prompt boundary | Done | T06, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T57a | Now | P1 | P1 | Proposal-only turn contract and prompt boundary | Done | T06, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T58 | Next | P1 | P1 | Player agency and pacing boundary | Done | T06, T57 | Manual planning-doc consistency review |
-| T58a | Next | P1 | P1 | Intent, simulation, and pacing contract split | Done | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T58a | Next | P1 | P1 | Intent, simulation, and pacing contract split | Done | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T59 | Now | P1 | P1 | Semantic event log and replay canon | Done | T06, T57 | Manual planning-doc consistency review |
 | T59a | Now | P1 | P1 | Canonical event schema and replay contract | Done | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/server/http-contract.test.ts src/rules/validator.test.ts` |
 | T60 | Next | P1 | P1 | Memory classes and authority policy | Done | T06, T57, T59 | Manual planning-doc consistency review |
-| T60a | Next | P1 | P1 | Memory class contract and admission rules | Done | T57a, T59a, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T60a | Next | P1 | P1 | Memory class contract and admission rules | Done | T57a, T59a, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T60b | Later | P2 | P1 | Class-aware retrieval and summarization policy | Blocked | T60a, T13, T62b, T63a | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
 | T61 | Now | P1 | P1 | Compact turn schema boundary | Done | T06, T57 | Manual planning-doc consistency review |
-| T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Done | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Done | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Done | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Done | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T12 | Next | P1 | P1 | New game onboarding | Done | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/session-controller.test.ts src/ui/launch-view.test.ts src/ui/setup-view.test.ts src/ui/setup-browser-smoke.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` + local `/api/setup/status` and `/api/state` smoke |
 | T12b | Next | P1 | P1 | First-run setup wizard and connection test | Done | T02f, T11, T12 | Manual first-run flow check |
 | T11b | Next | P1 | P2 | Turn surface renderer extraction | Done | T11a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
@@ -213,7 +215,7 @@ No global blocker as of 2026-03-09:
 | T64b | Next | P1 | P1 | story_sample authored content slice | Done | T34, T57c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/story/quest.test.ts src/state/adjudication.test.ts src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` + live `/api/state` and guided `/api/turn` smoke |
 | T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Done | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
 | T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Done | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
-| T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Done | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Done | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Done | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T59c | Next | P1 | P1 | Canonical player-creation replay bootstrap | Done | T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T58b | Later | P2 | P1 | Simulation-first consequence resolution | Done | T58a, T57b, T07, T08 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
@@ -223,23 +225,24 @@ No global blocker as of 2026-03-09:
 | T53 | Next | P1 | P1 | Launcher entrypoint and script library split | Dropped | T02h, T12c | Superseded by `T65` |
 | T54 | Next | P1 | P2 | Setup view model and recovery policy split | Done | T11a, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T62 | Next | P2 | P1 | NPC memory significance pipeline | Done | T59, T60 | Manual planning-doc consistency review |
-| T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Ready | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Ready | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T63 | Next | P2 | P1 | Memory storage hierarchy and context-budget policy | Done | T59, T60, T61, T62 | Manual planning-doc consistency review |
-| T63a | Next | P2 | P1 | Live context hierarchy and retrieval budget contract | Blocked | T60a, T61a, T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T63a | Next | P2 | P1 | Live context hierarchy and retrieval budget contract | Blocked | T60a, T61a, T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T63b | Next | P2 | P1 | Summary compression and versioned memory artifacts | Blocked | T63a, T59b, T62b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
-| T63c | Next | P2 | P1 | Memory context observability and replay tooling | Blocked | T63a, T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T63c | Next | P2 | P1 | Memory context observability and replay tooling | Blocked | T63a, T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T67 | Later | P2 | P2 | Grounded DM guide recall surface | Done | T59, T60, T62, T63 | Manual planning-doc consistency review + child task validation |
 | T67a | Later | P2 | P2 | Guide query contract and grounding policy | Blocked | T14, T59b, T60b, T62c, T63b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts src/state/**/*.test.ts src/rules/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T67b | Later | P2 | P2 | Guide retrieval and answer synthesis | Blocked | T47, T63c, T67a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts src/state/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T67c | Later | P2 | P2 | Guide UI surface and turn-safe presentation | Blocked | T67b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T68 | Now | P1 | P2 | VS Code AI auto-test workflow and operator guidance | Done | None | Manual planning-doc consistency review + child task validation |
 | T68a | Now | P1 | P2 | VS Code AI auto-test rules and usage docs | Done | T68 | Manual doc consistency review |
-| T68b | Next | P1 | P2 | SunRay scripted AI walkthrough matrix | Blocked | T64c, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
+| T68b | Next | P1 | P2 | SunRay scripted AI walkthrough matrix | Ready | T64c, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
 | T68c | Next | P1 | P2 | AI validation reporting and seed-capture contract | Done | T68a | Manual planning-doc consistency review + example handoff-note review |
 | T69 | Now | P1 | P2 | VS Code dual-AI validation protocol | Done | T68a | Manual planning-doc consistency review + child task validation |
 | T69a | Now | P1 | P2 | Dual-AI builder and challenger workflow docs | Done | T69 | Manual doc consistency review + example prompt review |
-| T69b | Next | P1 | P2 | SunRay AI validation manifest and review bundle | Blocked | T68c, T69a, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + manifest smoke review |
+| T69b | Next | P1 | P2 | SunRay AI validation manifest and review bundle | Done | T68c, T69a, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only --report-json <path>` + manifest smoke review |
 | T69c | Next | P1 | P2 | Dual-AI adversarial walkthrough matrix | Blocked | T68b, T69b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
+| T70 | Now | P1 | P1 | Clarification-safe turn input handling | Done | T57a, T58a, T64b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live AI smoke |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
 | T13 | Later | P2 | P1 | Embeddings pipeline | Blocked | T07a, T60a, T62b | Manual embedding call verification |
 | T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Ready | T02f | Manual embedding route verification |
@@ -257,11 +260,13 @@ No global blocker as of 2026-03-09:
 | T46 | Later | P2 | P1 | Save schema compatibility rules and migration fixture | Ready | T06, T09, T29, T59b | Save migration fixture run |
 | T30 | Later | P2 | P2 | Save import and export | Ready | T29 | Import/export compatibility check |
 | T31 | Later | P3 | P2 | Optional save encryption | Ready | T29 | Encryption or decryption smoke test |
-| T32 | Later | P3 | P1 | Accessibility pass | Blocked | T11, T34 | Accessibility checklist |
+| T32 | Later | P3 | P1 | Accessibility pass | Ready | T11, T34 | Accessibility checklist |
 | T33 | Later | P3 | P2 | Theme and typography pass | Ready | T11 | Manual readability review |
-| T36b | Later | P3 | P1 | Packaged AI prerequisite detection and repair flow | Ready | T12c, T35a | Packaged prerequisite smoke test |
-| T36 | Later | P3 | P1 | Windows playtest build | Blocked | T35a, T12c, T29, T36b | Build or install verification |
-| T38 | Later | P3 | P1 | Installer packaging | Blocked | T36 | Installer smoke test |
+| T35 | Later | P0 | P1 | Launcher distribution decision memo | Done | None | Decision memo review + clean-machine launch checklist dry run |
+| T35a | Later | P0 | P1 | Launcher AI runtime decision for Docker LiteLLM | Done | T35, T02f | Decision memo review + clean-machine checklist update review |
+| T36b | Later | P3 | P1 | Launcher AI prerequisite detection and repair flow | Done | T12c, T35a | Launcher prerequisite smoke test |
+| T36 | Later | P3 | P1 | Windows launcher playtest bundle | Ready | T35a, T12c, T29, T36b | Launcher bundle verification |
+| T38 | Later | P3 | P1 | Launcher installer packaging | Blocked | T36 | Installer smoke test |
 | T19 | Later | P4 | P1 | Quest schema and validation | Blocked | T16 | Schema validation check |
 | T20 | Later | P4 | P1 | Quest state transitions | Blocked | T19, T58b | `npm test` |
 | T21 | Later | P4 | P2 | Quest editor UI | Blocked | T19 | Manual editor smoke test |
@@ -1468,7 +1473,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Validation:
   - `docker compose run --rm --no-deps app npm run type-check`
   - `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts`
-  - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
 - Definition of Done:
   - NPC encounter facts are explicit and server-owned instead of being inferred later from arbitrary chat logs
   - significance scoring criteria and thresholds are documented and testable
@@ -1647,7 +1652,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Validation:
   - `docker compose run --rm --no-deps app npm run type-check`
   - `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts`
-  - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
 - Definition of Done:
   - the default hot-context contract is explicit and budgeted by bucket
   - durable storage buckets are named clearly enough that later retrieval and summary code can target them directly
@@ -1733,7 +1738,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Validation:
   - `docker compose run --rm --no-deps app npm run type-check`
   - replay fixture execution
-  - `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
 - Definition of Done:
   - context-entry accounting is inspectable without manually reading raw prompts
   - retrieval traces and prompt diffs explain why facts entered or stayed out of context
@@ -1988,7 +1993,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T68b - SunRay Scripted AI Walkthrough Matrix
 
-- Status: Blocked
+- Status: Ready
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -2021,7 +2026,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - named walkthrough scenarios are stable enough that later reporting or dual-AI review can cite them directly
   - future agents no longer need to improvise a broader AI playtest loop in VS Code
 - Handoff Notes:
-  - blocked until `T64c` establishes the baseline story walkthrough fixture that the broader AI test sweep should build on
+  - moved to `Ready` on 2026-03-13 after `T64c` and `T65c` both closed, so the walkthrough matrix now has its story baseline and harness foundation
   - when this starts, keep the output compact and reviewable; the follow-on dual-AI protocol should consume named scenarios and summaries, not giant raw transcripts
 
 ### T68c - AI Validation Reporting And Seed-Capture Contract
@@ -2135,7 +2140,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T69b - SunRay AI Validation Manifest And Review Bundle
 
-- Status: Blocked
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -2159,15 +2164,17 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - T65c
 - Validation:
   - `cargo test --manifest-path launcher/Cargo.toml`
-  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only --report-json <path>`
   - manifest smoke review
 - Definition of Done:
   - the harness can emit a stable review bundle with enough context for a second AI or human to understand what ran
   - the bundle names exact commands, personas or seeds, and scenario ids without requiring copied editor chat history
   - the output remains tool-agnostic so VS Code usage is supported without becoming a hard dependency
 - Handoff Notes:
-  - blocked until the repo is ready to invest in launcher-side output shaping instead of documentation-only workflow guidance
+  - completed on 2026-03-13 by adding `--report-json <path>` to `SunRay test-local-ai-workflow`, emitting a machine-readable review bundle with the exact command preview, persona or seed fields, overall pass or fail status, and stable per-scenario summaries
   - keep this file-first and automation-first; do not depend on scripting VS Code itself
+  - validation on 2026-03-13 ran `cargo test --manifest-path launcher/Cargo.toml` and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only --report-json launcher/tmp/t69b-selection-report.json`
+  - manifest smoke review on 2026-03-13 confirmed `launcher/tmp/t69b-selection-report.json` recorded command `SunRay test-local-ai-workflow --selection-only --report-json launcher/tmp/t69b-selection-report.json`, overall status `passed`, and scenario ids `local-gpu-profile-selection` plus `turn-schema-guardrails`
 
 ### T69c - Dual-AI Adversarial Walkthrough Matrix
 
@@ -2203,6 +2210,92 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - blocked until both the walkthrough matrix base (`T68b`) and the launcher-side review bundle (`T69b`) exist
   - prefer a handful of high-signal scenarios over a broad unreadable matrix
+
+### T70 - Clarification-Safe Turn Input Handling
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Keep clarification-style questions and raw internal tokens from consuming story progression while preserving grounded turn narration when possible.
+- Scope:
+  - classify clearly informational or internal-token inputs before turn resolution
+  - steer the prompt and turn pipeline so explanation-style inputs do not auto-inspect, auto-use, or unlock quest flags
+  - add deterministic regression coverage for object-question and raw-flag inputs taken from live quick-play failures
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - src/ai/prompt.ts
+  - src/ai/service.ts
+  - src/rules/
+  - src/state/turn.ts
+  - src/state/turn.test.ts
+- Do Not Touch:
+  - public/
+  - data/spec/
+  - launcher/
+- Dependencies:
+  - T57a
+  - T58a
+  - T64b
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - repeatable live AI smoke against a compatible local provider
+- Definition of Done:
+  - clarification-style inputs can answer or restate known context without advancing flags, quests, or director progress
+  - raw internal tokens such as quest-flag names do not act like valid in-world commands
+  - deterministic tests cover the reported quick-play regression before the task closes
+- Handoff Notes:
+  - user assigned this on 2026-03-13 after a quick playtest showed `what is the market beacon?` incorrectly unlocking `beacon_inspected`, and raw flag text like `beacon_inspected` incorrectly driving the next quest step
+  - keep this scoped to turn safety and prompt guidance; the richer read-only DM-guide surface still belongs to `T67`
+  - prefer preserving grounded explanatory narration when the model stays in-bounds, but authoritative progression safety outranks prose quality if the model still drifts
+  - completed on 2026-03-13 by adding `src/rules/turn-input-classification.ts`, threading `TURN_INPUT_CLASSIFICATION` guidance into `src/ai/service.ts`, tightening `src/ai/prompt.ts`, and freezing state, quest, director, and memory proposals for clarification or raw internal-token inputs in `src/state/turn.ts`
+  - `src/state/turn.test.ts` now covers the reported quick-play regressions directly: `what is the market beacon?` can no longer unlock `beacon_inspected`, and raw token input such as `beacon_inspected` no longer acts like a valid story command
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts`, and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - repeatable live smoke on 2026-03-13 ran `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona-seed 7`; the practical-fixer persona path passed embeddings, scene schema, and game-turn schema checks against the local Ollama setup
+
+### T02f - Docker-First LiteLLM Sidecar And GPU Override
+
+- Status: Done
+- Queue: Now
+- Phase: P0
+- Priority: P1
+- Owner Role: Tech lead
+- Goal: Make Docker the default LiteLLM startup path while keeping an optional GPU-backed local override behind the same app-facing alias contract.
+- Scope:
+  - keep the default Compose runtime responsible for both the app and the repo-managed LiteLLM sidecar
+  - preserve one optional GPU-backed override path for local inference without changing the `game-chat` and `game-embedding` contract
+  - keep docs and env templates aligned to the Docker-first path so later embedding and packaging work does not depend on host-only setup assumptions
+- Files to Touch:
+  - BACKLOG.md
+  - docker-compose.yml
+  - docker-compose.gpu.yml
+  - Dockerfile.litellm
+  - .env.example
+  - README.md
+  - litellm.config.yaml
+  - litellm.local-gpu.config.yaml
+  - setup_local_a.i.md
+- Do Not Touch:
+  - src/
+  - public/
+  - data/spec/
+- Dependencies:
+  - None
+- Validation:
+  - `docker compose up --build`
+  - `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`
+  - `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`
+- Definition of Done:
+  - the default Docker path brings up both the app and LiteLLM without a separate manual proxy step
+  - the optional GPU-backed local path stays behind the same app-facing aliases instead of becoming a second contract
+  - later embedding, setup, and packaging tasks can assume the Docker-managed LiteLLM sidecar is already the locked baseline
+- Handoff Notes:
+  - restored from `BACKLOG_ARCHIVE.md` on 2026-03-13 because active `T13a` and `T35a` still depend on this completed foundation
+  - the locked outcome is still the same: repo-managed LiteLLM is the default control plane and the local GPU override remains optional behind the same alias surface
 
 ### T02g - GPU Tier Matrix And Local Model Profiles
 
@@ -2340,7 +2433,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - README notes how unexpected runtime crashes now surface during local troubleshooting
 - Handoff Notes:
   - prefer safe logging and plain-language recovery copy over clever restart behavior
-  - keep the client boundary generic so it can be reused by the launcher or packaged shell later
+  - keep the client boundary generic so it can be reused by the launcher or other player-facing startup surfaces later
   - completed on 2026-03-08 with a new server-side `src/server/global-handler.ts` process handler for `uncaughtException` and `unhandledRejection`, wired into `src/server/index.ts` so fatal errors log once, close the HTTP server, and exit through one controlled shutdown path
   - completed on 2026-03-08 with a new browser-side `src/ui/global-error.ts` boundary and a fatal-error panel in `public/index.html`; `src/ui/app.ts` now registers global browser error listeners early, surfaces plain-language recovery copy, and disables interaction after an unexpected client crash
   - added focused automated coverage in `src/server/global-handler.test.ts` and `src/ui/global-error.test.ts`
@@ -3215,17 +3308,86 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - this task is a prerequisite for enforceable budget reporting, not a substitute for `T45`
   - do not collapse retrieval traces into human-only log text; later budget and replay tooling should be able to parse the data
 
-### T36b - Packaged AI Prerequisite Detection And Repair Flow
+### T35 - Packaging Prototype And Decision Memo
 
-- Status: Ready
+- Status: Done
+- Queue: Later
+- Phase: P0
+- Priority: P1
+- Owner Role: Release lead
+- Goal: Lock the earliest launcher-first distribution path that preserves one gameplay stack and provides a credible clean-machine Windows playtest direction.
+- Scope:
+  - compare launcher-first delivery options against the current runtime needs
+  - record the supported launcher-first direction and a clean-machine-oriented smoke checklist
+  - record save-path, logging, startup, and follow-up implications clearly enough for `T35a`, `T36`, and `T38`
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - ARCHITECTURE.md
+  - README.md
+  - package.json
+  - packaging/
+- Do Not Touch:
+  - data/spec/
+- Dependencies:
+  - None
+- Validation:
+  - prototype build verification
+  - clean-machine launch smoke checklist dry run
+- Definition of Done:
+  - one packaging direction is selected with rationale
+  - the prototype proves the existing gameplay stack can be launched from one obvious player action
+  - later packaging tasks inherit explicit save, log, and startup assumptions instead of rediscovering them
+- Handoff Notes:
+  - restored from `BACKLOG_ARCHIVE.md` on 2026-03-13 because active `T35a`, `T36`, `T36a`, and `T39` still depend on this completed foundation
+  - the earlier Electron spike was superseded on 2026-03-13 by launcher-first Rust delivery; `packaging/decision-memo.md` is the handoff artifact for the follow-on launcher distribution tasks
+
+### T35a - Launcher AI Runtime Decision For Docker LiteLLM
+
+- Status: Done
+- Queue: Later
+- Phase: P0
+- Priority: P1
+- Owner Role: Release lead
+- Goal: Lock how the launcher-first MVP path relates to the repo-managed LiteLLM Docker sidecar and its optional GPU-backed local runtime.
+- Scope:
+  - state whether Docker Desktop remains the launcher MVP prerequisite for AI startup
+  - keep launcher, setup, and browser messaging aligned around the same LiteLLM readiness contract
+  - give `T36b` and `T36` one explicit AI-runtime assumption instead of leaving launcher recovery behavior implied
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - README.md
+  - packaging/decision-memo.md
+- Do Not Touch:
+  - src/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T35
+  - T02f
+- Validation:
+  - decision memo review
+  - clean-machine checklist update review
+- Definition of Done:
+  - the launcher path clearly states that MVP AI startup still depends on Docker Desktop plus the repo-managed LiteLLM sidecar
+  - launcher prerequisite messaging covers missing Docker, missing LiteLLM readiness, and optional GPU issues in plain language
+  - later launcher distribution tasks inherit one explicit AI-runtime contract
+- Handoff Notes:
+  - restored from `BACKLOG_ARCHIVE.md` on 2026-03-13 because active `T36b` and `T36` still depend on this completed packaging decision
+  - the locked launcher AI contract remains Docker Desktop plus the repo-managed LiteLLM sidecar, not a bundled gateway inside the launcher binary
+
+### T36b - Launcher AI Prerequisite Detection And Repair Flow
+
+- Status: Done
 - Queue: Later
 - Phase: P3
 - Priority: P1
 - Owner Role: Release lead
-- Goal: Make the packaged player path explain Docker and LiteLLM startup problems in plain language before the user is dumped into a broken shell.
+- Goal: Make the player-facing launcher path explain Docker and LiteLLM startup problems in plain language before the user is dumped into a broken startup flow.
 - Scope:
   - detect whether Docker Desktop is missing, installed but not running, or running without a ready AI sidecar
-  - distinguish LiteLLM-not-ready failures from app-server startup failures inside the packaged path
+  - distinguish LiteLLM-not-ready failures from app-server startup failures inside the launcher-facing path
   - surface one recommended repair step per failure mode, with retry support that does not require deleting saves
   - explain when the GPU-backed launcher path is unsupported and steer the user toward the documented prerequisite repair flow cleanly
 - Files to Touch:
@@ -3241,29 +3403,30 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - T12c
   - T35a
 - Validation:
-  - packaged prerequisite smoke test
+  - launcher prerequisite smoke test
 - Definition of Done:
-  - the packaged path can tell Docker Desktop missing, Docker not running, LiteLLM not ready, and optional local GPU prerequisite failures apart
-  - each packaged startup blocker has plain-language recovery copy and a retry path
-  - packaged diagnostics stay aligned with the shared preflight contract instead of inventing a separate severity vocabulary
-  - `T36` can focus on the Windows build itself instead of hiding prerequisite-repair work inside a broad packaging task
+  - the launcher-facing path can tell Docker Desktop missing, Docker not running, LiteLLM not ready, and optional local GPU prerequisite failures apart
+  - each launcher startup blocker has plain-language recovery copy and a retry path
+  - launcher diagnostics stay aligned with the shared preflight contract instead of inventing a separate severity vocabulary
+  - `T36` can focus on the Windows launcher bundle itself instead of hiding prerequisite-repair work inside a broad delivery task
 - Handoff Notes:
-  - `packaging/decision-memo.md` already calls this out as required packaged behavior; this task makes that requirement executable in the backlog
-  - preserve save data and runtime logs while users retry packaged setup failures
+  - completed on 2026-03-13 by feeding launcher-facing Docker and GPU host checks into the shared `/api/setup/status` preflight contract and adding Docker Desktop recovery copy to the setup UI so startup failures stay distinct from LiteLLM readiness problems
+  - the repair flow now distinguishes `docker_missing`, `docker_not_running`, LiteLLM-sidecar or upstream AI blockers, and `gpu_tooling_not_detected` without forcing users to clear saves or restart first
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, and `docker compose run --rm --no-deps app npx tsx --test src/server/runtime-preflight.test.ts src/server/desktop-shell-preflight.test.ts src/server/setup-status.test.ts src/ui/setup-view.test.ts src/ui/setup-recovery-policy.test.ts src/ui/recovery-actions.test.ts`
 
-### T36 - Windows Playtest Build
+### T36 - Windows Launcher Playtest Bundle
 
-- Status: Blocked
+- Status: Ready
 - Queue: Later
 - Phase: P3
 - Priority: P1
 - Owner Role: Release lead
-- Goal: Produce one Windows-first playtest build that wraps the existing gameplay stack without reintroducing terminal-dependent setup.
+- Goal: Produce one Windows-first launcher bundle that starts the existing gameplay stack without reintroducing terminal-dependent setup.
 - Scope:
-  - build the packaged Windows playtest target from the chosen Electron path
-  - keep the packaged shell using the same compiled server and browser UI stack as the launcher path
+  - build the Windows launcher playtest target from the supported Rust launcher path
+  - keep the launcher bundle using the same compiled server and browser UI stack as the browser and Docker path
   - document save locations, logs, and supported recovery steps for playtesters
-  - validate the portable or unpacked build on a clean-machine-style smoke path after packaged prerequisite handling is in place
+  - validate the launcher bundle on a clean-machine-style smoke path after launcher prerequisite handling is in place
 - Files to Touch:
   - BACKLOG.md
   - README.md
@@ -3279,30 +3442,30 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - T29
   - T36b
 - Validation:
-  - build or install verification
+  - launcher bundle verification
 - Definition of Done:
-  - a Windows playtest build can be launched by double-click without requiring a terminal
-  - the packaged build still uses the existing server-authoritative gameplay stack
+  - a Windows launcher bundle can be launched by double-click without requiring a terminal
+  - the launcher bundle still uses the existing server-authoritative gameplay stack
   - save and log locations are documented in plain language for testers
-  - the packaged smoke path proves the build works with the supported Docker-backed AI contract
+  - the launcher bundle smoke path proves the build works with the supported Docker-backed AI contract
 - Handoff Notes:
-  - keep this task focused on the playable Windows build and clean-machine validation, not on repackaging the AI gateway
+  - keep this task focused on the playable Windows launcher bundle and clean-machine validation, not on repackaging the AI gateway
   - prerequisite and repair messaging for Docker and LiteLLM belongs in `T36b`
-  - blocked on 2026-03-09 because `T36b` remains unfinished
+  - reset to `Ready` on 2026-03-13 after the repo direction changed to launcher-first delivery; do not revive the retired desktop-wrapper build path
 
-### T38 - Installer Packaging
+### T38 - Launcher Installer Packaging
 
 - Status: Blocked
 - Queue: Later
 - Phase: P3
 - Priority: P1
 - Owner Role: Release lead
-- Goal: Turn the validated Windows playtest build into an installer path that preserves the same runtime contract and recovery clarity.
+- Goal: Turn the validated Windows launcher bundle into an installer path that preserves the same runtime contract and recovery clarity.
 - Scope:
-  - add an installer-capable packaging path on top of the validated Windows playtest build
+  - add an installer-capable packaging path on top of the validated Windows launcher bundle
   - preserve user data, saves, and logs outside the install directory through install, upgrade, and uninstall flows
   - document installer behavior, repair expectations, and uninstall impact in plain language
-  - validate that the installer does not break the packaged startup, preflight, or save-location assumptions already proven in `T36`
+  - validate that the installer does not break the launcher startup, preflight, or save-location assumptions already proven in `T36`
 - Files to Touch:
   - BACKLOG.md
   - README.md
@@ -3321,7 +3484,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - installer docs explain what happens to saves, logs, and Docker-backed AI prerequisites
   - installer validation catches obvious regressions in launch or persistence behavior before Phase 5 work begins
 - Handoff Notes:
-  - do not silently change the packaged AI ownership model here; keep the installer path aligned with the packaged Docker-backed LiteLLM contract
+  - do not silently change the launcher AI ownership model here; keep the installer path aligned with the launcher Docker-backed LiteLLM contract
   - signing, update channels, and release rehearsal still belong to later release tasks
 
 ### T48 - Server Route And Turn Pipeline Extraction
@@ -3624,11 +3787,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - user direction on 2026-03-09 is explicit: script automation moves to Rust, not to a better-organized PowerShell library
   - the Rust executable lives under `launcher/` and is named `SunRay`
-  - scope is limited to what `scripts/` currently does; do not treat this issue as approval to replace Docker, Electron, or the Node app runtime
+  - scope is limited to what `scripts/` currently does; do not treat this issue as approval to replace Docker or the Node app runtime
   - preserve current launcher and harness behavior where possible, but do not preserve shell syntax or `scripts/lib/*.ps1` as part of the long-term contract
-  - `SunRay` is not a webview shell, not an installer, not a package manager, not a replacement for Electron, and not a rewrite of the app server
+  - `SunRay` is not a webview shell, not an installer, not a package manager, and not a rewrite of the app server
   - repo-wide blocking status was lifted on 2026-03-09 after the Rust command surface, harness path, validators, and browser smoke path all validated cleanly enough for unrelated backlog work to resume
-  - remaining closeout work is limited to the interactive desktop-prototype recheck in `T65e`, the last shell-reference review in `T65f`, and the Rust-native follow-up decomposition in `T66`
+  - remaining closeout work is limited to shell-reference review in `T65f` and the Rust-native follow-up decomposition in `T66`
 
 ### T65a - SunRay Workspace And Command Contract
 
@@ -3641,7 +3804,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Scope:
   - add the Rust crate and dependency structure rooted at `launcher/Cargo.toml`
   - reserve `launcher/` as the only home for the `SunRay` executable and its shared Rust modules
-  - define subcommands for `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype`
+  - define subcommands for `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, and `validate-litellm-default-config`
   - add shared Rust modules for process execution, env loading, logging, error shaping, and reusable config or probe helpers
   - document the command mapping, parity-then-delete migration rule, and `SunRay` non-goals without claiming the old `.ps1` files are still the desired architecture
 - Files to Touch:
@@ -3795,18 +3958,17 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - closeout fix on 2026-03-09 moved the local GPU matrix contract into `launcher/assets/local-gpu-profile-matrix.json` so the validator no longer depends on the deleted `scripts/` tree
   - closeout validation on 2026-03-09 reran `cargo test --manifest-path launcher/Cargo.toml`, `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix`, and `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config`
 
-### T65e - SunRay Setup Smoke And Desktop Wrapper Migration
+### T65e - SunRay Setup Smoke Migration
 
-- Status: Review
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
 - Owner Role: Release lead
-- Goal: Replace the remaining operational PowerShell wrappers with Rust commands so browser smoke and desktop prototype entrypoints match the new tooling runtime.
+- Goal: Replace the remaining supported operational PowerShell wrapper with a Rust command so the setup smoke path matches the new tooling runtime.
 - Scope:
   - replace `scripts/test-setup-browser-smoke.ps1` with a Rust command that runs the same build, type-check, focused test, and client-build sequence
-  - replace `scripts/start-desktop-prototype.ps1` with a Rust command that starts the existing Electron prototype flow
-  - keep the commands orchestration-focused and let Docker, npm, and Electron remain the underlying executables
+  - keep the command orchestration-focused and let Docker and npm remain the underlying executables
   - align logging and error behavior with the rest of the Rust tooling crate
 - Files to Touch:
   - BACKLOG.md
@@ -3815,7 +3977,6 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - launcher/
   - scripts/
 - Do Not Touch:
-  - packaging/electron/
   - docker-compose.yml
   - docker-compose.gpu.yml
   - src/state/
@@ -3824,17 +3985,15 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - T65b
 - Validation:
   - `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke`
-  - `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype`
 - Definition of Done:
-  - the remaining script entrypoints no longer depend on PowerShell
-  - smoke and prototype wrappers follow the same Rust logging and process conventions as the launcher
-  - Electron and browser smoke flows remain callable without introducing new shell scripts
-  - `scripts/test-setup-browser-smoke.ps1` and `scripts/start-desktop-prototype.ps1` are deleted after parity is validated
+  - the remaining supported script entrypoint no longer depends on PowerShell
+  - the setup smoke wrapper follows the same Rust logging and process conventions as the launcher
+  - browser smoke remains callable without introducing new shell scripts
+  - `scripts/test-setup-browser-smoke.ps1` is deleted after parity is validated
 - Handoff Notes:
-  - do not change Electron packaging direction here; this task only changes the orchestration layer around the existing prototype command
-  - `SunRay` is not replacing Electron and is not becoming a desktop shell
+  - the unsupported desktop-prototype wrapper was removed from the supported launcher contract on 2026-03-13 when the repo shifted to launcher-first delivery
   - closeout validation on 2026-03-09 reran `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke`, which passed through the Rust command path after the launcher-copy updates
-  - `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` was not rerun in this session because it launches the interactive Electron prototype and would not terminate cleanly in the non-interactive validation loop; keep this task in `Review` until that host-side check is repeated explicitly
+  - task marked `Done` on 2026-03-13 after the unsupported desktop-prototype wrapper was removed from the active command surface instead of being carried forward as a supported path
 
 ### T65f - Shell Reference Cleanup And Script Deletion
 
@@ -4949,7 +5108,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T32 - Accessibility Pass
 
-- Status: Blocked
+- Status: Ready
 - Queue: Later
 - Phase: P3
 - Priority: P1
@@ -4978,7 +5137,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - preserve existing player-flow structure while improving accessibility defects
-  - blocked on 2026-03-09 because `T34` is blocked pending completion of onboarding validation in `T12`
+  - moved to `Ready` on 2026-03-13 after `T12` and `T34` both closed, so accessibility work no longer depends on onboarding validation cleanup
 
 ### T33 - Theme And Typography Pass
 
@@ -5146,9 +5305,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 | D01 | Concrete default numeric budgets for latency, token use, cost, and DB growth in the configurable budget file | Phase 0 exit | Tech lead | Locked |
 | D02 | Director spec format stays JSON at `data/spec/director.json` for MVP | Before T16 starts | Gameplay systems lead | Locked |
 | D03 | MVP sample story arc uses placeholder identifier `story_sample` until authored content begins | Before Phase 1 exit | Product/UI lead | Locked |
-| D04 | MVP packaging shell: launcher-only, Tauri, or Electron | Before Phase 0 exit | Release lead | Locked |
+| D04 | MVP player delivery surface: launcher-first Rust binaries backed by Docker-managed runtime services | Before Phase 0 exit | Release lead | Locked |
 | D05 | Default end-user AI setup: repo-managed LiteLLM Docker sidecar as the default control plane, with the GPU-backed Ollama launcher path as the normal local runtime contract | Before Phase 0 exit | Tech lead | Locked |
-| D06 | MVP packaged AI runtime: require Docker Desktop for the LiteLLM sidecar, or stage the gateway another way while preserving the same app-facing contract | Before T36 starts | Release lead | Locked |
+| D06 | MVP launcher AI runtime: require Docker Desktop for the LiteLLM sidecar while preserving the same app-facing contract | Before T36 starts | Release lead | Locked |
 | D07 | Initial local GPU tier matrix: which VRAM tiers are officially supported first, and which model profiles map to them | Before T02h starts | AI systems lead | Locked |
 | D08 | Preflight policy: which startup failures are blockers versus warnings versus info in end-user mode, and which actions can auto-fix safely | Before T01b starts | Tech lead | Locked |
 

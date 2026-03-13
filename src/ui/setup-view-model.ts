@@ -64,7 +64,7 @@ export interface PreflightPanelViewModel {
 
 export const DEFAULT_SUPPORTED_TITLE = "Supported MVP AI path";
 export const DEFAULT_SUPPORTED_SUMMARY =
-  "Use the Windows launcher with Docker Desktop so the app, LiteLLM, and the GPU-backed Ollama route start together.";
+  "Use Docker Desktop so the app can reach the repo-managed LiteLLM sidecar and the supported GPU-backed Ollama route. Retry from the setup panel if either service is still starting.";
 export const DEFAULT_LAUNCHER = "cargo run --manifest-path launcher/Cargo.toml -- start-dev";
 export const DEFAULT_SERVICES = ["Docker Desktop", "LiteLLM sidecar", "GPU-backed Ollama service"];
 

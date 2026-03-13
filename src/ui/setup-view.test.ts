@@ -97,6 +97,7 @@ test("createSetupWizardViewModel surfaces setup issues as guidance", () => {
   assert.deepEqual(viewModel.guidance, ["Docker Desktop: Start Docker Desktop."]);
   assert.deepEqual(viewModel.actions.map((action) => action.id), [
     "retry-setup-check",
+    "copy-docker-desktop-checklist",
     "copy-launcher-command",
     "copy-smaller-profile-guidance",
     "copy-gpu-repair-checklist"

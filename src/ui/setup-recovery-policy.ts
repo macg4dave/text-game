@@ -2,6 +2,7 @@ import type { RuntimePreflightIssue, SetupStatus } from "./contracts.js";
 
 export type SetupRecoveryActionId =
   | "retry-setup-check"
+  | "copy-docker-desktop-checklist"
   | "copy-launcher-command"
   | "copy-smaller-profile-guidance"
   | "copy-gpu-repair-checklist";
@@ -47,6 +48,14 @@ export function buildRecoveryActions(
       id: "retry-setup-check",
       label: "Retry setup check",
       description: "Run the connection test again without clearing the saved browser session."
+    });
+  }
+
+  if (issueCodes.some((code) => ["docker_missing", "docker_not_running"].includes(code))) {
+    actions.set("copy-docker-desktop-checklist", {
+      id: "copy-docker-desktop-checklist",
+      label: "Copy Docker Desktop checklist",
+      description: "Copy the packaged-path Docker Desktop install and startup checklist."
     });
   }
 

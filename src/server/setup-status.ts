@@ -4,7 +4,8 @@ import type { AppConfig, RuntimePreflightReport, SetupStatusPayload } from "../c
 const SUPPORTED_MVP_PATH = {
   provider: "LiteLLM",
   title: "Supported MVP AI path",
-  summary: "Use the Windows launcher with Docker Desktop so the app, LiteLLM, and the GPU-backed Ollama route start together.",
+  summary:
+    "Use Docker Desktop so the app can reach the repo-managed LiteLLM sidecar and the supported GPU-backed Ollama route. Retry from the setup panel if either service is still starting.",
   launcher: "cargo run --manifest-path launcher/Cargo.toml -- start-dev",
   services: ["Docker Desktop", "LiteLLM sidecar", "GPU-backed Ollama service"]
 } as const;

@@ -61,6 +61,24 @@ test("runRecoveryAction copies the supported launcher command", async () => {
   assert.deepEqual(entries, ["Launcher command copied"]);
 });
 
+test("runRecoveryAction copies the Docker Desktop checklist", async () => {
+  let copiedText = "";
+
+  await runRecoveryAction("copy-docker-desktop-checklist", {
+    setupStatus: createSetupStatus(),
+    async runSetupCheck() {},
+    async copyText(text) {
+      copiedText = text;
+    },
+    setStatus() {},
+    addEntry() {}
+  });
+
+  assert.match(copiedText, /Docker Desktop checklist/i);
+  assert.match(copiedText, /Install Docker Desktop for Windows/i);
+  assert.match(copiedText, /Retry the setup check without clearing saves/i);
+});
+
 test("runRecoveryAction copies the GPU repair checklist with the launcher path", async () => {
   let copiedText = "";
 

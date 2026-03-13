@@ -32,7 +32,7 @@ The roadmap is successful if the project reaches all of the following:
 - Deterministic replay means reconstructing final state from committed semantic events, not by re-querying models from historical prompts or prose.
 - AI output is validated before it affects authoritative state.
 - Content authors can change quests and director rules without code edits.
-- The same gameplay stack powers both the browser-based development loop and the packaged player build.
+- The same gameplay stack powers both the browser-based development loop and the launcher-driven player path.
 
 ## MVP
 
@@ -40,7 +40,7 @@ The roadmap is successful if the project reaches all of the following:
 
 The MVP is the first release that proves the core product loop while feeling like a normal app to the player:
 
-- Windows-first double-click launch path or packaged shell that starts the app and opens the play surface automatically.
+- Windows-first double-click Rust launcher that starts the app and opens the play surface automatically.
 - First-run setup path that validates required config and offers a clear supported Docker-managed LiteLLM gateway path, with Docker Desktop treated as the MVP packaged prerequisite and the GPU-backed Ollama path treated as the normal launcher contract instead of a hidden opt-in.
 - Start a new game with basic onboarding and tutorial guidance.
 - Submit turns through the UI.
@@ -67,13 +67,13 @@ The MVP is complete only when all of the following are true:
 - On a clean Windows machine following the supported setup guide, a tester can reach the first playable turn from one obvious launcher without terminal interaction after prerequisite install.
 - Startup preflight catches missing env values, unreachable AI endpoints, and obvious misconfiguration before gameplay begins, with recovery steps written for non-developers.
 - The supported setup guide brings up the app plus the repo-managed LiteLLM container from one documented GPU-backed path, and that path is smoke-tested.
-- The MVP packaged playtest path clearly states that the app shell is bundled but the AI gateway still depends on Docker Desktop and the repo-managed LiteLLM sidecar.
+- The MVP launcher playtest path clearly states that the launcher binary is thin orchestration and the AI gateway still depends on Docker Desktop and the repo-managed LiteLLM sidecar.
 - A new player can complete a scripted story arc without manual intervention, opening devtools, or editing config files mid-session.
 - A golden replay fixture reproduces the same final state from the stored event log.
 - Save and load work across at least one schema version change using documented migration rules.
 - The default LiteLLM chat route and embedding route are both exercised in automated integration tests.
 - Numeric budgets for latency, tokens per turn, and cost per 100 turns are recorded in [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md), loaded from the runtime budget config, and met in the MVP test fixture suite.
-- The packaged or launched player path and the browser dev path both use the same server-side gameplay stack.
+- The launcher-driven player path and the browser dev path both use the same server-side gameplay stack.
 - The MVP scope in [BACKLOG.md](/g:/text-game/BACKLOG.md) has no open P1 items.
 
 ### Explicitly Out of Scope for MVP
@@ -105,14 +105,14 @@ Exit gate:
 - One Windows launcher or equivalent double-click entry point starts the app, waits for readiness, and opens the play surface.
 - Environment variables are validated at startup.
 - Missing config and missing AI connectivity produce actionable recovery output in the launcher or UI.
-- Startup preflight uses one blocker, warning, and info contract across launcher, browser, and packaged-path diagnostics.
+- Startup preflight uses one blocker, warning, and info contract across launcher and browser diagnostics.
 - Host prerequisite checks cover Docker, ports, writable data paths, and baseline disk headroom before gameplay starts.
 - Logging, migrations, and error handling are wired into the baseline app.
 - The supported AI startup path brings up the app and repo-managed LiteLLM sidecar together on the GPU-backed Ollama path.
 - The GPU-backed launcher path has a documented VRAM-tier model matrix with at least one verified low-VRAM tier and one documented high-VRAM tier, with heuristic labeling until matching hardware validation is complete.
 - AI readiness checks distinguish LiteLLM health, alias availability, network reachability, auth failures, and local-model availability before the first turn.
 - LiteLLM default alias names for chat and embeddings are documented and exercised manually.
-- A packaging spike or wrapper decision is documented well enough to unblock early playtest builds.
+- A launcher delivery decision is documented well enough to unblock early playtest builds.
 - Numeric delivery budgets are added to [ENGINEERING_STANDARDS.md](/g:/text-game/ENGINEERING_STANDARDS.md).
 
 ### Phase 1 - Double-Click Playable Slice (Weeks 3-5)
@@ -120,13 +120,16 @@ Exit gate:
 Owner: Product/UI lead
 
 Outcome:
+
 - A first-time player can start, play, save, and resume through a guided path without terminal use.
 
 Entry gate:
+
 - Phase 0 exit gate met.
 
 Exit gate:
-- The launcher or packaged shell reaches the first playable turn on the supported Windows target.
+
+- The launcher reaches the first playable turn on the supported Windows target.
 - Turn input, turn output, and authoritative state schemas are versioned.
 - The model-facing turn schema stays compact and transport-oriented instead of becoming the game's hidden design language.
 - A new game can be created and played for at least 10 scripted turns in a row.
@@ -148,12 +151,15 @@ Exit gate:
 Owner: AI systems lead
 
 Outcome:
+
 - The launched game remembers prior context compactly, stays coherent across longer sessions, and can answer grounded guide questions about what the player already knows.
 
 Entry gate:
+
 - Phase 1 exit gate met.
 
 Exit gate:
+
 - Retrieval returns ranked memory summaries for each turn.
 - Memory classes and retrieval policy distinguish authority-relevant facts from flavor-only recollections before longer-session continuity is treated as stable.
 - NPC continuity uses significance-scored structured encounter facts and tiered long-lived memory instead of replaying raw dialogue history.
@@ -169,20 +175,23 @@ Exit gate:
 - Token use for the baseline replay fixture stays within the documented budget.
 - Save compatibility rules are documented and at least one migration path is tested.
 
-### Phase 3 - Packaged Playtest Build and Accessibility (Weeks 9-11)
+### Phase 3 - Launcher Playtest Build and Accessibility (Weeks 9-11)
 
 Owner: Release lead
 
 Outcome:
-- The internal web stack is wrapped and distributed as a normal Windows app or bundle for non-technical playtesters.
+
+- Platform-native Rust launcher binaries deliver the Docker-backed runtime to non-technical playtesters without an extra desktop-shell layer.
 
 Entry gate:
+
 - Phase 2 exit gate met.
 
 Exit gate:
-- The packaging decision is locked with rationale and no open blocker to building Windows playtest bundles.
-- A portable build or installer can be launched by double-click on a clean Windows test machine.
-- First-run checks behave correctly inside the packaged environment.
+
+- The launcher delivery decision is locked with rationale and no open blocker to building Windows playtest launcher bundles.
+- A launcher bundle can be launched by double-click on a clean Windows test machine.
+- First-run checks behave correctly through the launcher path.
 - Save locations, logs, and repair or reset steps are documented in plain language.
 - Keyboard navigation, contrast checks, and readable defaults pass the documented accessibility checklist.
 - Crash and error surfaces are understandable enough for external testers to report failures.
@@ -192,12 +201,15 @@ Exit gate:
 Owner: Gameplay systems lead
 
 Outcome:
+
 - Designers can change content safely and the system is observable and resilient enough for broader playtesting.
 
 Entry gate:
+
 - Phase 3 exit gate met.
 
 Exit gate:
+
 - Quest specs validate against a versioned schema.
 - Quest progression is visible in an admin surface or equivalent inspection tool.
 - World state changes are diffable and replayable.
@@ -213,12 +225,15 @@ Exit gate:
 Owner: Release lead
 
 Outcome:
+
 - The first playtest bundle becomes a supportable release process instead of a one-off build.
 
 Entry gate:
+
 - Phase 4 exit gate met.
 
 Exit gate:
+
 - Signed Windows builds are produced and tested.
 - macOS build feasibility is either proven or explicitly deferred with rationale.
 - Installer, update, rollback, and release checklist steps are documented and rehearsed.
@@ -248,7 +263,7 @@ Exit gate:
 
 - Resume broader Phase 1 backlog work now that `T65` no longer blocks unrelated implementation.
 - Keep the `T66` follow-up scoped to Rust-native launcher cleanup: remove shell-era wording, asset assumptions, and monolithic orchestration without reopening the migration blocker.
-- Keep the launcher refactor scoped to automation only: replace shell orchestration, not Docker, Electron, the installer path, or the Node gameplay runtime.
+- Keep the launcher refactor scoped to automation only: replace shell orchestration, not Docker, the installer path, or the Node gameplay runtime.
 - Ship the versioned turn pipeline through the supported launched app.
 - Lock the proposal-only authority boundary before more turn, replay, and save work deepens the Phase 1 contract.
 - Lock a compact model schema boundary before turn validation and pipeline work harden a smart-scene contract into the engine surface.
@@ -271,7 +286,7 @@ Exit gate:
 - Land context-entry accounting and retrieval traces before later telemetry and budget enforcement work depends on opaque prompt assembly.
 - Move delivery budgets from doc-only values into a shared server-side config contract and expose them through an advanced UI surface.
 - Add automatic local-model profile selection and setup guidance for common VRAM tiers.
-- Produce the first packaged Windows playtest build.
+- Produce the first Windows launcher playtest bundle.
 
 ### Later
 
@@ -286,7 +301,7 @@ Exit gate:
 | --- | --- | --- | --- |
 | Shell-script automation has become a delivery bottleneck and is now the wrong long-term runtime for launcher, harness, and smoke tooling. | Tech lead | Keep `SunRay` as the only supported automation surface and use `T66` to remove remaining shell-era wording, asset paths, and monolithic orchestration before they harden into the Rust runtime. | Any new task proposes adding or extending PowerShell or shell automation instead of the `SunRay` tooling surface |
 | The supported launch path still depends on AI setup that feels like developer work. | Tech lead | Pick one primary MVP AI path, add first-run connection tests, and write recovery steps in player language. | First clean-machine tester fails before reaching the first turn |
-| The Docker-managed LiteLLM default may conflict with packaging assumptions or fail on machines without working Docker or NVIDIA passthrough support. | Release lead | Keep the MVP packaged contract explicit: Docker Desktop plus NVIDIA support are required for AI startup, and GPU prerequisite failures must fall back to plain-language guidance instead of silent startup hangs. | First clean-machine launcher or packaged test fails before LiteLLM becomes ready |
+| The Docker-managed LiteLLM default may conflict with launcher assumptions or fail on machines without working Docker or NVIDIA passthrough support. | Release lead | Keep the MVP launcher contract explicit: Docker Desktop plus NVIDIA support are required for AI startup, and GPU prerequisite failures must fall back to plain-language guidance instead of silent startup hangs. | First clean-machine launcher test fails before LiteLLM becomes ready |
 | The GPU-backed launcher path may choose models that exceed VRAM or perform badly on common cards. | AI systems lead | Define a VRAM-tier profile matrix, add conservative defaults, and let users override the detected profile when needed. | First out-of-memory or unusably slow local-GPU smoke test on a supported tier |
 | Preflight may become either too strict for developers or too vague for end users. | Tech lead | Separate blocker versus warning policy from advanced diagnostics, keep the default surface plain-language, and validate manual overrides through the same contract. | First common setup issue requires support to explain hidden diagnostics or bypass checks manually |
 | Authority drift turns the model into a hidden game engine that invents world truth through prose or overreaching updates. | Gameplay systems lead | Lock a proposal-only model contract, adjudicate consequences server-side, and require drift fixtures where rejected proposals cannot leak into player-facing narrative or replay. | First turn where narrative, quest progress, or saved facts disagree with committed state |
@@ -296,8 +311,8 @@ Exit gate:
 | Memory stays one undifferentiated fact bucket, causing flavor recollections to compete with canon or quest truth in retrieval. | AI systems lead | Add explicit memory classes, class-aware retrieval policy, and authority rules so narration support does not become a parallel truth system. | First turn where flavor memory changes or crowds out canon-sensitive behavior |
 | NPC continuity hardens around raw dialogue retention, causing storage bloat, weak canon, and poor recognition quality for returning characters. | AI systems lead | Use structured encounter facts, significance thresholds, importance tiers, and separate NPC versus world versus journal recall before scaling retrieval or summarization. | First memory design or fixture that relies on replaying old dialogue to make an NPC feel remembered |
 | Memory turns into one expanding prompt with no per-bucket accounting, causing context drift, weak explainability, and avoidable token growth. | AI systems lead | Define hot-versus-cold storage, per-bucket retrieval budgets, summary compression, and inspectable context tooling before budget and telemetry work harden the wrong prompt shape. | First turn where the team cannot explain what entered context or why a prompt grew sharply |
-| Packaged runtime and local server coordination cause fragile startup or antivirus friction. | Release lead | Decide the wrapper early, prototype startup behavior, log launch phases, and smoke-test on clean Windows machines. | First packaged build requires manual recovery beyond the documented flow |
-| Save locations and schema migration rules confuse players in packaged builds. | Tech lead | Lock save-path conventions early, expose save slots in the UI, and require migration coverage before broader playtests. | First unreadable save or misplaced save report |
+| Launcher runtime and local server coordination cause fragile startup or antivirus friction. | Release lead | Keep the launcher thin, log launch phases, and smoke-test platform binaries on clean machines. | First launcher bundle requires manual recovery beyond the documented flow |
+| Save locations and schema migration rules confuse players in launcher-driven builds. | Tech lead | Lock save-path conventions early, expose save slots in the UI, and require migration coverage before broader playtests. | First unreadable save or misplaced save report |
 | Structured output through LiteLLM is less reliable than expected for the chosen upstream models. | AI systems lead | Maintain strict validation, fixture-based replay tests, and a fallback response path before state mutation. | First failed replay caused by model variance |
 | Memory summaries exceed token budgets and make turns too expensive. | AI systems lead | Track summary size, cap retrieval inputs, and test against the baseline fixture budget before Phase 2 closes. | Budget breach in the baseline fixture suite |
 
@@ -306,11 +321,11 @@ Exit gate:
 | Decision | Status | Owner | Rationale | Next Review |
 | --- | --- | --- | --- | --- |
 | Node.js + TypeScript app with lightweight browser asset compilation and SQLite | Locked | Tech lead | Keeps local development on direct TypeScript, keeps player-facing runtime paths on compiled server output, and adds compile-time safety without changing the runtime boundary. | After MVP |
-| Repo automation lives in the `launcher/` Rust executable `SunRay`, and PowerShell or other shell-script orchestration is retired as a supported path | Locked | Tech lead | The script surface outgrew demo-grade shell wrappers; `SunRay` gives one structured implementation language for launcher, harness, smoke, and validation commands without rewriting Docker, Electron, installers, or the app runtime. | Start of `T66` |
+| Repo automation lives in the `launcher/` Rust executable `SunRay`, and PowerShell or other shell-script orchestration is retired as a supported path | Locked | Tech lead | The script surface outgrew demo-grade shell wrappers; `SunRay` gives one structured implementation language for launcher, harness, smoke, and validation commands without rewriting Docker, installers, or the app runtime. | Start of `T66` |
 | Internal runtime stays web and HTTP based, but player-facing delivery is Windows-first and double-click oriented | Locked | Tech lead | Preserves one gameplay stack while hiding implementation details from players. | End of Phase 3 |
-| Electron is the Phase 0 packaging spike direction for Windows playtest builds | Locked | Release lead | Fits the current Node plus browser stack, reduces shell complexity versus Tauri, and provides a clearer bridge from launcher to portable build. | Start of T36 |
+| Platform-native `SunRay` launcher binaries are the supported player-facing delivery surface across platforms | Locked | Release lead | Keeps one launcher implementation language across platforms, avoids embedded-shell build requirements in the supported path, and leaves the gameplay runtime in Docker-backed services plus the browser UI. | Start of T36 |
 | LiteLLM-managed gateway runs as a repo-managed Docker sidecar by default, with the GPU-backed Ollama path as the normal launcher contract and manual larger-model overrides still available behind the same boundary | Locked | AI systems lead | Keeps the player-facing setup centered on one provider-neutral gateway, removes manual proxy startup from the default path, and still allows hosted and local upstreams behind the same boundary. | End of Phase 2 |
-| MVP packaged AI startup still depends on Docker Desktop and the repo-managed LiteLLM sidecar rather than bundling the gateway into Electron | Locked | Release lead | Avoids splitting AI-runtime ownership across two packaging strategies during Phase 0 and lets the launcher, setup flow, and packaged shell share one gateway contract and recovery language. | Start of T36 |
+| MVP launcher AI startup still depends on Docker Desktop and the repo-managed LiteLLM sidecar rather than bundling the gateway into the launcher binary | Locked | Release lead | Keeps the launcher thin, preserves one AI-runtime ownership model, and lets the launcher, setup flow, and browser UI share one gateway contract and recovery language. | Start of T36 |
 | Provider-neutral internal adapter boundary | Locked | Tech lead | Prevents provider-specific logic from leaking across the app. | End of Phase 1 |
 | Model is a narrator plus proposal engine only; the server adjudicates which consequences become truth and player-facing narrative must align to committed state | Locked | Gameplay systems lead | Prevents authority drift, keeps replay and save contracts deterministic, and stops prose from becoming an unreviewed state-mutation path. | End of Phase 1 |
 | Model-facing turn schema stays compact and transport-oriented rather than becoming the game's design language | Locked | AI systems lead | Keeps validation and schema evolution manageable while preserving server ownership of simulation, pacing, and quest semantics. | Start of T10 |

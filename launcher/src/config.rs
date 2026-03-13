@@ -9,7 +9,6 @@ pub enum SunrayCommand {
     TestSetupBrowserSmoke,
     ValidateLocalGpuProfileMatrix,
     ValidateLitellmDefaultConfig,
-    StartDesktopPrototype,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,7 +19,7 @@ pub struct CommandContract {
     pub backlog_task: &'static str,
 }
 
-pub const COMMAND_CONTRACTS: [CommandContract; 6] = [
+pub const COMMAND_CONTRACTS: [CommandContract; 5] = [
 	CommandContract {
 		name: "start-dev",
 		summary: "Launcher and Docker preflight entrypoint replacing scripts/start-dev.ps1.",
@@ -51,12 +50,6 @@ pub const COMMAND_CONTRACTS: [CommandContract; 6] = [
 		legacy_script: "scripts/validate-litellm-default-config.ps1",
 		backlog_task: "T65d",
 	},
-	CommandContract {
-		name: "start-desktop-prototype",
-		summary: "Electron prototype wrapper replacing scripts/start-desktop-prototype.ps1.",
-		legacy_script: "scripts/start-desktop-prototype.ps1",
-		backlog_task: "T65e",
-	},
 ];
 
 impl SunrayCommand {
@@ -67,7 +60,6 @@ impl SunrayCommand {
             SunrayCommand::TestSetupBrowserSmoke => &COMMAND_CONTRACTS[2],
             SunrayCommand::ValidateLocalGpuProfileMatrix => &COMMAND_CONTRACTS[3],
             SunrayCommand::ValidateLitellmDefaultConfig => &COMMAND_CONTRACTS[4],
-            SunrayCommand::StartDesktopPrototype => &COMMAND_CONTRACTS[5],
         }
     }
 }

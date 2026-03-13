@@ -13,6 +13,19 @@ export async function runRecoveryAction(actionId: string, handlers: RecoveryActi
     case "retry-setup-check":
       await handlers.runSetupCheck();
       return;
+    case "copy-docker-desktop-checklist": {
+      const checklist = [
+        "Docker Desktop checklist:",
+        "1. Install Docker Desktop for Windows if it is not installed yet.",
+        "2. Start Docker Desktop and wait for the Linux engine to report healthy.",
+        "3. Keep WSL 2 integration enabled for the supported packaged AI path.",
+        "4. Retry the setup check without clearing saves or restarting the packaged shell.",
+        handlers.setupStatus?.supported_path?.launcher || "cargo run --manifest-path launcher/Cargo.toml -- start-dev"
+      ].join("\n");
+
+      await copyRecoveryText(checklist, "Docker Desktop checklist copied", handlers);
+      return;
+    }
     case "copy-launcher-command": {
       const launcher = handlers.setupStatus?.supported_path?.launcher;
       if (!launcher) {

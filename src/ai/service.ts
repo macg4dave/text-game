@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { config } from "../core/config.js";
 import type { TurnResult } from "../core/types.js";
+import { classifyTurnInput } from "../rules/turn-input-classification.js";
 import { TURN_RESPONSE_SCHEMA, assertTurnResponseSchemaContract } from "./turn-schema.js";
 
 export interface AiChatCompletionRequest {
@@ -63,10 +64,13 @@ export function buildTurnPromptSections({
   memories: string[];
   input: string;
 }): string {
+  const inputClassification = classifyTurnInput(input);
+
   return [
     `STATE_PACK\n${JSON.stringify(statePack)}`,
     `SHORT_HISTORY\n${shortHistory.join("\n")}`,
     `MEMORIES\n${memories.join("\n")}`,
+    `TURN_INPUT_CLASSIFICATION\nkind: ${inputClassification.kind}\nguidance: ${inputClassification.guidance}`,
     `PLAYER_INPUT\n${input}`
   ].join("\n\n");
 }
