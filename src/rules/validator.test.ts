@@ -18,17 +18,65 @@ import {
   type TurnOutputPayload
 } from "../core/types.js";
 import {
-  parseTurnInput,
-  validateCanonicalTurnEvent,
+  validateDirectorSpec,
+  validateQuestSpec
+} from "./validator/content-spec.js";
+import { validateCanonicalTurnEvent } from "./validator/replay-contract.js";
+import {
   validateAuthoritativePlayerState,
-  validateMemoryCandidate,
   validateSaveSlotActionResponse,
   validateSaveSlotLoadResponse,
-  validateSetupStatusResponse,
   validateStateResponse,
-  validateTurnResponse,
+  validateTurnResponse
+} from "./validator/state-contract.js";
+import { validateSetupStatusResponse } from "./validator/setup-contract.js";
+import {
+  parseTurnInput,
+  validateMemoryCandidate,
   validateTurnOutput
-} from "./validator.js";
+} from "./validator/turn-payload.js";
+
+test("content-spec validators stay focused on authored spec contracts", () => {
+  const directorResult = validateDirectorSpec({
+    end_goal: "Reach the tower",
+    acts: [
+      {
+        id: "act-1",
+        name: "Arrival",
+        beats: [
+          {
+            id: "beat-1",
+            label: "Find the signal",
+            required_flags: [],
+            unlock_flags: ["signal_seen"]
+          }
+        ]
+      }
+    ]
+  });
+
+  const questResult = validateQuestSpec({
+    quests: [
+      {
+        id: "intro-signal",
+        title: "Find the signal",
+        stages: [
+          {
+            id: "stage-1",
+            label: "Inspect the market",
+            required_flags: [],
+            unlock_flags: []
+          }
+        ]
+      }
+    ]
+  });
+
+  assert.equal(directorResult.ok, true);
+  assert.deepEqual(directorResult.beatIds, ["beat-1"]);
+  assert.deepEqual(directorResult.flags, ["signal_seen"]);
+  assert.deepEqual(questResult, { ok: true, errors: [] });
+});
 
 test("parseTurnInput normalizes the legacy camelCase request body to the versioned schema", () => {
   const result = parseTurnInput({

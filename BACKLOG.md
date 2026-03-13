@@ -218,8 +218,8 @@ No global blocker as of 2026-03-09:
 | T59c | Next | P1 | P1 | Canonical player-creation replay bootstrap | Done | T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T58b | Later | P2 | P1 | Simulation-first consequence resolution | Ready | T58a, T57b, T07, T08 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T58c | Later | P2 | P1 | Director framing and beat pacing policy | Blocked | T16, T58b | Schema validation check + integration test + replay fixture execution |
-| T51 | Next | P1 | P1 | Database storage and migration boundary split | Ready | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
-| T52 | Next | P1 | P1 | Validator contract module split | Ready | T06, T12c, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
+| T51 | Next | P1 | P1 | Database storage and migration boundary split | Done | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
+| T52 | Next | P1 | P1 | Validator contract module split | Done | T06, T12c, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T53 | Next | P1 | P1 | Launcher entrypoint and script library split | Dropped | T02h, T12c | Superseded by `T65` |
 | T54 | Next | P1 | P2 | Setup view model and recovery policy split | Done | T11a, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T62 | Next | P2 | P1 | NPC memory significance pipeline | Done | T59, T60 | Manual planning-doc consistency review |
@@ -3449,7 +3449,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T51 - Database Storage And Migration Boundary Split
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -3483,10 +3483,13 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - anti-monolith audit on 2026-03-08 found `src/core/db.ts` combining singleton lifecycle, migration definitions, storage inspection, backup creation, file reset, env-path resolution, and CLI execution in one file
   - `T09` and `T46` will likely deepen this area; land the split before save or migration behavior grows further
   - avoid hiding new feature logic inside a replacement helper bucket under `src/core/db/`
+  - completed on 2026-03-13 by keeping `src/core/db.ts` as the stable public DB facade while extracting focused helpers under `src/core/db/` for path resolution, migration definitions and runner logic, storage inspection and backup/reset helpers, and CLI dispatch
+  - added `src/core/db.test.ts` to pin the documented `migrate` and `reset` command contract against a temporary database before and after the refactor
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/core/db.test.ts`, `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate`, `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset`, and `docker compose run --rm --no-deps app npm test`
 
 ### T52 - Validator Contract Module Split
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -3521,6 +3524,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - anti-monolith audit on 2026-03-08 found `src/rules/validator.ts` mixing content-spec, turn-input, turn-output, authoritative-state, setup-status, and runtime-preflight validation
   - `T10`, `T16`, and `T19` should extend focused validator modules rather than the current catch-all file
   - keep contract-level error wording stable unless a failing test or schema mismatch requires a fix
+  - completed on 2026-03-13 by keeping `src/rules/validator.ts` as a stable facade and extracting focused modules under `src/rules/validator/` for content specs, turn payloads, replay contracts, setup-preflight contracts, state-response contracts, and shared helpers
+  - `src/rules/validator.test.ts` now maps coverage to the extracted contract areas while server and state callers continue importing through `../rules/validator.js`
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts`, and `docker compose run --rm --no-deps app npm test`
 
 ### T53 - Launcher Entrypoint And Script Library Split
 
