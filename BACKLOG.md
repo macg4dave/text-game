@@ -227,8 +227,8 @@ No global blocker as of 2026-03-09:
 | T62 | Next | P2 | P1 | NPC memory significance pipeline | Done | T59, T60 | Manual planning-doc consistency review |
 | T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Done | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T63 | Next | P2 | P1 | Memory storage hierarchy and context-budget policy | Done | T59, T60, T61, T62 | Manual planning-doc consistency review |
-| T63a | Next | P2 | P1 | Live context hierarchy and retrieval budget contract | Blocked | T60a, T61a, T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
-| T63b | Next | P2 | P1 | Summary compression and versioned memory artifacts | Blocked | T63a, T59b, T62b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
+| T63a | Next | P2 | P1 | Live context hierarchy and retrieval budget contract | Done | T60a, T61a, T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T63b | Next | P2 | P1 | Summary compression and versioned memory artifacts | Done | T63a, T59b, T62b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T63c | Next | P2 | P1 | Memory context observability and replay tooling | Blocked | T63a, T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T67 | Later | P2 | P2 | Grounded DM guide recall surface | Done | T59, T60, T62, T63 | Manual planning-doc consistency review + child task validation |
 | T67a | Later | P2 | P2 | Guide query contract and grounding policy | Blocked | T14, T59b, T60b, T62c, T63b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts src/state/**/*.test.ts src/rules/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
@@ -246,13 +246,13 @@ No global blocker as of 2026-03-09:
 | T71 | Now | P1 | P1 | Commit-aligned weak narration reconciliation | Done | T57c, T64b, T70 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live AI smoke |
 | T72 | Now | P1 | P1 | Sparse hot-summary memory admission | Done | T60a, T71 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/reducer.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
-| T13 | Later | P2 | P1 | Embeddings pipeline | Blocked | T07a, T60a, T62b | Manual embedding call verification |
-| T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Ready | T02f | Manual embedding route verification |
-| T47 | Later | P2 | P1 | LiteLLM default route integration fixtures | Blocked | T07a, T13a | LiteLLM route fixture run |
+| T13 | Later | P2 | P1 | Embeddings pipeline | Done | T07a, T60a, T62b | Manual embedding call verification |
+| T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Done | T02f | Manual embedding route verification |
+| T47 | Later | P2 | P1 | LiteLLM default route integration fixtures | Ready | T07a, T13a | LiteLLM route fixture run |
 | T55 | Later | P2 | P2 | Config env resolution and diagnostics split | Ready | T02h | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/core/config.test.ts` |
 | T14 | Later | P2 | P1 | Retrieval and top-k ranking | Blocked | T13, T13a, T60b, T62c | Retrieval fixture check |
 | T15 | Later | P2 | P1 | Memory summarizer job | Blocked | T09, T60b, T62c, T63b | `npm test` |
-| T62b | Later | P2 | P1 | NPC importance tiers and long-lived memory admission | Blocked | T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
+| T62b | Later | P2 | P1 | NPC importance tiers and long-lived memory admission | Done | T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T62c | Later | P2 | P1 | Partitioned retrieval for NPC, world, journal, and scene context | Blocked | T62b, T60b, T13 | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
 | T16 | Later | P2 | P1 | Director spec format and versioning | Ready | T06, T58a | Schema validation check |
 | T17 | Later | P2 | P1 | Director enforcement in turn pipeline | Blocked | T16, T58b | Integration test |
@@ -1492,7 +1492,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T62b - NPC Importance Tiers And Long-Lived Memory Admission
 
-- Status: Blocked
+- Status: Done
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -1535,6 +1535,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - keep tier policy sparse by default; the point is believable recognition, not exhaustive biography storage
   - if a tier can be described only by prose volume instead of by stored fact types and retrieval priority, the design is too vague
   - tier promotion should not let soft flavor recollections overwrite canon facts already governed by `T60`
+  - implemented `NpcImportanceTier`, `NpcMemoryRecord`, structured validator coverage, and turn-pipeline persistence that promotes from cheap identity recall to richer anchor-cast recall based on cumulative significance plus re-engagement
+  - generic live-context retrieval now excludes raw `npc-memory` JSON alongside `npc-encounter-fact` so `T62c` can add partitioned retrieval intentionally instead of inheriting an accidental hot-context flood path
+  - validation passed with `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts`, and `docker compose run --rm --no-deps app npm test`
 
 ### T62c - Partitioned Retrieval For NPC, World, Journal, And Scene Context
 
@@ -1628,7 +1631,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T63a - Live Context Hierarchy And Retrieval Budget Contract
 
-- Status: Blocked
+- Status: Done
 - Queue: Next
 - Phase: P2
 - Priority: P1
@@ -1668,10 +1671,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - do not let `recent events` become a disguised transcript dump; if a raw-history slice is needed, it must be named and budgeted explicitly
   - keep the model-facing context minimal enough that `T61` remains true in practice, not just at the output-schema layer
   - prefer config-driven bucket ceilings over prompt-only conventions so later tooling can inspect and enforce them
+  - completed on 2026-03-13 by adding the shared `LIVE_CONTEXT_BUCKET_LIMITS` contract and a concrete default hot-context layout: `short_history` 2, `quest_progress` 2, `relationship_summaries` 2, `world_facts` 2, `cold_history` 0
+  - turn execution now assembles a named `LiveTurnContext` before model invocation, carries it through prompt construction, and keeps transcript-like `PLAYER:` or `NARRATOR:` lines out of hot recall unless a future explicit retrieval rule opts them in
+  - prompt assembly now surfaces live-context budgets and named buckets directly, so later retrieval and summary work can target a stable contract rather than relying on one undifferentiated `memories` list
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts`, and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
 
 ### T63b - Summary Compression And Versioned Memory Artifacts
 
-- Status: Blocked
+- Status: Done
 - Queue: Next
 - Phase: P2
 - Priority: P1
@@ -1712,6 +1719,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - cold history may remain for replay or debugging, but that does not make it eligible for hot prompt context
   - if a summary cannot be regenerated after the summarizer changes, the versioning policy is incomplete
   - prefer structured-fact extraction plus compact recaps over prose-only memory blobs
+  - completed on 2026-03-13 by adding versioned `memory-summary-artifact` records with `scene-summary` output per meaningful accepted turn and `beat-recap` output when beat progression completes or advances a beat
+  - summary artifacts record canonical source event ids and stay excluded from generic `getRecentMemories()` and `getRelevantMemories()` output so later retrieval work can opt them in deliberately instead of flooding hot recall
+  - replay-safe rebuild now lives in `src/state/memory-summary.ts` and is covered by focused tests plus the replay fixture path, so later summarizer changes can compare regenerated artifacts against canonical events
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts`, and `docker compose run --rm --no-deps app npm test`
 
 ### T63c - Memory Context Observability And Replay Tooling
 
@@ -3171,7 +3182,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T47 - LiteLLM Default Route Integration Fixtures
 
-- Status: Blocked
+- Status: Ready
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -4641,7 +4652,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T13 - Embeddings Pipeline
 
-- Status: Blocked
+- Status: Done
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -4673,10 +4684,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - keep retrieval policy out of this task; ranking belongs to `T14` and class policy belongs to `T60b`
+  - completed on 2026-03-13 by batching embeddings for admitted memory inserts in `src/state/turn.ts` instead of only plain `memory_updates`; the turn pipeline now assigns vectors to `fact`, `npc-memory`, and `memory-summary-artifact` records while intentionally leaving raw `npc-encounter-fact` JSON unembedded
+  - added `src/state/memory-embeddings.ts` to turn structured durable records into stable embedding text: plain facts stay as-is, `npc-memory` uses tier plus summary and recall fields, and summary artifacts use kind plus beat, location, summary, and detail lines so retrieval work can rank committed memory without embedding raw transcript dumps or opaque JSON blobs
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, and `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts`
+  - manual verification on 2026-03-13 exercised the built turn pipeline inside Docker with deterministic stubs and printed `memory_vectors_generated: 4`, embedding inputs for `fact`, `npc-memory`, `scene-summary`, and `beat-recap`, and stored-memory kinds showing embeddings on those admitted records while `npc-encounter-fact` remained unembedded
 
 ### T13a - LiteLLM Embedding Alias Integration
 
-- Status: Ready
+- Status: Done
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -4706,6 +4721,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - keep combined chat-plus-embedding fixture automation in `T47` rather than expanding this task
+  - completed on 2026-03-13 by adding focused adapter coverage in `src/ai/service.test.ts` for both single and batch embedding calls, asserting the configured LiteLLM alias `game-embedding` is forwarded unchanged with `encoding_format: "float"`
+  - added `scripts/validate-litellm-embedding-route.ts` as the repeatable manual verification path; it loads the active config, prints the route summary, and confirms the embedding alias returns a non-empty vector instead of silently succeeding through the wrong path
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/ai/service.test.ts`, and `docker compose run --rm --no-deps -e LITELLM_PROXY_URL=http://host.docker.internal:4000 app npx tsx scripts/validate-litellm-embedding-route.ts`; the live route summary reported `provider=litellm`, `embeddingModel=game-embedding`, and a non-empty vector with `embedding_length: 768`
 
 ### T14 - Retrieval And Top-K Ranking
 

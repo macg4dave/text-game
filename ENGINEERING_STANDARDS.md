@@ -123,9 +123,12 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 
 - Do not treat raw dialogue logs as durable NPC memory. Transcript retention exists for replay and debugging; durable NPC recall must come from committed structured encounter facts and server-owned significance scoring.
 - NPC memory should use explicit tiers with sparse defaults. Cheap identity facts such as names may persist broadly, but richer summaries, relationship state, open threads, and retrieval priority require higher cumulative significance.
+- Tier policy should remain concrete and testable: `ambient` stores encounter facts only, `known` admits identity recall, `important` adds concise summary or topic-thread recall, and `anchor_cast` admits richer relationship state and durable follow-up threads.
 - Keep structured encounter facts and durable NPC recall as separate storage kinds. `npc-encounter-fact` records exist for server-owned structure and later tiering work; they must not be dumped into the default live recall bucket like ordinary text memories.
 - The significance contract must stay testable. If weights or threshold change, update the documented rule table and the focused validator or turn tests in the same change instead of relying on hidden heuristics.
 - Retrieval policy must keep NPC memory, world memory, player journal memory, and short-lived scene context separate enough that one pool cannot crowd out the others by default.
+- Treat live-context ceilings as code, not convention. If bucket limits change, update the shared `LIVE_CONTEXT_BUCKET_LIMITS` contract and the focused turn tests in the same change.
+- Transcript-like lines such as `PLAYER:` or `NARRATOR:` are cold history by default and must not slip into relationship or world-fact buckets through formatting accidents.
 - NPC memory changes should include fixtures proving both that meaningful returning NPCs are recognized from committed facts and that irrelevant prior chat does not flood the turn context.
 
 ## Memory Storage Hierarchy Policy
@@ -136,6 +139,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Durable storage should stay legible as explicit buckets such as hard canon facts, quest or progression facts, relationship summaries, and cold history logs.
 - Raw history or transcript text must stay cold by default. If a turn needs transcript recovery, the retrieval mode, reason, and budget should be explicit and inspectable.
 - Run compression passes after scenes and larger recap merges after chapters or beats so hot memory sheds verbose dialogue quickly.
+- Treat summary artifacts as explicit contracts, not loose prose. Scene summaries and beat recaps must carry a versioned schema, list their canonical source event ids, and remain reproducible from committed events in tests or fixture tooling.
 - Version summary and recap artifacts so they can be recomputed later from canonical records when extraction or summarization logic changes.
 - Memory tooling must expose token accounting, prompt diffs, retrieval traces, and replay-oriented checks that explain what entered context and why.
 

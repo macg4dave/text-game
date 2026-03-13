@@ -3,13 +3,18 @@ import test from "node:test";
 import {
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
   COMMITTED_EVENT_SCHEMA_VERSION,
+  LIVE_CONTEXT_BUCKET_LIMITS,
+  MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION,
   MEMORY_CLASS_RULES,
   TURN_OUTPUT_SCHEMA_VERSION,
   type CanonicalEventPayload,
   type CanonicalTurnEventPayload,
   type DirectorSpec,
+  type LiveTurnContext,
   type MemoryCandidate,
+  type MemorySummaryArtifact,
   type NpcEncounterFact,
+  type NpcMemoryRecord,
   type Player,
   type QuestSpec,
   type TurnResult
@@ -20,7 +25,11 @@ import { TURN_RESPONSE_SCHEMA, validateTurnResponseSchemaContract } from "../ai/
 import { validateCanonicalTurnEvent, validateMemoryCandidate } from "../rules/validator.js";
 import { createCommittedTurnEventPayload } from "../server/http-contract.js";
 import { DRIFT_RECONCILED_PLAYER_OPTIONS } from "./presentation.js";
-import { evaluateNpcEncounterSignificance } from "./encounter-facts.js";
+import {
+  buildNpcMemoryRecord,
+  evaluateNpcEncounterSignificance,
+  resolveNpcImportanceTier
+} from "./encounter-facts.js";
 import { createTurnService } from "./turn.js";
 
 function getTurnResolutionEvent(event: CanonicalEventPayload): CanonicalTurnEventPayload | null {
@@ -227,6 +236,51 @@ test("turn prompt sections include clarification guidance for informational ques
   assert.match(promptSections, /do not .* advance|do not .* unlock|do not .* inspect/i);
 });
 
+test("turn prompt sections include explicit live-context budgets and keep cold history excluded by default", () => {
+  const liveContext: LiveTurnContext = {
+    budgets: {
+      short_history: { bucket: "short_history", limit: LIVE_CONTEXT_BUCKET_LIMITS.short_history, include_by_default: true },
+      quest_progress: { bucket: "quest_progress", limit: LIVE_CONTEXT_BUCKET_LIMITS.quest_progress, include_by_default: true },
+      relationship_summaries: { bucket: "relationship_summaries", limit: LIVE_CONTEXT_BUCKET_LIMITS.relationship_summaries, include_by_default: true },
+      world_facts: { bucket: "world_facts", limit: LIVE_CONTEXT_BUCKET_LIMITS.world_facts, include_by_default: true },
+      cold_history: { bucket: "cold_history", limit: LIVE_CONTEXT_BUCKET_LIMITS.cold_history, include_by_default: false }
+    },
+    buckets: {
+      short_history: ["PLAYER: ask about Nila", "NARRATOR: The beacon crackles overhead."],
+      quest_progress: ["QUEST: Ask Nila Vale where the relay draws power.", "GOAL: Confirm the relay is real."],
+      relationship_summaries: ["Nila Vale: now trusts the player with the causeway route."],
+      world_facts: ["The beacon is tied to the Ghostlight Relay."],
+      cold_history: []
+    },
+    recalled_facts: [
+      "Nila Vale: now trusts the player with the causeway route.",
+      "QUEST: Ask Nila Vale where the relay draws power.",
+      "GOAL: Confirm the relay is real.",
+      "The beacon is tied to the Ghostlight Relay."
+    ]
+  };
+
+  const promptSections = buildTurnPromptSections({
+    statePack: {
+      player: {
+        location: "Rooftop Market",
+        flags: [],
+        inventory: [],
+        quests: []
+      }
+    },
+    shortHistory: [],
+    memories: [],
+    liveContext,
+    input: "ask Nila where the relay draws power"
+  });
+
+  assert.match(promptSections, /LIVE_CONTEXT_BUDGETS/i);
+  assert.match(promptSections, /RELATIONSHIP_SUMMARIES/i);
+  assert.match(promptSections, /WORLD_FACTS/i);
+  assert.match(promptSections, /COLD_HISTORY\n\(excluded by default; budget 0\)/i);
+});
+
 test("turn response schema contract stays compact and proposal-oriented", () => {
   assert.deepEqual(validateTurnResponseSchemaContract(), { ok: true, errors: [] });
 });
@@ -343,6 +397,74 @@ test("npc encounter significance rises with stable identity, meaningful exchange
   assert.ok(returnedResult.breakdown.voluntary_return > 0);
 });
 
+test("npc importance tiers promote from known to important to anchor cast as significance and re-engagement accumulate", () => {
+  assert.equal(resolveNpcImportanceTier({ cumulativeSignificance: 1, encounterCount: 1, voluntaryReturn: false }), "ambient");
+  assert.equal(resolveNpcImportanceTier({ cumulativeSignificance: 3, encounterCount: 1, voluntaryReturn: false }), "known");
+  assert.equal(resolveNpcImportanceTier({ cumulativeSignificance: 7, encounterCount: 2, voluntaryReturn: true }), "important");
+  assert.equal(resolveNpcImportanceTier({ cumulativeSignificance: 10, encounterCount: 3, voluntaryReturn: true }), "anchor_cast");
+});
+
+test("npc memory records stay sparse by tier while preserving identity cheaply", () => {
+  const knownRecord = buildNpcMemoryRecord({
+    fact: {
+      npc_id: "npc-nila-vale",
+      display_name: "Nila Vale",
+      role: "relay mechanic",
+      location: "Rooftop Market",
+      topics: ["ghostlight relay"],
+      promises: [],
+      clues: [],
+      mood: "hurried",
+      relationship_change: null,
+      last_seen_beat: "beat-1",
+      encounter_count: 1,
+      significance: 3,
+      summary: "Nila Vale warns that the beacon is tied to the Ghostlight Relay.",
+      source_event_id: "turn-evt-1",
+      last_seen_at: "2026-03-13T12:00:00.000Z",
+      quest_hooks: []
+    },
+    previousRecord: null,
+    previousFacts: [],
+    voluntaryReturn: false
+  });
+
+  const anchorRecord = buildNpcMemoryRecord({
+    fact: {
+      npc_id: "npc-nila-vale",
+      display_name: "Nila Vale",
+      role: "relay mechanic",
+      location: "Rooftop Market",
+      topics: ["ghostlight relay", "causeway route", "relay vault"],
+      promises: ["Meet the player at the causeway gate"],
+      clues: ["The relay draws power through Stormglass Causeway"],
+      mood: "steady",
+      relationship_change: "Nila now trusts the player with the relay route.",
+      last_seen_beat: "beat-3",
+      encounter_count: 3,
+      significance: 10,
+      summary: "Nila Vale now trusts the player, shared the causeway route, and promised to meet at the gate.",
+      source_event_id: "turn-evt-3",
+      last_seen_at: "2026-03-13T12:10:00.000Z",
+      quest_hooks: ["Open the Relay Vault"]
+    },
+    previousRecord: knownRecord,
+    previousFacts: [],
+    voluntaryReturn: true
+  });
+
+  assert.equal(knownRecord.tier, "known");
+  assert.deepEqual(knownRecord.remembered_topics, ["ghostlight relay"]);
+  assert.equal(knownRecord.relationship_state, null);
+  assert.deepEqual(knownRecord.open_threads, []);
+
+  assert.equal(anchorRecord.tier, "anchor_cast");
+  assert.deepEqual(anchorRecord.remembered_topics, ["ghostlight relay", "causeway route", "relay vault"]);
+  assert.equal(anchorRecord.relationship_state, "Nila now trusts the player with the relay route.");
+  assert.deepEqual(anchorRecord.open_threads, ["Meet the player at the causeway gate", "Open the Relay Vault"]);
+  assert.ok(anchorRecord.retrieval_priority > knownRecord.retrieval_priority);
+});
+
 test("turn service executes the gameplay pipeline outside the server layer", async () => {
   const events: Array<{ playerId: string; role: string; content: string }> = [];
   const committedEvents: string[] = [];
@@ -352,6 +474,7 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
   let capturedInput = "";
   let capturedShortHistory: string[] = [];
   let capturedMemories: string[] = [];
+  let capturedLiveContext: LiveTurnContext | undefined;
 
   const player = createPlayer();
   const refreshedPlayer: Player = {
@@ -379,6 +502,7 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
       capturedInput = params.input;
       capturedShortHistory = params.shortHistory;
       capturedMemories = params.memories;
+      capturedLiveContext = params.liveContext;
       return {
         narrative: "The signal lantern hummed when touched.",
         player_options: ["Inspect the lantern"],
@@ -452,7 +576,19 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
   assert.equal(capturedModel, "game-chat");
   assert.equal(capturedInput, "touch the lantern");
   assert.deepEqual(capturedShortHistory, ["PLAYER: look around"]);
-  assert.deepEqual(capturedMemories, ["You heard the market signal last night."]);
+  assert.deepEqual(capturedMemories, [
+    "QUEST: You noticed the first signal marker.",
+    "GOAL: You have started the search.",
+    "You heard the market signal last night."
+  ]);
+  assert.deepEqual(capturedLiveContext?.buckets.short_history, ["PLAYER: look around"]);
+  assert.deepEqual(capturedLiveContext?.buckets.quest_progress, [
+    "QUEST: You noticed the first signal marker.",
+    "GOAL: You have started the search."
+  ]);
+  assert.deepEqual(capturedLiveContext?.buckets.relationship_summaries, []);
+  assert.deepEqual(capturedLiveContext?.buckets.world_facts, ["You heard the market signal last night."]);
+  assert.deepEqual(capturedLiveContext?.buckets.cold_history, []);
   assert.equal(events.length, 2);
   assert.deepEqual(
     events.map((event) => event.role),
@@ -470,16 +606,111 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
     "The signal now points toward the tower."
   );
   assert.deepEqual(committedEvents, ["accepted"]);
-  assert.deepEqual(memoriesAdded, [
+  const factMemories = memoriesAdded.filter((memory) => !memory.content.startsWith('{"schema_version":"memory-summary/v1"'));
+  const summaryArtifacts = memoriesAdded.filter((memory) => memory.content.startsWith('{"schema_version":"memory-summary/v1"'));
+  assert.deepEqual(factMemories, [
     {
       playerId: player.id,
       content: "The signal lantern hummed when touched.",
       embedding: [0.1, 0.2]
     }
   ]);
+  assert.equal(summaryArtifacts.length, 1);
 });
 
-test("turn service always persists cheap encounter facts but only promotes durable NPC memory above significance threshold", async () => {
+test("turn service applies fixed live-context bucket ceilings and keeps transcript-like memory cold by default", async () => {
+  const player = createStorySamplePlayer();
+  let capturedLiveContext: LiveTurnContext | undefined;
+
+  const service = createTurnService({
+    addCommittedTurnEvent() {},
+    addEvent() {},
+    addMemories() {},
+    async generateTurn(params): Promise<TurnResult> {
+      capturedLiveContext = params.liveContext;
+      return {
+        narrative: "Nila points across the causeway and taps the route in the dust.",
+        player_options: ["Follow the route"],
+        state_updates: {
+          location: "Rooftop Market",
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: [],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "Next step: Head for Stormglass Causeway."
+        },
+        memory_updates: []
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return player;
+    },
+    getRelevantMemories() {
+      return [
+        "Nila Vale: now trusts the player with the causeway route.",
+        "The beacon is tied to the Ghostlight Relay.",
+        "PLAYER: old transcript noise should stay cold.",
+        "Stormglass Causeway is exposed during lightning surges.",
+        "Relay Vault requires a tuning fork."
+      ];
+    },
+    getShortHistory() {
+      return [
+        "PLAYER: ask about the route",
+        "NARRATOR: Nila checks the alley behind you.",
+        "PLAYER: ask again about the causeway"
+      ];
+    },
+    persistPlayerState(nextPlayer) {
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "ask Nila where the causeway route starts",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  assert.deepEqual(capturedLiveContext?.buckets.short_history, [
+    "NARRATOR: Nila checks the alley behind you.",
+    "PLAYER: ask again about the causeway"
+  ]);
+  assert.deepEqual(capturedLiveContext?.buckets.relationship_summaries, [
+    "Nila Vale: now trusts the player with the causeway route."
+  ]);
+  assert.deepEqual(capturedLiveContext?.buckets.quest_progress, [
+    "QUEST: Inspect the sparking market beacon in Rooftop Market",
+    "GOAL: No one has proved the relay is more than panic."
+  ]);
+  assert.deepEqual(capturedLiveContext?.buckets.world_facts, [
+    "The beacon is tied to the Ghostlight Relay.",
+    "Stormglass Causeway is exposed during lightning surges."
+  ]);
+  assert.deepEqual(capturedLiveContext?.buckets.cold_history, []);
+  assert.deepEqual(capturedLiveContext?.recalled_facts, [
+    "Nila Vale: now trusts the player with the causeway route.",
+    "QUEST: Inspect the sparking market beacon in Rooftop Market",
+    "GOAL: No one has proved the relay is more than panic.",
+    "The beacon is tied to the Ghostlight Relay.",
+    "Stormglass Causeway is exposed during lightning surges."
+  ]);
+});
+
+test("turn service persists tiered npc memory snapshots so identity is cheap while richer recall waits for higher importance", async () => {
   const player = createStorySamplePlayer();
   const memoriesAdded: Array<{ playerId: string; content: string; kind?: string; embedding?: number[] }> = [];
   const persistedPlayers: Player[] = [];
@@ -506,13 +737,14 @@ test("turn service always persists cheap encounter facts but only promotes durab
     promises: ["Meet the player at the causeway gate"],
     clues: ["The relay draws power through Stormglass Causeway"],
     relationship_change: "Nila now trusts the player with the relay route.",
-    last_seen_beat: "beat-2",
-    encounter_count: 2,
+    last_seen_beat: "beat-3",
+    encounter_count: 3,
     summary: "Nila Vale shared the causeway route and promised to meet the player there.",
     source_event_id: "turn-evt-2",
     last_seen_at: "2026-03-13T12:05:00.000Z"
   };
   let encounterFactCalls = 0;
+  let memoryRecordCalls = 0;
 
   const service = createTurnService({
     addCommittedTurnEvent() {},
@@ -530,6 +762,18 @@ test("turn service always persists cheap encounter facts but only promotes durab
     async deriveNpcEncounterFacts() {
       encounterFactCalls += 1;
       return encounterFactCalls === 1 ? [lowSignificanceFact] : [highSignificanceFact];
+    },
+    getNpcEncounterFacts() {
+      return encounterFactCalls > 1 ? [lowSignificanceFact] : [];
+    },
+    getNpcMemoryRecords() {
+      memoryRecordCalls += 1;
+      if (memoryRecordCalls > 1) {
+        const firstNpcMemory = JSON.parse(memoriesAdded[2]?.content ?? "null") as NpcMemoryRecord | null;
+        return firstNpcMemory ? [firstNpcMemory] : [];
+      }
+
+      return [];
     },
     async generateTurn(): Promise<TurnResult> {
       return {
@@ -580,10 +824,17 @@ test("turn service always persists cheap encounter facts but only promotes durab
   });
 
   assert.equal(firstOutcome.ok, true);
-  assert.deepEqual(
-    memoriesAdded.map((memory) => memory.kind),
-    ["fact", "npc-encounter-fact"]
-  );
+  assert.deepEqual(memoriesAdded.slice(0, 5).map((memory) => memory.kind), [
+    "fact",
+    "npc-encounter-fact",
+    "npc-memory",
+    "memory-summary-artifact",
+    "memory-summary-artifact"
+  ]);
+  const firstNpcMemory = JSON.parse(memoriesAdded[2]?.content ?? "null") as NpcMemoryRecord | null;
+  assert.equal(firstNpcMemory?.tier, "known");
+  assert.deepEqual(firstNpcMemory?.remembered_topics, ["ghostlight relay"]);
+  assert.deepEqual(firstNpcMemory?.open_threads, []);
 
   const secondPlayer = persistedPlayers.at(-1) ?? player;
   const secondOutcome = await service.executeTurn({
@@ -596,12 +847,241 @@ test("turn service always persists cheap encounter facts but only promotes durab
   });
 
   assert.equal(secondOutcome.ok, true);
-  assert.deepEqual(
-    memoriesAdded.map((memory) => memory.kind),
-    ["fact", "npc-encounter-fact", "npc-encounter-fact", "npc-memory"]
-  );
+  assert.deepEqual(memoriesAdded.map((memory) => memory.kind), [
+    "fact",
+    "npc-encounter-fact",
+    "npc-memory",
+    "memory-summary-artifact",
+    "memory-summary-artifact",
+    "npc-encounter-fact",
+    "npc-memory"
+  ]);
   assert.match(memoriesAdded[1]?.content ?? "", /Nila Vale/);
-  assert.match(memoriesAdded[3]?.content ?? "", /causeway route/i);
+  const secondNpcMemory = JSON.parse(memoriesAdded[6]?.content ?? "null") as NpcMemoryRecord | null;
+  assert.equal(secondNpcMemory?.tier, "anchor_cast");
+  assert.match(secondNpcMemory?.summary ?? "", /causeway route/i);
+  assert.deepEqual(secondNpcMemory?.open_threads, ["Meet the player at the causeway gate"]);
+});
+
+test("turn service persists versioned scene summaries and beat recaps when a committed turn advances the beat", async () => {
+  const player = createStorySamplePlayer();
+  const memoriesAdded: Array<{ playerId: string; content: string; kind?: string }> = [];
+  const persistedPlayers: Player[] = [];
+
+  const service = createTurnService({
+    addCommittedTurnEvent() {},
+    addEvent() {},
+    addMemories(playerId, memoryList) {
+      memoryList.forEach((memory) => {
+        memoriesAdded.push({
+          playerId,
+          content: memory.content,
+          kind: "kind" in memory ? String(memory.kind) : undefined
+        });
+      });
+    },
+    async deriveNpcEncounterFacts() {
+      return [];
+    },
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "The signal lantern revealed the route toward the bridge.",
+        player_options: ["Cross the bridge"],
+        state_updates: {
+          location: "Rooftop Market",
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: ["beacon_inspected"],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "Next step: Ask Nila Vale where the relay draws power."
+        },
+        memory_updates: ["The market beacon is tied to the Ghostlight Relay."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings({ inputs }) {
+      return inputs.map(() => []);
+    },
+    getMemorySummaryArtifacts() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "cross toward the bridge",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  const summaryArtifacts = memoriesAdded.filter((memory) => memory.kind === "memory-summary-artifact");
+  assert.equal(summaryArtifacts.length, 2);
+
+  const sceneSummary = JSON.parse(summaryArtifacts[0]?.content ?? "null") as MemorySummaryArtifact | null;
+  const beatRecap = JSON.parse(summaryArtifacts[1]?.content ?? "null") as MemorySummaryArtifact | null;
+
+  assert.equal(sceneSummary?.schema_version, MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION);
+  assert.equal(sceneSummary?.artifact_kind, "scene-summary");
+  assert.equal(sceneSummary?.beat_id, "beat-1");
+  assert.equal(sceneSummary?.location, "Rooftop Market");
+  assert.match(sceneSummary?.summary ?? "", /Ghostlight Relay/i);
+  assert.deepEqual(sceneSummary?.detail_lines, ["The market beacon is tied to the Ghostlight Relay."]);
+
+  assert.equal(beatRecap?.schema_version, MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION);
+  assert.equal(beatRecap?.artifact_kind, "beat-recap");
+  assert.equal(beatRecap?.beat_id, "beat-1");
+  assert.match(beatRecap?.summary ?? "", /Confirm the relay is real/i);
+  assert.deepEqual(beatRecap?.source_event_ids, sceneSummary?.source_event_ids);
+});
+
+test("turn service generates embeddings for admitted durable memory records but leaves raw encounter facts unembedded", async () => {
+  const player = createStorySamplePlayer();
+  const memoriesAdded: Array<{ playerId: string; content: string; kind?: string; embedding?: number[] }> = [];
+  const persistedPlayers: Player[] = [];
+  const capturedEmbeddingInputs: string[][] = [];
+  const encounterFact: NpcEncounterFact = {
+    npc_id: "npc-nila-vale",
+    display_name: "Nila Vale",
+    role: "relay mechanic",
+    location: "Rooftop Market",
+    topics: ["ghostlight relay", "causeway route"],
+    promises: ["Meet the player at the causeway gate"],
+    clues: ["The relay draws power through Stormglass Causeway"],
+    mood: "steady",
+    relationship_change: "Nila now trusts the player with the relay route.",
+    last_seen_beat: "beat-1",
+    encounter_count: 2,
+    significance: 0,
+    summary: "Nila Vale shared the causeway route and promised to meet the player there.",
+    source_event_id: "turn-evt-embed-1",
+    last_seen_at: "2026-03-13T12:05:00.000Z",
+    quest_hooks: ["Open the Relay Vault"]
+  };
+
+  const service = createTurnService({
+    addCommittedTurnEvent() {},
+    addEvent() {},
+    addMemories(playerId, memoryList) {
+      memoryList.forEach((memory) => {
+        memoriesAdded.push({
+          playerId,
+          content: memory.content,
+          kind: "kind" in memory ? String(memory.kind) : undefined,
+          embedding: memory.embedding
+        });
+      });
+    },
+    async deriveNpcEncounterFacts() {
+      return [encounterFact];
+    },
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "Nila points toward Stormglass Causeway and marks the relay route in chalk.",
+        player_options: ["Follow the route"],
+        state_updates: {
+          location: "Rooftop Market",
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: ["beacon_inspected"],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "Next step: Ask Nila Vale where the relay draws power."
+        },
+        memory_updates: ["The beacon is tied to the Ghostlight Relay."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings({ inputs }) {
+      capturedEmbeddingInputs.push(inputs);
+      return inputs.map((input, index) => [index + 1, input.length]);
+    },
+    getMemorySummaryArtifacts() {
+      return [];
+    },
+    getNpcEncounterFacts() {
+      return [];
+    },
+    getNpcMemoryRecords() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "ask Nila where the causeway route starts",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  assert.equal(capturedEmbeddingInputs.length, 1);
+  assert.equal(capturedEmbeddingInputs[0]?.length, 4);
+  assert.equal(capturedEmbeddingInputs[0]?.[0], "The beacon is tied to the Ghostlight Relay.");
+  assert.match(capturedEmbeddingInputs[0]?.[1] ?? "", /Nila Vale/i);
+  assert.match(capturedEmbeddingInputs[0]?.[1] ?? "", /causeway route/i);
+  assert.match(capturedEmbeddingInputs[0]?.[2] ?? "", /scene-summary/i);
+  assert.match(capturedEmbeddingInputs[0]?.[2] ?? "", /Ghostlight Relay/i);
+  assert.match(capturedEmbeddingInputs[0]?.[3] ?? "", /beat-recap/i);
+  assert.match(capturedEmbeddingInputs[0]?.[3] ?? "", /Confirm the relay is real/i);
+
+  const factMemory = memoriesAdded.find((memory) => memory.kind === "fact");
+  const encounterMemory = memoriesAdded.find((memory) => memory.kind === "npc-encounter-fact");
+  const npcMemory = memoriesAdded.find((memory) => memory.kind === "npc-memory");
+  const summaryArtifacts = memoriesAdded.filter((memory) => memory.kind === "memory-summary-artifact");
+
+  assert.deepEqual(factMemory?.embedding, [1, "The beacon is tied to the Ghostlight Relay.".length]);
+  assert.equal(encounterMemory?.embedding, undefined);
+  assert.deepEqual(npcMemory?.embedding, [2, capturedEmbeddingInputs[0]?.[1]?.length ?? 0]);
+  assert.deepEqual(summaryArtifacts.map((memory) => memory.embedding), [
+    [3, capturedEmbeddingInputs[0]?.[2]?.length ?? 0],
+    [4, capturedEmbeddingInputs[0]?.[3]?.length ?? 0]
+  ]);
+  assert.deepEqual(outcome.ok ? outcome.trace.memoryEmbeddings : [], [
+    [1, "The beacon is tied to the Ghostlight Relay.".length],
+    [2, capturedEmbeddingInputs[0]?.[1]?.length ?? 0],
+    [3, capturedEmbeddingInputs[0]?.[2]?.length ?? 0],
+    [4, capturedEmbeddingInputs[0]?.[3]?.length ?? 0]
+  ]);
 });
 
 test("turn service returns a 400 outcome when turn output validation fails", async () => {
@@ -684,7 +1164,10 @@ test("turn service returns a 400 outcome when turn output validation fails", asy
   assert.equal(outcome.trace.input, "touch the lantern");
   assert.equal(outcome.trace.player?.id, player.id);
   assert.deepEqual(outcome.trace.shortHistory, []);
-  assert.deepEqual(outcome.trace.memories, []);
+  assert.deepEqual(outcome.trace.memories, [
+    "QUEST: You noticed the first signal marker.",
+    "GOAL: You have started the search."
+  ]);
   assert.deepEqual(outcome.trace.inputEmbedding, []);
   assert.deepEqual(outcome.trace.updateValidation, { ok: true, errors: [] });
   assert.deepEqual(committedEvents, ["rejected"]);
@@ -1059,7 +1542,7 @@ test("turn service persists only adjudicated state changes when proposals includ
     quests: []
   });
   assert.deepEqual(committedEvents[0]?.committed.memory_updates, ["The player reached the bridge."]);
-  assert.equal(storedMemories.length, 1);
+  assert.equal(storedMemories.length, 2);
   assert.equal(storedMemories[0]?.content, "The player reached the bridge.");
   assert.equal(committedEvents[0]?.supplemental?.presentation?.narrative, outcome.turnOutput.narrative);
   assert.deepEqual(committedEvents[0]?.supplemental?.proposal_presentation?.player_options, ["Study the tower lights"]);

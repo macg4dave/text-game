@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TURN_RESPONSE_SCHEMA } from "./turn-schema.js";
-import { createAiService, type AiChatCompletionRequest } from "./service.js";
+import { createAiService, type AiChatCompletionRequest, type AiEmbeddingRequest } from "./service.js";
 
 test("createAiService sends turn generation through the configured model alias", async () => {
   const capturedRequests: AiChatCompletionRequest[] = [];
@@ -65,4 +65,81 @@ test("createAiService sends turn generation through the configured model alias",
   });
   assert.match(String(request.messages[1]?.content ?? ""), /PLAYER_INPUT\s+inspect the relay/i);
   assert.equal(result.narrative, "The relay hums.");
+});
+
+test("createAiService sends embedding requests through the configured LiteLLM alias", async () => {
+  const capturedRequests: AiEmbeddingRequest[] = [];
+  const service = createAiService({
+    chat: {
+      completions: {
+        async create() {
+          return { choices: [] };
+        }
+      }
+    },
+    embeddings: {
+      async create(request: AiEmbeddingRequest) {
+        capturedRequests.push(request);
+        return {
+          data: [
+            {
+              embedding: [0.11, 0.22, 0.33]
+            }
+          ]
+        };
+      }
+    }
+  });
+
+  const embedding = await service.getEmbedding({
+    model: "game-embedding",
+    input: "What route did Nila share?"
+  });
+
+  assert.deepEqual(embedding, [0.11, 0.22, 0.33]);
+  assert.deepEqual(capturedRequests, [
+    {
+      model: "game-embedding",
+      input: "What route did Nila share?",
+      encoding_format: "float"
+    }
+  ]);
+});
+
+test("createAiService sends batch embedding requests through the configured LiteLLM alias", async () => {
+  const capturedRequests: AiEmbeddingRequest[] = [];
+  const service = createAiService({
+    chat: {
+      completions: {
+        async create() {
+          return { choices: [] };
+        }
+      }
+    },
+    embeddings: {
+      async create(request: AiEmbeddingRequest) {
+        capturedRequests.push(request);
+        return {
+          data: [
+            { embedding: [1, 0] },
+            { embedding: [0, 1] }
+          ]
+        };
+      }
+    }
+  });
+
+  const embeddings = await service.getEmbeddings({
+    model: "game-embedding",
+    inputs: ["The beacon is tied to the relay.", "Nila knows the causeway route."]
+  });
+
+  assert.deepEqual(embeddings, [[1, 0], [0, 1]]);
+  assert.deepEqual(capturedRequests, [
+    {
+      model: "game-embedding",
+      input: ["The beacon is tied to the relay.", "Nila knows the causeway route."],
+      encoding_format: "float"
+    }
+  ]);
 });

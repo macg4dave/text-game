@@ -3,13 +3,16 @@ import { getDb } from "../core/db.js";
 import { getInitialDirectorState, loadDirectorSpec } from "../story/director.js";
 import { loadQuestSpec, resolveQuestUpdates } from "../story/quest.js";
 import { AUTHORITATIVE_STATE_SCHEMA_VERSION } from "../core/types.js";
+import { validateMemorySummaryArtifact } from "../rules/validator.js";
 import type {
   CanonicalEventPayload,
   CommittedEventRow,
   DirectorState,
   EventRow,
+  MemorySummaryArtifact,
   MemoryInsert,
   NpcEncounterFact,
+  NpcMemoryRecord,
   MemoryRow,
   Player,
   PlayerRow,
@@ -86,7 +89,7 @@ export function getShortHistory(playerId: string, limit = 6): string[] {
 export function getRecentMemories(playerId: string, limit = 6): string[] {
   const db = getDb();
   const rows = db
-    .prepare("SELECT content FROM memories WHERE player_id = ? AND kind != 'npc-encounter-fact' ORDER BY created_at DESC LIMIT ?")
+    .prepare("SELECT content FROM memories WHERE player_id = ? AND kind NOT IN ('npc-encounter-fact', 'npc-memory', 'memory-summary-artifact') ORDER BY created_at DESC LIMIT ?")
     .all(playerId, limit) as ContentRow[];
 
   return rows.reverse().map((row) => row.content);
@@ -176,6 +179,46 @@ export function getNpcEncounterFacts(playerId: string, npcId?: string, limit = 1
     .filter((row): row is NpcEncounterFact => row !== null);
 }
 
+export function getNpcMemoryRecords(playerId: string, npcId?: string, limit = 12): NpcMemoryRecord[] {
+  const db = getDb();
+  const rows = (npcId
+    ? db
+        .prepare(
+          "SELECT content FROM memories WHERE player_id = ? AND kind = 'npc-memory' AND content LIKE ? ORDER BY created_at DESC LIMIT ?"
+        )
+        .all(playerId, `%\"npc_id\":\"${npcId}\"%`, limit)
+    : db
+        .prepare("SELECT content FROM memories WHERE player_id = ? AND kind = 'npc-memory' ORDER BY created_at DESC LIMIT ?")
+        .all(playerId, limit)) as ContentRow[];
+
+  return rows
+    .map((row) => safeJsonParse<NpcMemoryRecord | null>(row.content, null))
+    .filter((row): row is NpcMemoryRecord => row !== null);
+}
+
+export function getMemorySummaryArtifacts(
+  playerId: string,
+  options: {
+    artifactKind?: MemorySummaryArtifact["artifact_kind"];
+    beatId?: string;
+    limit?: number;
+  } = {}
+): MemorySummaryArtifact[] {
+  const db = getDb();
+  const { artifactKind, beatId, limit = 12 } = options;
+  const rows = db
+    .prepare("SELECT content FROM memories WHERE player_id = ? AND kind = 'memory-summary-artifact' ORDER BY created_at DESC LIMIT ?")
+    .all(playerId, limit * 4) as ContentRow[];
+
+  return rows
+    .map((row) => safeJsonParse<MemorySummaryArtifact | null>(row.content, null))
+    .filter((row): row is MemorySummaryArtifact => row !== null)
+    .filter((row) => validateMemorySummaryArtifact(row).ok)
+    .filter((row) => (artifactKind ? row.artifact_kind === artifactKind : true))
+    .filter((row) => (beatId ? row.beat_id === beatId : true))
+    .slice(0, limit);
+}
+
 export function getRelevantMemories(playerId: string, queryEmbedding: number[], limit = 6): string[] {
   const db = getDb();
   if (!queryEmbedding.length) {
@@ -183,7 +226,7 @@ export function getRelevantMemories(playerId: string, queryEmbedding: number[], 
   }
 
   const rows = db
-    .prepare("SELECT content, embedding FROM memories WHERE player_id = ? AND kind != 'npc-encounter-fact' AND embedding IS NOT NULL")
+    .prepare("SELECT content, embedding FROM memories WHERE player_id = ? AND kind NOT IN ('npc-encounter-fact', 'npc-memory', 'memory-summary-artifact') AND embedding IS NOT NULL")
     .all(playerId) as MemoryRow[];
 
   if (!rows.length) return getRecentMemories(playerId, limit);

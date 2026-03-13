@@ -3,11 +3,14 @@ import test from "node:test";
 import {
   COMMITTED_EVENT_SCHEMA_VERSION,
   AUTHORITATIVE_STATE_SCHEMA_VERSION,
+  MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION,
   MEMORY_CLASS_RULES,
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
   type MemoryCandidate,
+  type MemorySummaryArtifact,
   type NpcEncounterFact,
+  type NpcMemoryRecord,
   type CanonicalPlayerCreatedEventPayload,
   type CanonicalTurnEventPayload,
   type AuthoritativePlayerState,
@@ -34,7 +37,9 @@ import { validateSetupStatusResponse } from "./validator/setup-contract.js";
 import {
   parseTurnInput,
   validateMemoryCandidate,
+  validateMemorySummaryArtifact,
   validateNpcEncounterFact,
+  validateNpcMemoryRecord,
   validateTurnOutput
 } from "./validator/turn-payload.js";
 
@@ -387,6 +392,111 @@ test("validateNpcEncounterFact rejects malformed encounter facts and negative si
   assert.match(result.errors.join(" "), /summary/i);
   assert.match(result.errors.join(" "), /source_event_id/i);
   assert.match(result.errors.join(" "), /last_seen_at/i);
+});
+
+test("validateNpcMemoryRecord accepts a structured tiered NPC memory snapshot", () => {
+  const record: NpcMemoryRecord = {
+    npc_id: "npc-nila-vale",
+    display_name: "Nila Vale",
+    tier: "important",
+    cumulative_significance: 8,
+    encounter_count: 2,
+    retrieval_priority: 10,
+    stable_identity: true,
+    summary: "Nila Vale knows the causeway route and now trusts the player with it.",
+    remembered_topics: ["ghostlight relay", "causeway route"],
+    relationship_state: "trusting",
+    open_threads: ["Meet the player at the causeway gate"],
+    first_met_at: "2026-03-13T12:00:00.000Z",
+    last_seen_at: "2026-03-13T12:05:00.000Z",
+    last_seen_beat: "beat-2"
+  };
+
+  assert.deepEqual(validateNpcMemoryRecord(record), { ok: true, errors: [] });
+});
+
+test("validateNpcMemoryRecord rejects malformed tiers and invalid structured recall fields", () => {
+  const result = validateNpcMemoryRecord({
+    npc_id: "",
+    display_name: "Nila Vale",
+    tier: "legendary",
+    cumulative_significance: -1,
+    encounter_count: 0,
+    retrieval_priority: -3,
+    stable_identity: "yes",
+    summary: " ",
+    remembered_topics: ["ghostlight relay", " "],
+    relationship_state: 42,
+    open_threads: "Meet later",
+    first_met_at: "bad-date",
+    last_seen_at: "",
+    last_seen_beat: 17
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /npc_id/i);
+  assert.match(result.errors.join(" "), /tier/i);
+  assert.match(result.errors.join(" "), /cumulative_significance/i);
+  assert.match(result.errors.join(" "), /encounter_count/i);
+  assert.match(result.errors.join(" "), /retrieval_priority/i);
+  assert.match(result.errors.join(" "), /stable_identity/i);
+  assert.match(result.errors.join(" "), /summary/i);
+  assert.match(result.errors.join(" "), /remembered_topics/i);
+  assert.match(result.errors.join(" "), /relationship_state/i);
+  assert.match(result.errors.join(" "), /open_threads/i);
+  assert.match(result.errors.join(" "), /first_met_at/i);
+  assert.match(result.errors.join(" "), /last_seen_at/i);
+  assert.match(result.errors.join(" "), /last_seen_beat/i);
+});
+
+test("validateMemorySummaryArtifact accepts a versioned beat recap artifact", () => {
+  const artifact: MemorySummaryArtifact = {
+    schema_version: MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION,
+    artifact_kind: "beat-recap",
+    source_kind: "committed-events",
+    source_event_ids: ["turn-evt-1", "turn-evt-2"],
+    generated_at: "2026-03-13T12:10:00.000Z",
+    player_id: "player-123",
+    beat_id: "beat-1",
+    beat_label: "Find the signal",
+    location: "Rooftop Market",
+    summary: "Beat recap: the player confirmed the relay signal and advanced toward the tower route.",
+    detail_lines: [
+      "The signal lantern revealed the bridge route.",
+      "Nila Vale shared the causeway route."
+    ]
+  };
+
+  assert.deepEqual(validateMemorySummaryArtifact(artifact), { ok: true, errors: [] });
+});
+
+test("validateMemorySummaryArtifact rejects malformed versioned artifact fields", () => {
+  const result = validateMemorySummaryArtifact({
+    schema_version: "memory-summary/v9",
+    artifact_kind: "chapter",
+    source_kind: "transcript",
+    source_event_ids: ["turn-evt-1", " "],
+    generated_at: "not-a-date",
+    player_id: "",
+    beat_id: 42,
+    beat_label: [],
+    location: " ",
+    summary: " ",
+    detail_lines: "not-an-array"
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /schema_version/i);
+  assert.match(result.errors.join(" "), /artifact_kind/i);
+  assert.match(result.errors.join(" "), /source_kind/i);
+  assert.match(result.errors.join(" "), /source_event_ids/i);
+  assert.match(result.errors.join(" "), /generated_at/i);
+  assert.match(result.errors.join(" "), /player_id/i);
+  assert.match(result.errors.join(" "), /beat_id/i);
+  assert.match(result.errors.join(" "), /beat_label/i);
+  assert.match(result.errors.join(" "), /location/i);
+  assert.match(result.errors.join(" "), /summary/i);
+  assert.match(result.errors.join(" "), /detail_lines/i);
 });
 
 test("validateStateResponse accepts a versioned authoritative player envelope", () => {

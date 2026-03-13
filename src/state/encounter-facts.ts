@@ -1,6 +1,9 @@
+import { NPC_MEMORY_TIER_POLICIES } from "../core/types.js";
 import type {
   MemoryInsert,
   NpcEncounterFact,
+  NpcImportanceTier,
+  NpcMemoryRecord,
   NpcEncounterSignificanceBreakdown,
   NpcEncounterSignificanceResult,
   Player,
@@ -24,6 +27,19 @@ export interface DeriveNpcEncounterFactsParams {
   acceptedConsequences: AcceptedTurnConsequences;
   sourceEventId: string;
   occurredAt: string;
+}
+
+export interface ResolveNpcImportanceTierParams {
+  cumulativeSignificance: number;
+  encounterCount: number;
+  voluntaryReturn: boolean;
+}
+
+export interface BuildNpcMemoryRecordParams {
+  fact: NpcEncounterFact;
+  previousRecord: NpcMemoryRecord | null;
+  previousFacts: NpcEncounterFact[];
+  voluntaryReturn: boolean;
 }
 
 export function evaluateNpcEncounterSignificance({
@@ -61,10 +77,85 @@ export function createNpcEncounterFactMemoryInsert(fact: NpcEncounterFact): Memo
   };
 }
 
-export function createNpcLongLivedMemoryInsert(fact: NpcEncounterFact): MemoryInsert {
+export function createNpcLongLivedMemoryInsert(record: NpcMemoryRecord): MemoryInsert {
   return {
     kind: "npc-memory",
-    content: `${fact.display_name}: ${fact.summary}`
+    content: JSON.stringify(record)
+  };
+}
+
+export function resolveNpcImportanceTier({
+  cumulativeSignificance,
+  encounterCount,
+  voluntaryReturn
+}: ResolveNpcImportanceTierParams): NpcImportanceTier {
+  if (
+    cumulativeSignificance >= NPC_MEMORY_TIER_POLICIES.anchor_cast.minimum_significance &&
+    encounterCount >= 3 &&
+    voluntaryReturn
+  ) {
+    return "anchor_cast";
+  }
+
+  if (cumulativeSignificance >= NPC_MEMORY_TIER_POLICIES.important.minimum_significance) {
+    return "important";
+  }
+
+  if (cumulativeSignificance >= NPC_MEMORY_TIER_POLICIES.known.minimum_significance) {
+    return "known";
+  }
+
+  return "ambient";
+}
+
+export function buildNpcMemoryRecord({
+  fact,
+  previousRecord,
+  previousFacts,
+  voluntaryReturn
+}: BuildNpcMemoryRecordParams): NpcMemoryRecord {
+  const cumulativeSignificance = Math.max(
+    fact.significance,
+    (previousRecord?.cumulative_significance ?? 0) + fact.significance
+  );
+  const encounterCount = Math.max(fact.encounter_count, previousFacts.length + 1, previousRecord?.encounter_count ?? 0);
+  const tier = resolveNpcImportanceTier({
+    cumulativeSignificance,
+    encounterCount,
+    voluntaryReturn
+  });
+  const policy = NPC_MEMORY_TIER_POLICIES[tier];
+  const rememberedTopics = uniqueMatches([
+    ...(previousRecord?.remembered_topics ?? []),
+    ...fact.topics
+  ]).slice(0, policy.max_topics);
+  const openThreads = policy.allow_open_threads
+    ? uniqueMatches([
+        ...(previousRecord?.open_threads ?? []),
+        ...fact.promises,
+        ...(fact.quest_hooks ?? [])
+      ])
+    : [];
+  const relationshipState = policy.allow_relationship_state
+    ? fact.relationship_change ?? previousRecord?.relationship_state ?? null
+    : null;
+  const retrievalPriority = cumulativeSignificance + encounterCount + (voluntaryReturn ? 2 : 0) + tierPriorityBoost(tier);
+
+  return {
+    npc_id: fact.npc_id,
+    display_name: fact.display_name,
+    tier,
+    cumulative_significance: cumulativeSignificance,
+    encounter_count: encounterCount,
+    retrieval_priority: retrievalPriority,
+    stable_identity: Boolean(fact.npc_id.trim() && fact.display_name.trim()),
+    summary: fact.summary,
+    remembered_topics: rememberedTopics,
+    relationship_state: relationshipState,
+    open_threads: openThreads,
+    first_met_at: previousRecord?.first_met_at ?? earliestFactTimestamp(previousFacts, fact.last_seen_at),
+    last_seen_at: fact.last_seen_at,
+    last_seen_beat: fact.last_seen_beat
   };
 }
 
@@ -160,4 +251,22 @@ function uniqueMatches(values: string[]): string[] {
   }
 
   return unique;
+}
+
+function tierPriorityBoost(tier: NpcImportanceTier): number {
+  switch (tier) {
+    case "anchor_cast":
+      return 6;
+    case "important":
+      return 3;
+    case "known":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function earliestFactTimestamp(previousFacts: NpcEncounterFact[], fallback: string): string {
+  const all = previousFacts.map((fact) => fact.last_seen_at).concat(fallback).filter(Boolean).sort();
+  return all[0] ?? fallback;
 }

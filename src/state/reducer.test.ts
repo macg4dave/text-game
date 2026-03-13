@@ -97,7 +97,10 @@ test("reduceCommittedPlayerState deterministically applies accepted consequences
       summary: "You crossed the bridge."
     }
   ]);
-  assert.equal(reduced.player.summary, "You arrived at the market.");
+  assert.equal(
+    reduced.player.summary,
+    "You arrived at the market.\nThe signal lantern revealed the bridge route."
+  );
   assert.deepEqual(reduced.player.director_state, resolvedDirectorState);
   assert.equal(reduced.authoritativePlayer.schema_version, AUTHORITATIVE_STATE_SCHEMA_VERSION);
   assert.equal(reduced.authoritativePlayer.location, "Sky Bridge");

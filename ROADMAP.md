@@ -163,8 +163,10 @@ Exit gate:
 - Retrieval returns ranked memory summaries for each turn.
 - Memory classes and retrieval policy distinguish authority-relevant facts from flavor-only recollections before longer-session continuity is treated as stable.
 - NPC continuity uses significance-scored structured encounter facts and tiered long-lived memory instead of replaying raw dialogue history.
+- The NPC tier ladder is explicit and sparse: ambient encounters stay as structured facts only, known NPCs preserve cheap identity, important NPCs add concise recall fields, and anchor-cast NPCs retain richer relationship history.
 - Live model context is assembled from budgeted memory buckets rather than from one expanding prompt, and raw history remains cold unless explicitly retrieved.
-- Scene- and chapter-level summary artifacts are versioned so recap logic can be recomputed from canonical records when needed.
+- Scene- and beat-level summary artifacts are versioned so recap logic can be recomputed from canonical records when needed.
+- The default compression path now emits server-owned `scene-summary` artifacts after meaningful committed turns and `beat-recap` artifacts when a beat completes or changes.
 - Context-entry accounting and retrieval traces make it possible to inspect what entered the turn context and why.
 - Players can ask an optional guide surface grounded questions about known places, NPCs, goals, and prior discoveries without spending a story turn or mutating state.
 - Director rules are loaded from versioned specs and can be reloaded without app reinstall.

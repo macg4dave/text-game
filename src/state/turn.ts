@@ -1,10 +1,14 @@
 import { SYSTEM_PROMPT } from "../ai/prompt.js";
 import { generateTurn, getEmbedding, getEmbeddings } from "../ai/service.js";
 import {
+  LIVE_CONTEXT_BUCKET_LIMITS,
   DEFAULT_RULESET_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
   type CanonicalTurnEventPayload,
   type DirectorSpec,
+  type LiveTurnContext,
+  type MemoryInsert,
+  type MemorySummaryArtifact,
   type Player,
   type QuestSpec,
   type TurnOutputPayload,
@@ -14,8 +18,10 @@ import {
   addCommittedTurnEvent,
   addEvent,
   addMemories,
+  getMemorySummaryArtifacts,
   getOrCreatePlayer,
   getNpcEncounterFacts,
+  getNpcMemoryRecords,
   persistPlayerState,
   getRelevantMemories,
   getShortHistory
@@ -29,12 +35,22 @@ import { adjudicateTurnOutput } from "./adjudication.js";
 import { reconcileTurnPresentation } from "./presentation.js";
 import { reduceCommittedPlayerState } from "./reducer.js";
 import {
+  buildNpcMemoryRecord,
   createNpcEncounterFactMemoryInsert,
   createNpcLongLivedMemoryInsert,
   deriveNpcEncounterFacts,
   type DeriveNpcEncounterFactsParams,
   evaluateNpcEncounterSignificance
 } from "./encounter-facts.js";
+import {
+  buildBeatRecapArtifact,
+  buildSceneSummaryArtifact,
+  createMemorySummaryArtifactInsert
+} from "./memory-summary.js";
+import {
+  applyMemoryEmbeddings,
+  prepareMemoryEmbeddingInputs
+} from "./memory-embeddings.js";
 import { sanitizeTurnResult } from "./turn-result.js";
 import { getCurrentBeat } from "../story/director.js";
 import { classifyTurnInput, freezesTurnProgress } from "../rules/turn-input-classification.js";
@@ -45,6 +61,7 @@ export interface TurnExecutionTrace {
   player: Player | null;
   refreshedPlayer: Player | null;
   committedEvent: CanonicalTurnEventPayload | null;
+  liveContext: LiveTurnContext | null;
   shortHistory: string[];
   memories: string[];
   statePack: unknown;
@@ -101,6 +118,8 @@ export interface TurnServiceDependencies {
   getEmbedding: typeof getEmbedding;
   getEmbeddings: typeof getEmbeddings;
   getNpcEncounterFacts: typeof getNpcEncounterFacts;
+  getNpcMemoryRecords: typeof getNpcMemoryRecords;
+  getMemorySummaryArtifacts: typeof getMemorySummaryArtifacts;
   getOrCreatePlayer: typeof getOrCreatePlayer;
   getRelevantMemories: typeof getRelevantMemories;
   getShortHistory: typeof getShortHistory;
@@ -116,6 +135,7 @@ export function createTurnExecutionTrace(input = ""): TurnExecutionTrace {
     player: null,
     refreshedPlayer: null,
     committedEvent: null,
+    liveContext: null,
     shortHistory: [],
     memories: [],
     statePack: null,
@@ -141,6 +161,8 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
     getEmbedding,
     getEmbeddings,
     getNpcEncounterFacts,
+    getNpcMemoryRecords,
+    getMemorySummaryArtifacts,
     getOrCreatePlayer,
     getRelevantMemories,
     getShortHistory,
@@ -176,7 +198,13 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           trace.inputEmbeddingError = getErrorMessage(error);
         }
 
-        trace.memories = deps.getRelevantMemories(player.id, trace.inputEmbedding, 6);
+        trace.liveContext = createLiveTurnContext({
+          player,
+          shortHistory: deps.getShortHistory(player.id, 6),
+          recalledMemories: deps.getRelevantMemories(player.id, trace.inputEmbedding, 6)
+        });
+        trace.shortHistory = trace.liveContext.buckets.short_history;
+        trace.memories = trace.liveContext.recalled_facts;
         trace.statePack = createStatePack(player, directorSpec, questSpec);
 
         trace.rawResult = await deps.generateTurn({
@@ -185,6 +213,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           statePack: trace.statePack,
           shortHistory: trace.shortHistory,
           memories: trace.memories,
+          liveContext: trace.liveContext,
           input
         });
 
@@ -333,23 +362,12 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
         });
         deps.addCommittedTurnEvent(trace.committedEvent);
 
+        const pendingMemoryInserts: MemoryInsert[] = [];
         if (acceptedConsequences.memory_updates.length) {
-          try {
-            trace.memoryEmbeddings = await deps.getEmbeddings({
-              model: embeddingModel,
-              inputs: acceptedConsequences.memory_updates
-            });
-          } catch (error) {
-            trace.memoryEmbeddings = [];
-            trace.memoryEmbeddingError = getErrorMessage(error);
-          }
-
-          deps.addMemories(
-            player.id,
-            acceptedConsequences.memory_updates.map((content, index) => ({
+          pendingMemoryInserts.push(
+            ...acceptedConsequences.memory_updates.map((content) => ({
               content,
-              kind: "fact",
-              embedding: trace.memoryEmbeddings[index]
+              kind: "fact" as const
             }))
           );
         }
@@ -366,6 +384,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
         if (derivedEncounterFacts.length) {
           const encounterMemoryInserts = derivedEncounterFacts.flatMap((fact) => {
             const previousFacts = deps.getNpcEncounterFacts(player.id, fact.npc_id);
+            const previousRecord = deps.getNpcMemoryRecords(player.id, fact.npc_id, 1)[0] ?? null;
             const significance = evaluateNpcEncounterSignificance({
               fact,
               previousFacts,
@@ -376,18 +395,77 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
               encounter_count: Math.max(fact.encounter_count, previousFacts.length + 1),
               significance: significance.score
             };
+            const npcMemoryRecord = buildNpcMemoryRecord({
+              fact: scoredFact,
+              previousRecord,
+              previousFacts,
+              voluntaryReturn: previousFacts.length > 0
+            });
 
-            return significance.shouldPromoteToLongLivedMemory
+            return npcMemoryRecord.tier !== "ambient"
               ? [
                   createNpcEncounterFactMemoryInsert(scoredFact),
-                  createNpcLongLivedMemoryInsert(scoredFact)
+                  createNpcLongLivedMemoryInsert(npcMemoryRecord)
                 ]
               : [createNpcEncounterFactMemoryInsert(scoredFact)];
           });
 
           if (encounterMemoryInserts.length) {
-            deps.addMemories(player.id, encounterMemoryInserts);
+            pendingMemoryInserts.push(...encounterMemoryInserts);
           }
+        }
+
+        if (trace.committedEvent && hasCommittedSummaryArtifactContent(acceptedConsequences)) {
+          const summaryArtifacts: MemorySummaryArtifact[] = [];
+          const sceneSummaryArtifact = buildSceneSummaryArtifact({
+            player,
+            nextPlayer: reducedState.player,
+            event: trace.committedEvent
+          });
+          summaryArtifacts.push(sceneSummaryArtifact);
+
+          if (player.director_state.current_beat_id !== reducedState.player.director_state.current_beat_id) {
+            const previousSceneArtifacts = deps.getMemorySummaryArtifacts(player.id, {
+              artifactKind: "scene-summary",
+              beatId: player.director_state.current_beat_id,
+              limit: 12
+            });
+            summaryArtifacts.push(
+              buildBeatRecapArtifact({
+                player,
+                sceneArtifacts: [...previousSceneArtifacts.reverse(), sceneSummaryArtifact],
+                generatedAt: trace.committedEvent.occurred_at
+              })
+            );
+          }
+
+          pendingMemoryInserts.push(
+            ...summaryArtifacts.map((artifact) => createMemorySummaryArtifactInsert(artifact))
+          );
+        }
+
+        if (pendingMemoryInserts.length) {
+          let memoryInsertsWithEmbeddings = pendingMemoryInserts;
+          const preparedMemoryInputs = prepareMemoryEmbeddingInputs(pendingMemoryInserts);
+
+          if (preparedMemoryInputs.length) {
+            try {
+              trace.memoryEmbeddings = await deps.getEmbeddings({
+                model: embeddingModel,
+                inputs: preparedMemoryInputs.map((item) => item.input)
+              });
+              memoryInsertsWithEmbeddings = applyMemoryEmbeddings(
+                pendingMemoryInserts,
+                preparedMemoryInputs,
+                trace.memoryEmbeddings
+              );
+            } catch (error) {
+              trace.memoryEmbeddings = [];
+              trace.memoryEmbeddingError = getErrorMessage(error);
+            }
+          }
+
+          deps.addMemories(player.id, memoryInsertsWithEmbeddings);
         }
 
         trace.refreshedPlayer = deps.getOrCreatePlayer({ playerId: player.id });
@@ -411,6 +489,16 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
       }
     }
   };
+}
+
+function hasCommittedSummaryArtifactContent(
+  committed: CanonicalTurnEventPayload["committed"]
+): boolean {
+  return Boolean(
+    committed.state_updates ||
+    committed.director_updates ||
+    committed.memory_updates.length
+  );
 }
 
 export const turnService = createTurnService();
@@ -460,4 +548,73 @@ function getErrorMessage(error: unknown): string {
   }
 
   return String(error);
+}
+
+function createLiveTurnContext({
+  player,
+  shortHistory,
+  recalledMemories
+}: {
+  player: Player;
+  shortHistory: string[];
+  recalledMemories: string[];
+}): LiveTurnContext {
+  const budgets: LiveTurnContext["budgets"] = {
+    short_history: {
+      bucket: "short_history",
+      limit: LIVE_CONTEXT_BUCKET_LIMITS.short_history,
+      include_by_default: true
+    },
+    quest_progress: {
+      bucket: "quest_progress",
+      limit: LIVE_CONTEXT_BUCKET_LIMITS.quest_progress,
+      include_by_default: true
+    },
+    relationship_summaries: {
+      bucket: "relationship_summaries",
+      limit: LIVE_CONTEXT_BUCKET_LIMITS.relationship_summaries,
+      include_by_default: true
+    },
+    world_facts: {
+      bucket: "world_facts",
+      limit: LIVE_CONTEXT_BUCKET_LIMITS.world_facts,
+      include_by_default: true
+    },
+    cold_history: {
+      bucket: "cold_history",
+      limit: LIVE_CONTEXT_BUCKET_LIMITS.cold_history,
+      include_by_default: false
+    }
+  };
+
+  const bucketedHistory = shortHistory.slice(-budgets.short_history.limit);
+  const questProgress = [
+    ...player.quests.map((quest) => `QUEST: ${quest.summary}`),
+    `GOAL: ${player.director_state.end_goal_progress}`
+  ].filter(Boolean).slice(0, budgets.quest_progress.limit);
+
+  const relationshipSummaries = recalledMemories
+    .filter((memory) => !/^(PLAYER|NARRATOR):/i.test(memory.trim()))
+    .filter((memory) => /^[A-Z][^:\n]{1,80}:/.test(memory.trim()))
+    .slice(0, budgets.relationship_summaries.limit);
+
+  const coldHistory = recalledMemories
+    .filter((memory) => /^(PLAYER|NARRATOR):/i.test(memory.trim()))
+    .slice(0, budgets.cold_history.limit);
+
+  const worldFacts = recalledMemories
+    .filter((memory) => !relationshipSummaries.includes(memory) && !/^(PLAYER|NARRATOR):/i.test(memory.trim()))
+    .slice(0, budgets.world_facts.limit);
+
+  return {
+    budgets,
+    buckets: {
+      short_history: bucketedHistory,
+      quest_progress: questProgress,
+      relationship_summaries: relationshipSummaries,
+      world_facts: worldFacts,
+      cold_history: coldHistory
+    },
+    recalled_facts: [...relationshipSummaries, ...questProgress, ...worldFacts]
+  };
 }

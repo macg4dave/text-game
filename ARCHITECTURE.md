@@ -113,11 +113,14 @@ Do not assume:
   - warm structured facts and rolling summaries
   - cold history retained for replay, debugging, or explicit recovery use
 - Default live context should contain only the current scene, current goal, nearby world state, and a small set of high-priority recalled facts.
+- The current live-context boundary is explicit in shared types and prompt assembly: `short_history` 2, `quest_progress` 2, `relationship_summaries` 2, `world_facts` 2, and `cold_history` 0 by default.
 - Durable memory should be split across distinct buckets such as hard canon facts, quest or progression facts, relationship summaries, and cold history logs rather than one monolithic prompt payload.
 - Raw history should remain out of the live prompt by default; if a transcript slice is needed, it should be requested as an explicit retrieval mode with its own budget.
 - Summary and recap artifacts should be versioned so later recomputation can rebuild them from canonical event data and committed facts when summarization logic changes.
 - Ranking inside bucket budgets should prefer relevance first, then recency and narrative importance, with strong boosts for later voluntary player re-engagement.
 - Compression should happen in layers: post-scene fact extraction and compact summaries first, then chapter- or beat-level recap merges later.
+- The current compression contract stores versioned `memory-summary-artifact` JSON records, with `scene-summary` emitted from meaningful accepted turns and `beat-recap` emitted when beat progression closes or advances a beat.
+- These summary artifacts are durable and replay-recomputable, but they remain out of generic live retrieval by default until later partitioned retrieval work can pull them intentionally.
 - NPC continuity should flow through four layers:
   - transcript or event-log retention for replay and debugging
   - structured encounter facts extracted from committed scenes
@@ -127,6 +130,8 @@ Do not assume:
 - The current implementation stores every committed structured encounter as `npc-encounter-fact`, excludes that raw structured record from default hot recall, and promotes a separate `npc-memory` recall record only when the weighted significance score reaches the current threshold of 6.
 - The current scoring weights are intentionally small and inspectable: stable identity +2, repeated meaningful exchange +2, relationship change +2, clues up to +2, promises up to +2, quest hooks up to +2, unique role +1, and voluntary return +2.
 - NPC importance tiers should control what is persisted and how aggressively it is retrieved, from ambient presence through anchor-cast history.
+- The current sparse tier contract is: `ambient` keeps only structured encounter facts, `known` admits cheap identity recall, `important` adds concise summary plus remembered topics or open threads, and `anchor_cast` permits richer relationship state and longer-lived recall fields.
+- Default hot recall should stay conservative even after admission: raw `npc-encounter-fact` and structured `npc-memory` records remain outside generic live-context retrieval until partitioned retrieval work can select them intentionally.
 - World memory, NPC memory, and player journal memory should remain separate retrieval domains even if they share lower-level storage primitives.
 - Context assembly should be budgeted by bucket and remain inspectable enough to explain which facts entered the model context, why they were selected, and what token cost they consumed.
 

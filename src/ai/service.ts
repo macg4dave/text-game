@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import { config } from "../core/config.js";
-import type { TurnResult } from "../core/types.js";
+import {
+  LIVE_CONTEXT_BUCKET_LIMITS,
+  type LiveTurnContext,
+  type TurnResult
+} from "../core/types.js";
 import { classifyTurnInput } from "../rules/turn-input-classification.js";
 import { TURN_RESPONSE_SCHEMA, assertTurnResponseSchemaContract } from "./turn-schema.js";
 
@@ -57,22 +61,45 @@ export function buildTurnPromptSections({
   statePack,
   shortHistory,
   memories,
+  liveContext,
   input
 }: {
   statePack: unknown;
   shortHistory: string[];
   memories: string[];
+  liveContext?: LiveTurnContext;
   input: string;
 }): string {
   const inputClassification = classifyTurnInput(input);
 
-  return [
+  const promptSections = [
     `STATE_PACK\n${JSON.stringify(statePack)}`,
-    `SHORT_HISTORY\n${shortHistory.join("\n")}`,
-    `MEMORIES\n${memories.join("\n")}`,
+    liveContext
+      ? `LIVE_CONTEXT_BUDGETS\n${Object.values(liveContext.budgets)
+          .map((budget) => `${budget.bucket}: limit=${budget.limit}; default=${budget.include_by_default ? "on" : "off"}`)
+          .join("\n")}`
+      : null,
+    `SHORT_HISTORY\n${(liveContext?.buckets.short_history ?? shortHistory).join("\n")}`,
+    liveContext
+      ? `QUEST_PROGRESS\n${renderBucketSection(liveContext.buckets.quest_progress)}`
+      : null,
+    liveContext
+      ? `RELATIONSHIP_SUMMARIES\n${renderBucketSection(liveContext.buckets.relationship_summaries)}`
+      : null,
+    liveContext
+      ? `WORLD_FACTS\n${renderBucketSection(liveContext.buckets.world_facts)}`
+      : null,
+    liveContext
+      ? `COLD_HISTORY\n${liveContext.buckets.cold_history.length
+          ? liveContext.buckets.cold_history.join("\n")
+          : `(excluded by default; budget ${LIVE_CONTEXT_BUCKET_LIMITS.cold_history})`}`
+      : null,
+    `MEMORIES\n${(liveContext?.recalled_facts ?? memories).join("\n")}`,
     `TURN_INPUT_CLASSIFICATION\nkind: ${inputClassification.kind}\nguidance: ${inputClassification.guidance}`,
     `PLAYER_INPUT\n${input}`
-  ].join("\n\n");
+  ].filter((section): section is string => section !== null);
+
+  return promptSections.join("\n\n");
 }
 
 export function createAiService(client: AiServiceClient = createDefaultClient()) {
@@ -83,6 +110,7 @@ export function createAiService(client: AiServiceClient = createDefaultClient())
       statePack,
       shortHistory,
       memories,
+      liveContext,
       input
     }: {
       model: string;
@@ -90,9 +118,10 @@ export function createAiService(client: AiServiceClient = createDefaultClient())
       statePack: unknown;
       shortHistory: string[];
       memories: string[];
+      liveContext?: LiveTurnContext;
       input: string;
     }): Promise<TurnResult> {
-      const promptSections = buildTurnPromptSections({ statePack, shortHistory, memories, input });
+      const promptSections = buildTurnPromptSections({ statePack, shortHistory, memories, liveContext, input });
 
       const response = await client.chat.completions.create({
         model,
@@ -154,6 +183,7 @@ export async function generateTurn({
   statePack,
   shortHistory,
   memories,
+  liveContext,
   input
 }: {
   model: string;
@@ -161,9 +191,14 @@ export async function generateTurn({
   statePack: unknown;
   shortHistory: string[];
   memories: string[];
+  liveContext?: LiveTurnContext;
   input: string;
 }): Promise<TurnResult> {
-  return aiService.generateTurn({ model, systemPrompt, statePack, shortHistory, memories, input });
+  return aiService.generateTurn({ model, systemPrompt, statePack, shortHistory, memories, liveContext, input });
+}
+
+function renderBucketSection(values: string[]): string {
+  return values.length ? values.join("\n") : "(none)";
 }
 
 export async function getEmbedding({ model, input }: { model: string; input: string }): Promise<number[]> {

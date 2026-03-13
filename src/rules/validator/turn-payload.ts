@@ -1,9 +1,13 @@
 import {
+  MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION,
   MEMORY_CLASS_RULES,
+  NPC_MEMORY_TIER_POLICIES,
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
   type MemoryCandidate,
+  type MemorySummaryArtifact,
   type NpcEncounterFact,
+  type NpcMemoryRecord,
   type StateUpdates,
   type TurnInputPayload,
   type TurnOutputPayload,
@@ -167,6 +171,126 @@ export function validateNpcEncounterFact(fact: unknown): ValidationResult<string
   return { ok: errors.length === 0, errors };
 }
 
+export function validateNpcMemoryRecord(record: unknown): ValidationResult<string> {
+  const errors: string[] = [];
+  if (!record || typeof record !== "object") {
+    return { ok: false, errors: ["npc memory record must be an object."] };
+  }
+
+  const typedRecord = record as Partial<NpcMemoryRecord> & Record<string, unknown>;
+  const allowedKeys = new Set([
+    "npc_id",
+    "display_name",
+    "tier",
+    "cumulative_significance",
+    "encounter_count",
+    "retrieval_priority",
+    "stable_identity",
+    "summary",
+    "remembered_topics",
+    "relationship_state",
+    "open_threads",
+    "first_met_at",
+    "last_seen_at",
+    "last_seen_beat"
+  ]);
+
+  for (const key of Object.keys(typedRecord)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`${key} is not allowed in the npc memory record contract.`);
+    }
+  }
+
+  validateRequiredString(typedRecord.npc_id, "npc_id", errors);
+  validateRequiredString(typedRecord.display_name, "display_name", errors);
+  validateRequiredString(typedRecord.summary, "summary", errors);
+  validateOptionalString(typedRecord.relationship_state, "relationship_state", errors);
+  validateOptionalString(typedRecord.last_seen_beat, "last_seen_beat", errors);
+  validateStringArray(typedRecord.remembered_topics, "remembered_topics", errors);
+  validateStringArray(typedRecord.open_threads, "open_threads", errors);
+
+  if (typeof typedRecord.tier !== "string" || !(typedRecord.tier in NPC_MEMORY_TIER_POLICIES)) {
+    errors.push("tier must be one of ambient, known, important, or anchor_cast.");
+  }
+
+  if (typeof typedRecord.cumulative_significance !== "number" || !Number.isFinite(typedRecord.cumulative_significance) || typedRecord.cumulative_significance < 0) {
+    errors.push("cumulative_significance must be a non-negative number.");
+  }
+
+  if (!Number.isInteger(typedRecord.encounter_count) || (typedRecord.encounter_count ?? 0) < 1) {
+    errors.push("encounter_count must be an integer greater than or equal to 1.");
+  }
+
+  if (typeof typedRecord.retrieval_priority !== "number" || !Number.isFinite(typedRecord.retrieval_priority) || typedRecord.retrieval_priority < 0) {
+    errors.push("retrieval_priority must be a non-negative number.");
+  }
+
+  if (typeof typedRecord.stable_identity !== "boolean") {
+    errors.push("stable_identity must be a boolean.");
+  }
+
+  validateIsoTimestamp(typedRecord.first_met_at, "first_met_at", errors);
+  validateIsoTimestamp(typedRecord.last_seen_at, "last_seen_at", errors);
+
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateMemorySummaryArtifact(artifact: unknown): ValidationResult<string> {
+  const errors: string[] = [];
+  if (!artifact || typeof artifact !== "object") {
+    return { ok: false, errors: ["memory summary artifact must be an object."] };
+  }
+
+  const typedArtifact = artifact as Partial<MemorySummaryArtifact> & Record<string, unknown>;
+  const allowedKeys = new Set([
+    "schema_version",
+    "artifact_kind",
+    "source_kind",
+    "source_event_ids",
+    "generated_at",
+    "player_id",
+    "beat_id",
+    "beat_label",
+    "location",
+    "summary",
+    "detail_lines"
+  ]);
+
+  for (const key of Object.keys(typedArtifact)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`${key} is not allowed in the memory summary artifact contract.`);
+    }
+  }
+
+  if (typedArtifact.schema_version !== MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION) {
+    errors.push(`schema_version must be ${MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION}.`);
+  }
+
+  if (typedArtifact.artifact_kind !== "scene-summary" && typedArtifact.artifact_kind !== "beat-recap") {
+    errors.push("artifact_kind must be scene-summary or beat-recap.");
+  }
+
+  if (typedArtifact.source_kind !== "committed-events") {
+    errors.push("source_kind must be committed-events.");
+  }
+
+  if (!Array.isArray(typedArtifact.source_event_ids) || typedArtifact.source_event_ids.length < 1) {
+    errors.push("source_event_ids must be a non-empty array.");
+  } else if (typedArtifact.source_event_ids.some((item) => typeof item !== "string" || !item.trim())) {
+    errors.push("source_event_ids must contain only non-empty strings.");
+  }
+
+  validateIsoTimestamp(typedArtifact.generated_at, "generated_at", errors);
+  validateRequiredString(typedArtifact.player_id, "player_id", errors);
+  validateOptionalString(typedArtifact.beat_id, "beat_id", errors);
+  validateOptionalString(typedArtifact.beat_label, "beat_label", errors);
+  validateRequiredString(typedArtifact.location, "location", errors);
+  validateRequiredString(typedArtifact.summary, "summary", errors);
+  validateStringArray(typedArtifact.detail_lines, "detail_lines", errors);
+
+  return { ok: errors.length === 0, errors };
+}
+
 export function parseTurnInput(payload: unknown): SchemaValidationResult<TurnInputPayload> {
   const errors: string[] = [];
   if (!payload || typeof payload !== "object") {
@@ -311,5 +435,13 @@ function validateStringArray(value: unknown, field: string, errors: string[], op
 
   if (value.some((item) => typeof item !== "string" || !item.trim())) {
     errors.push(`${field} must contain only non-empty strings.`);
+  }
+}
+
+function validateIsoTimestamp(value: unknown, field: string, errors: string[]): void {
+  if (typeof value !== "string" || !value.trim()) {
+    errors.push(`${field} must be a non-empty ISO timestamp string.`);
+  } else if (Number.isNaN(Date.parse(value))) {
+    errors.push(`${field} must be a valid ISO timestamp.`);
   }
 }

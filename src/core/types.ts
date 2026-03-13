@@ -19,6 +19,7 @@ export const TURN_OUTPUT_SCHEMA_VERSION = "turn-output/v1";
 export const AUTHORITATIVE_STATE_SCHEMA_VERSION = "authoritative-state/v1";
 export const COMMITTED_EVENT_SCHEMA_VERSION = "committed-event/v1";
 export const SAVE_SLOT_SCHEMA_VERSION = "save-slot/v1";
+export const MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION = "memory-summary/v1";
 export const DEFAULT_RULESET_VERSION = "story-rules/v1";
 
 export interface TurnInputPayload {
@@ -470,7 +471,7 @@ export interface MemoryRow {
   embedding: string | null;
 }
 
-export type MemoryKind = "fact" | "npc-encounter-fact" | "npc-memory";
+export type MemoryKind = "fact" | "npc-encounter-fact" | "npc-memory" | "memory-summary-artifact";
 
 export const MEMORY_CLASS_RULES = {
   hard_canon: {
@@ -543,10 +544,124 @@ export interface NpcEncounterSignificanceResult {
   breakdown: NpcEncounterSignificanceBreakdown;
 }
 
+export type NpcImportanceTier = "ambient" | "known" | "important" | "anchor_cast";
+
+export interface NpcMemoryTierPolicy {
+  tier: NpcImportanceTier;
+  minimum_significance: number;
+  requires_voluntary_return: boolean;
+  allow_identity_only: boolean;
+  max_topics: number;
+  allow_relationship_state: boolean;
+  allow_open_threads: boolean;
+}
+
+export const NPC_MEMORY_TIER_POLICIES: Record<NpcImportanceTier, NpcMemoryTierPolicy> = {
+  ambient: {
+    tier: "ambient",
+    minimum_significance: 0,
+    requires_voluntary_return: false,
+    allow_identity_only: false,
+    max_topics: 0,
+    allow_relationship_state: false,
+    allow_open_threads: false
+  },
+  known: {
+    tier: "known",
+    minimum_significance: 2,
+    requires_voluntary_return: false,
+    allow_identity_only: true,
+    max_topics: 1,
+    allow_relationship_state: false,
+    allow_open_threads: false
+  },
+  important: {
+    tier: "important",
+    minimum_significance: 6,
+    requires_voluntary_return: false,
+    allow_identity_only: true,
+    max_topics: 2,
+    allow_relationship_state: true,
+    allow_open_threads: true
+  },
+  anchor_cast: {
+    tier: "anchor_cast",
+    minimum_significance: 10,
+    requires_voluntary_return: true,
+    allow_identity_only: true,
+    max_topics: 4,
+    allow_relationship_state: true,
+    allow_open_threads: true
+  }
+} as const;
+
+export interface NpcMemoryRecord {
+  npc_id: string;
+  display_name: string;
+  tier: NpcImportanceTier;
+  cumulative_significance: number;
+  encounter_count: number;
+  retrieval_priority: number;
+  stable_identity: boolean;
+  summary: string;
+  remembered_topics: string[];
+  relationship_state: string | null;
+  open_threads: string[];
+  first_met_at: string;
+  last_seen_at: string;
+  last_seen_beat: string | null;
+}
+
+export type MemorySummaryArtifactKind = "scene-summary" | "beat-recap";
+
+export interface MemorySummaryArtifact {
+  schema_version: typeof MEMORY_SUMMARY_ARTIFACT_SCHEMA_VERSION;
+  artifact_kind: MemorySummaryArtifactKind;
+  source_kind: "committed-events";
+  source_event_ids: string[];
+  generated_at: string;
+  player_id: string;
+  beat_id: string | null;
+  beat_label: string | null;
+  location: string;
+  summary: string;
+  detail_lines: string[];
+}
+
 export interface MemoryInsert {
   content: string;
   kind?: MemoryKind;
   embedding?: number[];
+}
+
+export const LIVE_CONTEXT_BUCKET_LIMITS = {
+  short_history: 2,
+  quest_progress: 2,
+  relationship_summaries: 2,
+  world_facts: 2,
+  cold_history: 0
+} as const;
+
+export type LiveContextBucketId = keyof typeof LIVE_CONTEXT_BUCKET_LIMITS;
+
+export interface LiveTurnContextBudget {
+  bucket: LiveContextBucketId;
+  limit: number;
+  include_by_default: boolean;
+}
+
+export interface LiveTurnContextBuckets {
+  short_history: string[];
+  quest_progress: string[];
+  relationship_summaries: string[];
+  world_facts: string[];
+  cold_history: string[];
+}
+
+export interface LiveTurnContext {
+  budgets: Record<LiveContextBucketId, LiveTurnContextBudget>;
+  buckets: LiveTurnContextBuckets;
+  recalled_facts: string[];
 }
 
 export interface AssistCorrection {
