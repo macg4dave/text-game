@@ -65,7 +65,12 @@ Do not assume:
   - freeform intent interpretation
   - world simulation resolution
   - story pacing or framing
+- Input interpretation should support both parser-like affordances and natural-language utterances. The parser verb is a helpful hint, not the required boundary format.
 - Intent interpretation turns broad player input into one or more candidate intents without deciding story pacing.
+- Referential follow-ups such as `what is that` should be resolved against the current salient scene or conversation context when the referent is clear, and should fall back to explicit clarification only when grounding is genuinely ambiguous.
+- First-person or quoted NPC speech should be normalized into dialogue intent when context identifies a plausible target, rather than being treated as out-of-band meta text by default.
+- NPC conversation should maintain a compact short-lived conversational state separate from long-lived NPC memory so broad talk can feel coherent without dragging full transcript history into hot context.
+- NPC dialogue assembly may include a compact persona bootstrap built from authored identity fields and admitted NPC memory at first contact, then refreshed from later admitted traits rather than from raw transcript accumulation.
 - World simulation resolution decides plausibility, accepted consequences, failures, and side effects against authoritative state and rules.
 - Director logic should consume accepted simulation outcomes and decide how to frame, emphasize, or pace them toward the end goal.
 - Beat controls such as `required_flags`, `unlock_flags`, and `max_beats_per_turn` are pacing tools. They should not be the primary reason an otherwise plausible action succeeds or fails.
@@ -126,6 +131,8 @@ Do not assume:
   - structured encounter facts extracted from committed scenes
   - long-lived NPC memory records admitted only above a significance threshold
   - short-lived scene context used only for the current conversation
+- Current-conversation state should track active interlocutor, recent answered points, and open conversational threads so repetition guards can act on grounded dialogue state instead of brittle string matching alone.
+- Treat NPC prompt refresh as a projection over structured records, not as a writable prompt scratchpad. If a later trait is not admitted by policy, it must not persist into future persona assembly.
 - A server-side significance evaluator should score encounter facts after dialogue scenes using committed signals such as stable identity, repeated meaningful exchange, relationship change, clues, promises, quest hooks, unique role, and later voluntary player return.
 - The current implementation stores every committed structured encounter as `npc-encounter-fact`, excludes that raw structured record from default hot recall, and promotes a separate `npc-memory` recall record only when the weighted significance score reaches the current threshold of 6.
 - The current scoring weights are intentionally small and inspectable: stable identity +2, repeated meaningful exchange +2, relationship change +2, clues up to +2, promises up to +2, quest hooks up to +2, unique role +1, and voluntary return +2.

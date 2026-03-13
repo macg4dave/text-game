@@ -33,9 +33,16 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Turn handling must separate freeform intent interpretation, world simulation resolution, and story pacing or framing.
 - The model-facing turn contract must treat those layers distinctly: infer what the player is trying to do first, propose plausible world consequences second, and use director guidance only to frame or pace the aftermath.
 - Clarification-style questions and raw internal tokens submitted through the normal turn input must not auto-inspect, auto-use, or advance flags, quests, or director progress; they may answer in place, but committed state changes require an actual in-world attempt.
+- Classic parser-style affordances such as `look`, `inspect`, `ask`, and similar verbs should remain available, but they must not be the only supported input style; natural-language phrasing should be interpreted when the player's intent is clear.
+- Short referential follow-ups such as `what is that`, `what do you mean`, or `tell me more about that` should resolve against the current salient scene or conversation context when possible, and should ask for clarification only when the referent is genuinely ambiguous.
+- The opening playable slice must support authored scene grounding for common exploratory turns such as `look around`, `inspect <thing>`, and simple topical questions so limited local models do not collapse those turns into generic lead-reminder output.
+- Dialogue input should accept both parser-like commands and natural first-person speech. Inputs such as `I ask Nila where the power comes from` or `"Where does it draw power from?"` should count as in-world dialogue attempts when context makes the target clear.
+- NPC conversation should support side-topic and opinion-oriented exchanges that do not directly advance the current quest. Players should be able to linger in conversation without every reply snapping back to the main story breadcrumb.
+- NPC dialogue may use a compact per-character prompt bootstrap assembled from authored identity and server-owned memory so first contact does not start from a blank generic narrator voice.
 - The player may attempt almost anything; implausible or failed actions should be resolved by simulation rules, not by the director acting as a hidden refusal gate.
 - Director and beat controls such as `required_flags`, `unlock_flags`, and `max_beats_per_turn` must shape pacing and framing after accepted outcomes, not replace simulation or plausibility checks.
 - Current beat, `required_flags`, and `unlock_flags` must not serve as the sole permission logic for an otherwise plausible action.
+- Early movement should feel local and legible: nearby authored destinations and aliases in the opening hub should accept natural phrasing, while blocked or premature travel should return grounded direction instead of a generic no-change fallback.
 - Replayable event logging must record committed semantic outcomes and authoritative transitions, not only raw prompts, raw responses, or presentation prose.
 - The canonical replay-event contract must explicitly separate replay-critical fields such as player attempt, accepted or rejected outcome, committed transitions, and contract-version markers from optional transcript, prompt, or presentation data.
 - Canonical replay must bootstrap authoritative state from an explicit `player-created` event in the committed event log rather than relying on an external initial player snapshot.
@@ -59,6 +66,8 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Versioned compression artifacts must be server-owned scene summaries and higher-level beat recaps that remain regenerable from canonical committed events when summarization logic changes.
 - NPC continuity must use a significance pipeline, not a raw chat-log replay. The system must distinguish transcript or event-log data, structured encounter facts, thresholded long-lived NPC memory, and short-lived scene context.
 - Structured encounter facts must be explicit server-owned records with fields for NPC identity, display name, role or location, topics, promises, clues, mood, relationship-relevant change, last-seen beat, source event id, and last-seen timestamp so later tiers can build on committed data instead of raw prose.
+- NPC dialogue should track recent answered points and active conversational threads well enough to avoid obvious repetition loops such as rephrasing the same beacon fact every turn.
+- Later NPC prompt refreshes must only incorporate traits admitted through the memory and authority policy. Model-invented details may enrich one reply as disposable flavor, but they must not silently become durable future NPC facts.
 - NPC memory persistence must be tiered and significance-gated. Ambient encounters should remain structured encounter facts only, known NPCs should preserve cheap identity such as names and role hints, important NPCs may add concise summaries plus remembered topics or open threads, and anchor-cast NPCs may retain richer relationship or history recall after cumulative importance and player re-engagement.
 - NPC memory, world memory, and player journal memory must remain separate stores or classes of recall, and durable canon must be stored as structured facts or summaries rather than as raw dialogue prose.
 - The default hot turn context must be budgeted by named buckets. The current contract uses `short_history` 2, `quest_progress` 2, `relationship_summaries` 2, `world_facts` 2, and `cold_history` 0 unless an explicit retrieval rule opts raw history in.
@@ -85,6 +94,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Minimum playable path: the baseline sample must still cover investigation, dialogue with multiple named actors, gated progression toward a final scene, and one committed resolution path.
 - Tutorial coverage: the sample must naturally exercise look or inspect, movement between locations, dialogue, item use, one off-path but plausible action, and one safe save or load checkpoint.
 - Content boundary: one hub area, one support interior, one hazardous approach, and one final resolution scene are sufficient for MVP as long as the player can complete the sample in roughly 10 guided turns.
+- The hub area should still feel explorable during the MVP slice: players should be able to read the room, inspect obvious anchors, ask grounded follow-up questions, and try nearby movement without every off-path turn flattening to the same response.
 - Completion condition: the MVP sample is complete only when the final outcome and key downstream consequences are server-committed, player-visible, and reproducible from replay data.
 
 ## Quality Attributes

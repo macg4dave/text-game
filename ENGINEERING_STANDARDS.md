@@ -130,6 +130,7 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Treat live-context ceilings as code, not convention. If bucket limits change, update the shared `LIVE_CONTEXT_BUCKET_LIMITS` contract and the focused turn tests in the same change.
 - Transcript-like lines such as `PLAYER:` or `NARRATOR:` are cold history by default and must not slip into relationship or world-fact buckets through formatting accidents.
 - NPC memory changes should include fixtures proving both that meaningful returning NPCs are recognized from committed facts and that irrelevant prior chat does not flood the turn context.
+- NPC persona-bootstrap or prompt-refresh changes must prove that unsupported model inventions do not persist as future prompt facts, while admitted identity or relationship traits do refresh consistently.
 
 ## Memory Storage Hierarchy Policy
 

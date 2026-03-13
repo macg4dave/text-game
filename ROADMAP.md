@@ -278,6 +278,8 @@ Exit gate:
 ### Next
 
 - Add memory retrieval and director control without increasing player-facing setup friction.
+- Make the opening `story_sample` hub feel more explorable by adding authored scene grounding, nearby movement affordances, and local-model-safe fallback narration before broader content expansion.
+- Add broader NPC conversation support so players can linger on side topics, opinions, and personal exchanges without every conversation collapsing back to the current quest fact.
 - Add an optional DM-style guide for grounded recall and orientation once memory retrieval, partitioning, and summaries are stable.
 - Separate freeform intent interpretation, simulation resolution, and pacing before later director-spec and quest-progression work hardens the wrong gameplay boundary.
 - Keep the turn-output schema compact so later validator, memory, and director work extends server-owned logic instead of growing model contract complexity.

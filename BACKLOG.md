@@ -245,6 +245,19 @@ No global blocker as of 2026-03-09:
 | T70 | Now | P1 | P1 | Clarification-safe turn input handling | Done | T57a, T58a, T64b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live AI smoke |
 | T71 | Now | P1 | P1 | Commit-aligned weak narration reconciliation | Done | T57c, T64b, T70 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live AI smoke |
 | T72 | Now | P1 | P1 | Sparse hot-summary memory admission | Done | T60a, T71 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/reducer.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T73 | Next | P1 | P1 | Open-play opening slice and local-model mitigation | Ready | T64b, T70, T71 | Manual planning-doc consistency review + child task validation |
+| T73a | Next | P1 | P1 | Scene grounding contract for look, inspect, and ask | Ready | T73 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/server/**/*.test.ts src/rules/**/*.test.ts` |
+| T73b | Next | P1 | P1 | Authored local movement and failed-travel affordances | Ready | T73a, T58b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/story/**/*.test.ts src/server/**/*.test.ts` |
+| T73c | Next | P1 | P1 | Small-model fallback narration for exploratory turns | Ready | T73a, T73b, T71 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/ui/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T73d | Next | P1 | P2 | Local AI exploratory regression harness | Ready | T73c, T73e, T68b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live exploratory smoke |
+| T73e | Next | P1 | P1 | Natural-language intent and first-person dialogue parsing | Ready | T73a, T70 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/**/*.test.ts src/state/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T74 | Later | P2 | P1 | Open-ended NPC conversation and anti-loop dialogue | Ready | T73e, T62b | Manual planning-doc consistency review + child task validation |
+| T74a | Later | P2 | P1 | NPC conversation topic map and conversational state contract | Ready | T74 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/rules/**/*.test.ts src/server/**/*.test.ts` |
+| T74b | Later | P2 | P1 | Dialogue turn classification and non-quest conversation handling | Ready | T74a, T73e | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/**/*.test.ts src/state/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T74c | Later | P2 | P1 | NPC anti-loop response shaping and repetition guards | Blocked | T74a, T74b, T62c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/ui/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T74d | Later | P2 | P2 | Conversational NPC local AI regression harness | Blocked | T74c, T68b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live dialogue smoke |
+| T74e | Later | P2 | P1 | NPC persona prompt bootstrap contract | Ready | T74a, T62b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/rules/**/*.test.ts src/ai/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T74f | Later | P2 | P1 | Curated NPC trait admission and prompt refresh | Ready | T74e, T60a, T62b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/rules/**/*.test.ts src/ai/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
 | T13 | Later | P2 | P1 | Embeddings pipeline | Done | T07a, T60a, T62b | Manual embedding call verification |
 | T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Done | T02f | Manual embedding route verification |
@@ -2365,6 +2378,506 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - `src/state/reducer.test.ts` now covers both sides of the stopgap rule: generic movement memory stays out of the hot summary, and distinctive world-fact memory such as the market beacon's false evacuation orders still lands there
   - `REQUIREMENTS.md` now states that the hot summary should stay sparse rather than absorbing every generic admitted memory line immediately
   - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/reducer.test.ts src/state/turn.test.ts`, and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+
+### T73 - Open-Play Opening Slice And Local-Model Mitigation
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Make the opening slice feel meaningfully explorable and less locked to one verb path by shifting more early-turn grounding from fragile model improvisation into authored server-owned affordances.
+- Scope:
+  - define the near-term mitigation plan for local and small-model play so exploratory inputs do not collapse into repetitive lead-reminder text
+  - add explicit child tasks for scene grounding, local movement affordances, deterministic fallback narration, and repeatable exploratory validation
+  - keep the supported MVP slice deterministic and replay-friendly rather than turning this into open-world generation work
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - REQUIREMENTS.md
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T64b
+  - T70
+  - T71
+- Child Tasks:
+  - T73a
+  - T73b
+  - T73c
+  - T73d
+  - T73e
+- Validation:
+  - manual planning-doc consistency review
+  - child task validation listed on each child card
+- Definition of Done:
+  - the repo has one explicit plan for making the opening slice feel more open without relying on stronger hosted-model behavior
+  - exploratory look, inspect, ask, and movement gaps are decomposed into implementation-ready tasks
+  - parser-style commands remain supported, but the plan also covers natural-language follow-ups and first-person dialogue phrasing
+  - local-model mitigation is captured as a first-class delivery concern rather than an informal caveat
+- Handoff Notes:
+  - user assigned this issue on 2026-03-13 after a quick playtest in `Rooftop Market` showed the current opening still feels locked in place: `look around`, `tell me more about the rooftop market`, and `go down stairs` all flattened to the same lead-reminder response
+  - follow-up clarification from the user on 2026-03-13: classic commands like `look` and `inspect` should stay supported, but the game should also accept more natural phrasing such as `what is that` and first-person NPC dialogue without feeling parser-strict
+  - the current docs already want strong player agency, but the implemented MVP slice still depends too heavily on one authored quest lead plus model phrasing, especially on smaller local models
+  - keep this issue focused on the opening slice and the near-term mitigation path: authored scene facts, clearer local movement affordances, grounded fallback responses, and better local-AI regression coverage
+  - do not treat this as a license to bypass the authority boundary or to replace the future read-only guide work in `T67`; the goal is to make ordinary opening turns feel responsive and grounded now
+
+### T73a - Scene Grounding Contract For Look, Inspect, And Ask
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Add a server-owned scene grounding contract so common exploratory inputs in the opening slice can return specific authored detail without requiring the model to invent or remember it.
+- Scope:
+  - define authored scene facts and affordances for the opening locations, including visible landmarks, named actors, obvious exits, and inspectable anchors
+  - route common inputs such as `look around`, `inspect <thing>`, `what is that`, and `ask about <topic>` through deterministic grounding before or alongside model narration
+  - support short natural-language follow-ups that refer to the current salient object, NPC, or location detail without forcing explicit parser phrasing every turn
+  - keep the contract compact and replay-safe so it supports narration without becoming a second world-state engine
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - data/spec/
+  - src/state/
+  - src/server/
+  - src/rules/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T73
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/server/**/*.test.ts src/rules/**/*.test.ts`
+- Definition of Done:
+  - the opening slice has authored scene detail that can answer basic exploratory turns without generic fallback
+  - `look`, `inspect`, short referential follow-ups, and simple topical questions produce grounded detail even on limited local models
+  - focused tests cover at least one `look around`, one object inspection, one `what is that`-style follow-up, and one topical ask path from the opening hub
+- Handoff Notes:
+  - prefer authored scene facts over larger prompts; this task is a mitigation for local-model weakness, not a request for more prompt bloat
+  - keep the scope to the opening slice first so later world expansion can reuse the same contract if it proves sound
+  - classic parser verbs should stay as strong affordances, but this task should not require the player to restate nouns in strict command form when the immediate referent is already clear
+
+### T73b - Authored Local Movement And Failed-Travel Affordances
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Make movement around the opening slice feel intentional by introducing authored nearby destinations, aliases, and grounded failed-travel responses instead of silently snapping back to the current lead.
+- Scope:
+  - define immediate movement affordances and alias handling for the opening hub and its adjacent reachable spaces
+  - distinguish between valid nearby travel, premature stage-skipping travel, and impossible or unclear movement requests
+  - return grounded travel failure language that tells the player what is actually in reach instead of only repeating the quest lead
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - data/spec/
+  - src/story/
+  - src/state/
+  - src/server/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T73a
+  - T58b
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/story/**/*.test.ts src/server/**/*.test.ts`
+- Definition of Done:
+  - nearby authored travel in the opening slice works through player-natural phrasing and aliases
+  - premature or impossible movement returns grounded direction instead of a generic no-change fallback
+  - tests cover one successful nearby move, one blocked premature move, and one ambiguous movement alias from the opening hub
+- Handoff Notes:
+  - preserve the simulation-first boundary from `T58b`; movement should feel broader, not more permissive than authored prerequisites allow
+  - use this task to make the opening hub feel explorable, not to open unrestricted fast travel
+
+### T73c - Small-Model Fallback Narration For Exploratory Turns
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Replace repetitive lead-reminder output on exploratory no-commit turns with grounded fallback narration assembled from authored scene facts, accepted context, and local movement affordances.
+- Scope:
+  - detect repetitive exploratory turn failures such as generic `You pause...` loops in the opening slice
+  - synthesize fallback narration from server-owned scene grounding and nearby affordances when the model returns thin or unhelpful prose
+  - keep accepted-commit narration and clarification safety aligned with the existing authority and presentation boundary
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - src/state/
+  - src/ui/
+  - src/rules/
+- Do Not Touch:
+  - public/
+  - packaging/
+  - launcher/
+- Dependencies:
+  - T73a
+  - T73b
+  - T71
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/ui/**/*.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Definition of Done:
+  - exploratory turns in the opening slice stop collapsing into the same lead-reminder text when grounded authored detail is available
+  - no-commit narration still stays truthful about what did and did not change
+  - deterministic regressions cover the reported `look around`, `tell me more about the rooftop market`, and nearby-movement failure shapes
+- Handoff Notes:
+  - this is a mitigation layer for limited local models, not a substitute for richer future guide or memory work
+  - keep fallback wording informative and grounded; do not smuggle in unearned state change just to make the response feel richer
+
+### T73d - Local AI Exploratory Regression Harness
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P2
+- Owner Role: AI systems lead
+- Goal: Add a repeatable local-AI validation path that exercises exploratory opening-turn behavior on smaller models so open-play regressions are caught before live playtests.
+- Scope:
+  - extend the local AI workflow harness or fixture coverage with an exploratory opening-turn script focused on look, inspect, referential follow-up questions, first-person NPC speech, and nearby movement inputs
+  - capture builder-friendly deterministic checks plus one replayable live smoke path for local-model behavior
+  - record expected degraded-but-acceptable outcomes for smaller models so regressions are judged against grounded behavior, not ideal hosted-model prose
+- Files to Touch:
+  - BACKLOG.md
+  - launcher/
+  - src/state/
+  - scripts/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T73c
+  - T68b
+- Validation:
+  - `cargo test --manifest-path launcher/Cargo.toml`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - repeatable live exploratory smoke
+- Definition of Done:
+  - the local AI workflow has a rerunnable exploratory opening-turn check instead of only the guided quest path
+  - the exploratory check covers at least one referential clarification turn and one first-person NPC speech input
+  - handoff notes can point to concrete acceptable local-model behavior for exploratory turns
+  - later open-play work has a stable regression path against small-model limitations
+- Handoff Notes:
+  - use this task to make local-model limitations visible and manageable, not to overfit the product to one provider
+  - prefer concrete acceptance bands such as grounded scene detail plus truthful no-change behavior over fragile exact-prose assertions
+
+### T73e - Natural-Language Intent And First-Person Dialogue Parsing
+
+- Status: Ready
+- Queue: Next
+- Phase: P1
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Support classic parser-style verbs as explicit affordances while accepting natural-language referential questions and first-person NPC speech as equally valid player input forms.
+- Scope:
+  - extend turn-input interpretation so parser commands such as `look`, `inspect`, `ask`, and `talk` remain useful without becoming mandatory syntax
+  - recognize short referential follow-ups such as `what is that`, `what do you mean`, or `tell me more about that` against the current salient scene or conversation context
+  - recognize first-person speech to NPCs such as `I ask Nila where the power comes from` or `"Where does it draw power from?"` as dialogue attempts rather than generic clarification
+  - keep the authority boundary intact so conversational phrasing improves interpretation without auto-granting progression or fabricating context
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - ARCHITECTURE.md
+  - src/rules/
+  - src/state/
+  - src/ai/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T73a
+  - T70
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/rules/**/*.test.ts src/state/**/*.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Definition of Done:
+  - parser verbs remain supported as clear affordances
+  - natural-language referential questions can resolve against current salient context without forcing explicit repeated noun phrases
+  - first-person or quoted NPC speech is interpreted as an in-world dialogue attempt when the target and context are sufficiently clear
+  - tests cover at least one parser-style command, one `what is that`-style follow-up, and one first-person NPC speech input
+- Handoff Notes:
+  - the goal is parser-plus-natural-language, not parser-versus-natural-language
+  - keep ambiguous follow-ups truthful: if there is no clear referent or dialogue target, the response should ask for clarification instead of inventing one
+
+### T74 - Open-Ended NPC Conversation And Anti-Loop Dialogue
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Let players spend real conversational time with NPCs on side topics, opinions, and personal phrasing without the dialogue collapsing into repetitive quest-reminder loops.
+- Scope:
+  - define the planning contract for open-ended NPC conversation that is broader than quest progression but still grounded in authored knowledge, scene context, and committed memory
+  - decompose the work into topic mapping, dialogue-turn handling, repetition guards, and local-AI regression coverage
+  - keep this separate from the read-only DM guide so NPCs remain in-world conversational partners rather than hint consoles
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - REQUIREMENTS.md
+  - ARCHITECTURE.md
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T73e
+  - T62b
+- Child Tasks:
+  - T74a
+  - T74b
+  - T74c
+  - T74d
+  - T74e
+  - T74f
+- Validation:
+  - manual planning-doc consistency review
+  - child task validation listed on each child card
+- Definition of Done:
+  - the repo has one explicit plan for broad NPC conversation that does not reduce every exchange to story progression
+  - open-ended side-topic dialogue and anti-loop behavior are decomposed into implementation-ready tasks
+  - NPC persona bootstrapping and later trait admission are explicitly planned so conversational richness does not depend on raw transcript replay or hidden prompt drift
+  - the local-model risk for repetitive NPC phrasing is captured as a first-class validation concern
+- Handoff Notes:
+  - user assigned this issue on 2026-03-13 after clarifying that players may want to spend significant time talking with NPCs about ideas, issues, or side topics that do not advance the main story
+  - the immediate failure mode to avoid is NPC loopback such as repeating `the beacon is to the east` or `I was told about a beacon` instead of sustaining a grounded conversation
+  - follow-up clarification from the user on 2026-03-13: a good implementation direction is to give each NPC its own initial persona prompt on first contact, then refresh that prompt with later learned traits such as demeanor or relationship details when those details are accepted into structured memory
+  - keep this issue focused on in-world NPC conversation, not on the read-only recall guide in `T67`
+  - preserve the authority boundary: conversational breadth should improve expressive dialogue, not let NPC banter silently mutate quest truth or canon facts
+
+### T74a - NPC Conversation Topic Map And Conversational State Contract
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Add a server-owned topic map and short-lived conversational state contract so NPCs can discuss more than quest facts without relying on raw transcript replay.
+- Scope:
+  - define authored and derived NPC conversation topics such as quest facts, local rumors, opinions, personal background, relationships, and ambient world commentary
+  - add a compact conversational state contract for active interlocutor, recent topics, answered points, open threads, and current conversational stance
+  - keep broad side-topic conversation grounded in authored NPC material, committed encounter facts, and sparse recent context rather than in unlimited transcript history
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - ARCHITECTURE.md
+  - src/core/
+  - src/state/
+  - src/rules/
+  - data/spec/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T74
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/rules/**/*.test.ts src/server/**/*.test.ts`
+- Definition of Done:
+  - the app has an explicit conversational state contract rather than relying on raw transcript carryover
+  - at least one NPC can ground answers across both story-relevant and side-topic conversational areas
+  - tests cover topic availability, answered-topic tracking, and a side-topic exchange that does not advance quest state
+- Handoff Notes:
+  - keep the contract small and inspectable; this is a dialogue-state aid, not a hidden social simulator
+  - broad topic coverage should come from authored topic buckets plus committed facts, not from improvising biography wholesale
+
+### T74b - Dialogue Turn Classification And Non-Quest Conversation Handling
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: Gameplay systems lead
+- Goal: Distinguish exploratory dialogue, side-topic conversation, and story-driving questions so NPC turns can breathe without forcing every exchange through quest progression logic.
+- Scope:
+  - extend dialogue-turn interpretation to recognize conversational intents such as follow-up, opinion-seeking, small talk, personal question, challenge, and story-driving ask
+  - allow non-quest conversation to persist recent conversational context and relationship-relevant signals without manufacturing quest advancement
+  - keep conversational turns compatible with natural first-person and quoted speech inputs already planned in `T73e`
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - src/rules/
+  - src/state/
+  - src/ai/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T74a
+  - T73e
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/rules/**/*.test.ts src/state/**/*.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Definition of Done:
+  - side-topic dialogue no longer has to masquerade as a quest question to get a grounded response
+  - non-quest conversation can leave relationship or conversational traces without silently advancing flags or quest state
+  - tests cover at least one opinion question, one personal or side-topic question, and one story-driving question to the same NPC
+- Handoff Notes:
+  - keep authority explicit: relationship tone and remembered topics may shift, but quest or canon truth still requires accepted grounded consequences
+  - avoid a binary split where everything non-quest becomes pure flavor with no remembered effect at all
+
+### T74c - NPC Anti-Loop Response Shaping And Repetition Guards
+
+- Status: Blocked
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Stop NPCs from looping the same fact or paraphrase when the player stays in conversation by adding repetition detection, answered-topic awareness, and grounded redirect behavior.
+- Scope:
+  - detect repeated NPC response shapes and recently answered points within the current conversation window
+  - prefer grounded elaboration, acknowledgement, uncertainty, or topic transition over repeating the same quest fact wording
+  - add bounded redirect behavior so NPCs can say they have already answered something, offer a related angle, or ask the player what they want to know next without falling into canned loops
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - src/state/
+  - src/ai/
+  - src/rules/
+  - src/ui/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T74a
+  - T74b
+  - T62c
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/ui/**/*.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Definition of Done:
+  - repeated NPC turns stop collapsing into near-duplicate quest reminders when grounded alternative responses are available
+  - the system can track that a point was already answered and react differently on the next follow-up
+  - tests cover a repeated beacon-style question sequence and verify the NPC does not simply restate the same line three times
+- Handoff Notes:
+  - the target is bounded anti-loop behavior, not infinite chat depth
+  - if the NPC truly has little else to say, prefer an honest concise limit plus a related redirect over fake novelty
+  - blocked until `T62c` lands, because repetition guards need the partitioned current-conversation versus durable-memory retrieval boundary instead of another transcript-shaped stopgap
+
+### T74d - Conversational NPC Local AI Regression Harness
+
+- Status: Blocked
+- Queue: Later
+- Phase: P2
+- Priority: P2
+- Owner Role: AI systems lead
+- Goal: Add a repeatable local-AI validation path for longer NPC conversations so repetitive loop failures are caught before live playtests.
+- Scope:
+  - extend the local AI workflow harness with a multi-turn NPC conversation script that includes side-topic questions, opinion questions, and repeated follow-ups
+  - capture acceptable degraded local-model behavior for NPC talk, including honest limits and bounded redirects, instead of requiring ideal hosted-model richness
+  - include at least one regression case modeled on the beacon-loop failure shape
+- Files to Touch:
+  - BACKLOG.md
+  - launcher/
+  - src/state/
+  - scripts/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T74c
+  - T68b
+- Validation:
+  - `cargo test --manifest-path launcher/Cargo.toml`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - repeatable live dialogue smoke
+- Definition of Done:
+  - the repo has a rerunnable NPC-conversation regression path instead of only action-turn or guided-story smoke tests
+  - the harness covers at least one side-topic conversation, one repeated follow-up sequence, and one first-person dialogue path
+  - handoff notes can point to concrete acceptable local-model conversation behavior and loop-failure thresholds
+- Handoff Notes:
+  - prefer acceptance bands over exact prose snapshots
+  - keep this harness focused on conversational resilience and grounded breadth, not on evaluating literary quality
+  - blocked until `T74c` establishes the anti-loop behavior worth regression-testing
+
+### T74e - NPC Persona Prompt Bootstrap Contract
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Give NPC conversations a compact per-character prompt bootstrap on first meaningful contact so the model starts from grounded identity instead of generic quest exposition.
+- Scope:
+  - define the compact NPC persona prompt contract seeded from authored and server-owned identity fields such as role, approximate age band, presentation, trade, known location, tone, and baseline stance toward the player
+  - generate that prompt bootstrap from explicit structured NPC data and cheap identity memory rather than from raw transcript replay
+  - keep the bootstrap bounded and provider-neutral so it improves dialogue quality on local models without turning prompts into hidden biographies
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - ARCHITECTURE.md
+  - ENGINEERING_STANDARDS.md
+  - src/ai/
+  - src/state/
+  - src/rules/
+  - data/spec/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T74a
+  - T62b
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/rules/**/*.test.ts src/ai/**/*.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Definition of Done:
+  - first-contact NPC conversation can include a compact persona bootstrap assembled from structured data rather than ad hoc model improvisation
+  - the bootstrap stays inspectable, bounded, and replay-friendly
+  - tests cover bootstrap generation for at least one authored NPC and confirm it excludes unsupported biography drift
+- Handoff Notes:
+  - keep the bootstrap small: think identity and stance, not a full character sheet
+  - prefer neutral structured fields such as `rare-jewelry shopkeeper`, `middle-aged`, or `guarded tone` over florid prose that is hard to validate later
+
+### T74f - Curated NPC Trait Admission And Prompt Refresh
+
+- Status: Ready
+- Queue: Later
+- Phase: P2
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Allow later learned NPC traits to refresh the persona prompt only after those traits pass an explicit admission path, so the model can stay consistent without turning made-up details into hidden canon.
+- Scope:
+  - define which later-discovered NPC traits may be admitted into prompt refreshes as authoritative identity, relationship-state, or soft flavor detail
+  - add a server-owned admission and refresh path for details such as demeanor, recurring opinions, marriage, habits, or known affiliations when they come from authored data, accepted consequences, or trusted summaries
+  - ensure unsupported model inventions remain disposable flavor and do not silently persist into future NPC prompts
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - ARCHITECTURE.md
+  - ENGINEERING_STANDARDS.md
+  - src/ai/
+  - src/state/
+  - src/rules/
+- Do Not Touch:
+  - public/
+  - packaging/
+- Dependencies:
+  - T74e
+  - T60a
+  - T62b
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/rules/**/*.test.ts src/ai/**/*.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Definition of Done:
+  - later NPC prompt refreshes pull from an explicit admitted-trait contract instead of raw model claims
+  - authoritative identity and relationship changes remain distinguishable from soft disposable flavor
+  - tests cover one accepted trait refresh and one rejected invented trait that does not persist into later dialogue
+- Handoff Notes:
+  - use the memory class boundary here: some traits are durable relationship or world facts, some are soft flavor, and some must be rejected outright
+  - if a detail such as `she is married` is not grounded in authored data, accepted state, or trusted summary policy, it must not become a durable future prompt fact just because the model said it once
 
 ### T02f - Docker-First LiteLLM Sidecar And GPU Override
 
