@@ -19,7 +19,7 @@ export function reconcileTurnPresentation({
   acceptedConsequences,
   nextPlayer
 }: ReconcileTurnPresentationParams): TurnOutputPayload {
-  if (!hasPresentationDrift(player, proposedTurnOutput, acceptedConsequences)) {
+  if (!hasPresentationDrift(player, proposedTurnOutput, acceptedConsequences, nextPlayer)) {
     return proposedTurnOutput;
   }
 
@@ -33,11 +33,13 @@ export function reconcileTurnPresentation({
 function hasPresentationDrift(
   player: Player,
   proposedTurnOutput: TurnOutputPayload,
-  acceptedConsequences: AcceptedTurnConsequences
+  acceptedConsequences: AcceptedTurnConsequences,
+  nextPlayer: Player
 ): boolean {
   return (
     hasStatePresentationDrift(player, proposedTurnOutput, acceptedConsequences) ||
-    hasDirectorPresentationDrift(player, proposedTurnOutput, acceptedConsequences)
+    hasDirectorPresentationDrift(player, proposedTurnOutput, acceptedConsequences) ||
+    hasWeakAcceptedNarrative(proposedTurnOutput, acceptedConsequences, nextPlayer)
   );
 }
 
@@ -117,7 +119,7 @@ function questsEqual(
 
 function buildCommittedNarrative(
   player: Player,
-  _nextPlayer: Player,
+  nextPlayer: Player,
   acceptedConsequences: AcceptedTurnConsequences
 ): string {
   const sentences: string[] = [];
@@ -135,8 +137,13 @@ function buildCommittedNarrative(
     sentences.push(`You lose ${formatList(acceptedStateUpdates.inventory_remove)}.`);
   }
 
-  if (acceptedConsequences.director_updates?.end_goal_progress) {
-    sentences.push(acceptedConsequences.director_updates.end_goal_progress);
+  if (!sentences.length && hasStructuralStateChange(acceptedStateUpdates) && acceptedConsequences.memory_updates.length) {
+    sentences.push(acceptedConsequences.memory_updates[0] ?? "");
+  }
+
+  const progressSentence = buildCommittedProgressSentence(nextPlayer, acceptedConsequences);
+  if (progressSentence) {
+    sentences.push(progressSentence);
   }
 
   if (!sentences.length && acceptedConsequences.memory_updates.length) {
@@ -157,6 +164,64 @@ function buildNoCommitNarrative(player: Player): string {
   }
 
   return `You pause in ${player.location} and take stock, but nothing else changes yet.`;
+}
+
+function hasWeakAcceptedNarrative(
+  proposedTurnOutput: TurnOutputPayload,
+  acceptedConsequences: AcceptedTurnConsequences,
+  nextPlayer: Player
+): boolean {
+  const narrative = proposedTurnOutput.narrative.trim();
+  if (!narrative) {
+    return false;
+  }
+
+  const hasAcceptedChanges = Boolean(
+    acceptedConsequences.state_updates || acceptedConsequences.director_updates || acceptedConsequences.memory_updates.length
+  );
+  if (!hasAcceptedChanges) {
+    return false;
+  }
+
+  if (/^next step:/i.test(narrative)) {
+    return true;
+  }
+
+  const proposedProgress = proposedTurnOutput.director_updates.end_goal_progress.trim();
+  if (proposedProgress && narrative === proposedProgress) {
+    return true;
+  }
+
+  const derivedProgress = buildCommittedProgressSentence(nextPlayer, acceptedConsequences);
+  return Boolean(derivedProgress && /^next step:/i.test(proposedProgress) && proposedProgress !== derivedProgress);
+}
+
+function hasStructuralStateChange(stateUpdates: AcceptedTurnConsequences["state_updates"]): boolean {
+  return Boolean(
+    stateUpdates &&
+    (stateUpdates.flags_add.length ||
+      stateUpdates.flags_remove.length ||
+      stateUpdates.quests.length)
+  );
+}
+
+function buildCommittedProgressSentence(
+  nextPlayer: Player,
+  acceptedConsequences: AcceptedTurnConsequences
+): string | null {
+  if (acceptedConsequences.state_updates?.quests.length) {
+    const nextQuestSummary = nextPlayer.quests[0]?.summary?.trim();
+    if (nextQuestSummary) {
+      return normalizeNextStep(nextQuestSummary);
+    }
+  }
+
+  const acceptedProgress = acceptedConsequences.director_updates?.end_goal_progress?.trim();
+  if (acceptedProgress) {
+    return acceptedProgress;
+  }
+
+  return null;
 }
 
 function getCurrentLead(player: Player): string | null {
@@ -191,4 +256,17 @@ function lowerCaseFirstCharacter(value: string): string {
   }
 
   return value.charAt(0).toLowerCase() + value.slice(1);
+}
+
+function normalizeNextStep(value: string): string {
+  const trimmed = value.trim().replace(/[.]+$/u, "");
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^next step:/i.test(trimmed)) {
+    return `${trimmed}.`;
+  }
+
+  return `Next step: ${trimmed}.`;
 }

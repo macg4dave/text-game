@@ -243,6 +243,8 @@ No global blocker as of 2026-03-09:
 | T69b | Next | P1 | P2 | SunRay AI validation manifest and review bundle | Done | T68c, T69a, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only --report-json <path>` + manifest smoke review |
 | T69c | Next | P1 | P2 | Dual-AI adversarial walkthrough matrix | Blocked | T68b, T69b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
 | T70 | Now | P1 | P1 | Clarification-safe turn input handling | Done | T57a, T58a, T64b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live AI smoke |
+| T71 | Now | P1 | P1 | Commit-aligned weak narration reconciliation | Done | T57c, T64b, T70 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live AI smoke |
+| T72 | Now | P1 | P1 | Sparse hot-summary memory admission | Done | T60a, T71 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/reducer.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
 | T13 | Later | P2 | P1 | Embeddings pipeline | Blocked | T07a, T60a, T62b | Manual embedding call verification |
 | T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Ready | T02f | Manual embedding route verification |
@@ -2256,6 +2258,92 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - `src/state/turn.test.ts` now covers the reported quick-play regressions directly: `what is the market beacon?` can no longer unlock `beacon_inspected`, and raw token input such as `beacon_inspected` no longer acts like a valid story command
   - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts`, and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
   - repeatable live smoke on 2026-03-13 ran `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona-seed 7`; the practical-fixer persona path passed embeddings, scene schema, and game-turn schema checks against the local Ollama setup
+
+### T71 - Commit-Aligned Weak Narration Reconciliation
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Rewrite thin or stale accepted-turn narration so small-model turns still explain what actually changed before pointing to the next lead.
+- Scope:
+  - detect accepted-turn narratives that only parrot stale `Next step` wording or otherwise fail to explain the committed outcome
+  - rebuild player-facing narration from committed consequences, admitted memory, and the next authoritative lead when the proposed prose is too weak
+  - add deterministic regression coverage for the live `look at beacon` then `what?` failure shape
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - src/state/presentation.ts
+  - src/state/turn.test.ts
+- Do Not Touch:
+  - public/
+  - data/spec/
+  - launcher/
+- Dependencies:
+  - T57c
+  - T64b
+  - T70
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - repeatable live AI smoke against a compatible local provider
+- Definition of Done:
+  - committed progression turns explain the accepted outcome before redirecting the player to the next lead
+  - weak `Next step`-only narration from the model is replaced with committed-state-aligned wording
+  - the reported Rooftop Market beacon regression is covered by a rerunnable deterministic test
+- Handoff Notes:
+  - user assigned this follow-on issue on 2026-03-13 after a quick playtest showed `look at beacon` apparently progressed the story, but the narrator only returned a thin `Next step` line, leaving the player confused when the next clarification turn pointed at Nila Vale
+  - keep this scoped to presentation reconciliation after accepted commits; do not reopen clarification freezing from `T70`
+  - prioritize player comprehension over preserving weak model flavor when the proposed prose omits the accepted outcome
+  - completed on 2026-03-13 by tightening `src/state/presentation.ts` so accepted-turn narration is reconciled not only on explicit drift but also when the proposed prose is a thin or stale `Next step` line; in that case the returned narrative is rebuilt from committed memory plus the next authoritative quest lead
+  - `src/state/turn.test.ts` now covers the reported Rooftop Market beacon failure directly with a deterministic regression where `look at beacon` commits `beacon_inspected` but the model only says `Next step: Inspect the sparking market beacon.`
+  - `REQUIREMENTS.md` now makes the player-facing expectation explicit: committed progression turns should explain the accepted outcome before redirecting the player
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts`, and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - repeatable live smoke on 2026-03-13 ran `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona-seed 7`; the practical-fixer persona path passed embeddings, scene schema, and game-turn schema checks against the local Ollama setup
+
+### T72 - Sparse Hot-Summary Memory Admission
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P1
+- Owner Role: AI systems lead
+- Goal: Keep `player.summary` as a sparse hot recap instead of appending every generic admitted memory line immediately.
+- Scope:
+  - stop promoting low-information actor-centric memory lines into the hot summary when accepted state already captures the same change
+  - preserve durable memory storage and retrieval while reducing summary churn for small-model prompts
+  - add deterministic coverage for generic movement memory versus distinctive world-fact memory
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - src/state/reducer.ts
+  - src/state/reducer.test.ts
+  - src/state/turn.test.ts
+- Do Not Touch:
+  - public/
+  - data/spec/
+  - launcher/
+- Dependencies:
+  - T60a
+  - T71
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/state/reducer.test.ts src/state/turn.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Definition of Done:
+  - generic lines such as `The player reached the bridge.` no longer get copied into `player.summary` when the committed state already says the same thing
+  - distinctive world-fact memories can still land in `player.summary` when they add context not already present in structured state
+  - reducer and turn tests cover both the sparse-summary case and the retained-distinctive-memory case
+- Handoff Notes:
+  - user assigned this follow-on issue on 2026-03-13 after noticing the current stopgap memory path feels compressed too quickly for small local models
+  - current implementation appends every admitted `memory_update` directly into `player.summary` while also storing the same memory in durable retrieval, so hot summary and durable memory are not meaningfully separated yet
+  - keep this as a stopgap improvement; the broader class-aware retrieval and storage-tier work still belongs to `T60b` and `T63a`
+  - completed on 2026-03-13 by tightening `src/state/reducer.ts` so generic actor-centric memory lines such as `The player reached the bridge.` or `You ...` are no longer promoted into `player.summary` when accepted structured state already captures the same turn, while distinctive world-fact memory lines still remain eligible for the hot summary
+  - `src/state/reducer.test.ts` now covers both sides of the stopgap rule: generic movement memory stays out of the hot summary, and distinctive world-fact memory such as the market beacon's false evacuation orders still lands there
+  - `REQUIREMENTS.md` now states that the hot summary should stay sparse rather than absorbing every generic admitted memory line immediately
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/reducer.test.ts src/state/turn.test.ts`, and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
 
 ### T02f - Docker-First LiteLLM Sidecar And GPU Override
 

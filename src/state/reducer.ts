@@ -40,7 +40,10 @@ export function reduceCommittedPlayerState({
 
   if (acceptedConsequences.memory_updates.length) {
     const summaryLines = reducedPlayer.summary ? reducedPlayer.summary.split("\n").filter(Boolean) : [];
-    reducedPlayer.summary = [...summaryLines, ...acceptedConsequences.memory_updates].slice(-30).join("\n");
+    const summaryUpdates = selectSummaryUpdates(acceptedConsequences);
+    if (summaryUpdates.length) {
+      reducedPlayer.summary = [...summaryLines, ...summaryUpdates].slice(-30).join("\n");
+    }
   }
 
   return {
@@ -87,4 +90,33 @@ function cloneDirectorState(directorState: DirectorState): DirectorState {
     ...directorState,
     completed_beats: [...directorState.completed_beats]
   };
+}
+
+function selectSummaryUpdates(acceptedConsequences: DeterministicStateReducerInput["acceptedConsequences"]): string[] {
+  const hasConcreteStateChange = Boolean(
+    acceptedConsequences.state_updates &&
+    (
+      acceptedConsequences.state_updates.location ||
+      acceptedConsequences.state_updates.inventory_add.length ||
+      acceptedConsequences.state_updates.inventory_remove.length ||
+      acceptedConsequences.state_updates.flags_add.length ||
+      acceptedConsequences.state_updates.flags_remove.length ||
+      acceptedConsequences.state_updates.quests.length
+    )
+  );
+
+  return acceptedConsequences.memory_updates.filter((memory) => shouldPromoteMemoryToSummary(memory, hasConcreteStateChange));
+}
+
+function shouldPromoteMemoryToSummary(memory: string, hasConcreteStateChange: boolean): boolean {
+  const trimmed = memory.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  if (!hasConcreteStateChange) {
+    return true;
+  }
+
+  return !/^(?:the player|you)\b/i.test(trimmed);
 }

@@ -29,6 +29,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - In turn-output schema `v1`, transitional field names such as `state_updates`, `director_updates`, and `memory_updates` remain in the payload for compatibility, but they are proposal-only fields. The authoritative truth in `/api/turn` remains the versioned `player` snapshot until a later schema revision renames those fields.
 - The turn-output proposal contract must stay compact. It may carry narrative, player options, and narrowly scoped proposed deltas, but it must not grow scene graphs, world-state objects, beat-state mirrors, or other schema fields that encode game design logic.
 - Player-facing narrative, options, quest progress, and memory facts shown after a turn must align to committed authoritative state rather than uncommitted model prose.
+- When a turn commits meaningful progression, the returned narrative should explain the accepted outcome before redirecting the player to the next lead; a bare stale `Next step` line is not sufficient.
 - Turn handling must separate freeform intent interpretation, world simulation resolution, and story pacing or framing.
 - The model-facing turn contract must treat those layers distinctly: infer what the player is trying to do first, propose plausible world consequences second, and use director guidance only to frame or pace the aftermath.
 - Clarification-style questions and raw internal tokens submitted through the normal turn input must not auto-inspect, auto-use, or advance flags, quests, or director progress; they may answer in place, but committed state changes require an actual in-world attempt.
@@ -50,6 +51,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Retrieval policy must differ by memory class; only the classes that matter for the current turn should be retrieved, and always-on retrieval should be limited to the smallest authority-relevant set.
 - Memory classes may support narration and continuity, but memory retrieval itself must not become a second authority channel that overrides committed state.
 - Memory must behave as a storage hierarchy rather than one large prompt. The default live context should contain only the current scene, current goal, nearby world state, and a few high-priority recalled facts.
+- The hot summary sent with normal turns should stay sparse and should not absorb every generic admitted memory line immediately when structured state or durable memory already capture the same event.
 - Durable memory should be split into at least hard canon facts, quest or progression facts, relationship summaries, and cold history logs. Raw history should remain outside the live context unless a retrieval rule explicitly requires it.
 - Per-turn live context assembly must use explicit bucket budgets, with recall ranked by relevance, recency, narrative importance, and strong boosts for voluntary player re-engagement.
 - Old interactions must be compressed into rolling summaries and structured facts, with summary formats versioned so they can be recomputed later from canonical data.

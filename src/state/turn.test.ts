@@ -1157,6 +1157,97 @@ test("turn service blocks raw internal tokens from acting like valid story comma
   assert.deepEqual(committedEvents[0]?.committed.memory_updates, []);
 });
 
+test("turn service rewrites stale next-step narration after committed beacon inspection", async () => {
+  const player = createStorySamplePlayer();
+  const committedEvents: CanonicalTurnEventPayload[] = [];
+  const persistedPlayers: Player[] = [];
+
+  const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent);
+      }
+    },
+    addEvent() {},
+    addMemories() {},
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "Next step: Inspect the sparking market beacon.",
+        player_options: ["Look at the beacon again"],
+        state_updates: {
+          location: "Rooftop Market",
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: ["beacon_inspected"],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "Next step: Inspect the sparking market beacon."
+        },
+        memory_updates: ["The market beacon is broadcasting false evacuation orders tied to the Ghostlight Relay."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "look at beacon",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected the reconciled story-sample state to persist");
+  }
+
+  assert.deepEqual(persistedPlayer.flags, ["beacon_inspected"]);
+  assert.deepEqual(persistedPlayer.quests, [
+    {
+      id: "ghostlight_relay",
+      status: "active",
+      summary: "Ask Nila Vale where the relay draws power"
+    }
+  ]);
+  assert.equal(
+    outcome.turnOutput.narrative,
+    "The market beacon is broadcasting false evacuation orders tied to the Ghostlight Relay. Next step: Ask Nila Vale where the relay draws power."
+  );
+  assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
+  assert.equal(
+    committedEvents[0]?.supplemental?.proposal_presentation?.narrative,
+    "Next step: Inspect the sparking market beacon."
+  );
+});
+
 test("turn service rejects stage-skipping travel and progression before director framing can treat it as truth", async () => {
   const player = createStorySamplePlayer();
 

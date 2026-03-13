@@ -97,10 +97,7 @@ test("reduceCommittedPlayerState deterministically applies accepted consequences
       summary: "You crossed the bridge."
     }
   ]);
-  assert.equal(
-    reduced.player.summary,
-    "You arrived at the market.\nThe signal lantern revealed the bridge route."
-  );
+  assert.equal(reduced.player.summary, "You arrived at the market.");
   assert.deepEqual(reduced.player.director_state, resolvedDirectorState);
   assert.equal(reduced.authoritativePlayer.schema_version, AUTHORITATIVE_STATE_SCHEMA_VERSION);
   assert.equal(reduced.authoritativePlayer.location, "Sky Bridge");
@@ -147,4 +144,37 @@ test("reduceCommittedPlayerState falls back to committed director progress when 
   );
   assert.equal(reduced.player.director_state.current_beat_id, player.director_state.current_beat_id);
   assert.deepEqual(reduced.player.director_state.completed_beats, player.director_state.completed_beats);
+});
+
+test("reduceCommittedPlayerState keeps distinctive world-fact memory in the hot summary", () => {
+  const player = createPlayer();
+
+  const reduced = reduceCommittedPlayerState({
+    player,
+    acceptedConsequences: {
+      state_updates: {
+        location: "Rooftop Market",
+        inventory_add: [],
+        inventory_remove: [],
+        flags_add: ["beacon_inspected"],
+        flags_remove: [],
+        quests: [
+          {
+            id: "intro-signal",
+            status: "active",
+            summary: "Ask Nila Vale where the relay draws power"
+          }
+        ]
+      },
+      director_updates: {
+        end_goal_progress: "Next step: Ask Nila Vale where the relay draws power."
+      },
+      memory_updates: ["The market beacon is broadcasting false evacuation orders tied to the Ghostlight Relay."]
+    }
+  });
+
+  assert.equal(
+    reduced.player.summary,
+    "You arrived at the market.\nThe market beacon is broadcasting false evacuation orders tied to the Ghostlight Relay."
+  );
 });
