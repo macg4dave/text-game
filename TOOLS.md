@@ -15,8 +15,8 @@
 - Reload endpoints validate specs and return errors if invalid.
 - Specs are used to steer AI behavior and enforce pacing rules.
 
-## Script Helper Note
+## SunRay Note
 
-- Shared launcher and harness helper functions live in `scripts/lib/shared.ps1`.
-- Prefer updating shared helpers there instead of duplicating script plumbing in multiple entry scripts.
-- Local GPU tier selection for manual larger-model experiments also lives there; use `LOCAL_GPU_PROFILE_ID` or `LOCAL_GPU_VRAM_GB` for manual overrides instead of forking launcher logic.
+- Shared launcher and harness logic lives under `launcher/src/`.
+- Prefer extending `SunRay` modules instead of adding repo shell wrappers.
+- Launcher-owned GPU profile data lives under `launcher/assets/`; use `LOCAL_GPU_PROFILE_ID` or `LOCAL_GPU_VRAM_GB` for manual overrides instead of forking launcher logic.

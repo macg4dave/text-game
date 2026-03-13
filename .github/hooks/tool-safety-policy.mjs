@@ -10,7 +10,7 @@ export const TOOL_SAFETY_POLICY = {
       id: "remote-access",
       decision: "deny",
       reason:
-        "Remote access commands are blocked by workspace policy. Do not use SSH, SCP, SFTP, rsync-to-remote, Plink/PSCP, or PowerShell remoting from this workspace.",
+        "Remote access commands are blocked by workspace policy. Do not use SSH, SCP, SFTP, rsync-to-remote, Plink/PSCP, or Windows remoting from this workspace.",
       patterns: [
         /(^|[^\w-])ssh(?:\.exe)?(?=\s|$)/i,
         /(^|[^\w-])scp(?:\.exe)?(?=\s|$)/i,

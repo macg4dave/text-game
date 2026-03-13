@@ -1,19 +1,19 @@
 ---
 name: "SunRay Script Parity Migration"
-description: "Use when migrating one legacy launcher script into Rust SunRay with parity-first, delete-after-validation rules."
+description: "Use when retiring one legacy launcher entrypoint into Rust SunRay with parity-first, delete-after-validation rules."
 ---
 
 Context
 -------
-This prompt is for `T65`-style migration work in `text-game`, where one legacy script is replaced by a matching `SunRay` Rust subcommand.
+This prompt is for `T65`-style migration work in `text-game`, where one retired launcher entrypoint is replaced by a matching `SunRay` Rust subcommand.
 
 Relevant repo facts
 -------------------
 - Rust crate: `launcher/Cargo.toml`
 - Launcher docs: `launcher/README.md`
 - Source of truth for launcher work: `BACKLOG.md`
-- Legacy scripts live under `scripts/`
-- Shared legacy PowerShell helpers live under `scripts/lib/`
+- Legacy launcher entrypoints, when still present, live under `scripts/`
+- Shared retired helpers should be replaced by focused modules under `launcher/src/`
 - Shared Rust replacements should live under `launcher/src/`
 
 Parity rules
@@ -61,4 +61,4 @@ Assistant instructions
 
 Example prompts
 ---------------
-- "Task: Migrate `scripts/start-dev.ps1` into `SunRay` command `start-dev`. Details: preserve dotenv loading, Docker and GPU checks, port fallback, readiness polling, and `--no-browser`. Legacy helper files involved: `scripts/lib/env.ps1`, `scripts/lib/launcher.ps1`, `scripts/lib/http.ps1`. Rust files to update: `launcher/src/main.rs`, `launcher/src/env.rs`, `launcher/src/process.rs`, `launcher/src/config.rs`. Validation to run: cargo check/test plus `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`. Delete after parity: yes, remove `scripts/start-dev.ps1` once validated. Constraints / do not modify: `docker-compose.yml`, `src/` application code."
+- "Task: Confirm the retired `start-dev` launcher flow now lives in `SunRay` command `start-dev`. Details: preserve dotenv loading, Docker and GPU checks, port fallback, readiness polling, and `--no-browser`. Legacy helper files involved: any remaining `scripts/` launcher helpers. Rust files to update: `launcher/src/main.rs`, `launcher/src/env.rs`, `launcher/src/process.rs`, `launcher/src/config.rs`. Validation to run: cargo check/test plus `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`. Delete after parity: yes, remove any retired launcher entrypoint once validated. Constraints / do not modify: `docker-compose.yml`, `src/` application code."

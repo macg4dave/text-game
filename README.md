@@ -70,7 +70,6 @@ Recommended VS Code extensions for this repo:
 
 - Rust Analyzer
 - Docker
-- PowerShell if you need Windows-specific shell inspection or troubleshooting
 
 The supported validation and runtime path still stays in Docker even if you use the host install for editor support.
 
@@ -142,19 +141,19 @@ The authoritative local-GPU profile matrix for manual larger-model tuning now li
 
 On Windows, the launcher wraps the same compiled Docker path and opens the browser for you:
 
-```powershell
+```text
 cargo run --manifest-path launcher/Cargo.toml --
 ```
 
 That no-argument launcher path now defaults to the same behavior as `start-dev`. You can still call the explicit subcommand if you want:
 
-```powershell
+```text
 cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
 If you want a launcher binary you can hand to end users, build the Windows release executable:
 
-```powershell
+```text
 cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml
 ```
 
@@ -163,7 +162,7 @@ That produces `SunRay.exe` at [launcher/target/release/SunRay.exe](/g:/text-game
 Launcher note as of 2026-03-09:
 
 - `SunRay` under `launcher/` is now the supported launcher and automation surface
-- do not add new PowerShell, Bash, or batch automation in this repo; extend the Rust tooling surface instead
+- do not add new shell-script automation in this repo; extend the Rust tooling surface instead
 - remaining launcher cleanup work is about Rust-native structure and asset ownership, not restoring shell wrappers
 
 ## Database Reset And Recovery
@@ -210,10 +209,10 @@ Official references:
 1. Open the official Node.js downloads page.
 2. Download the Windows `.msi` installer for the current LTS release that matches your machine (`x64` for most PCs, `arm64` for ARM devices).
 3. Run the installer with the default options.
-4. Close and reopen PowerShell or Command Prompt.
+4. Close and reopen your terminal.
 5. Verify the install:
 
-```powershell
+```text
 node -v
 npm -v
 ```
@@ -291,14 +290,14 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml down
 
 If port `3000` is already in use on your machine, you can still set `PORT` for that shell session before starting:
 
-```powershell
-$env:PORT = "3300"
+```text
+PORT=3300
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
 On Windows, the repo now has a one-command launcher:
 
-```powershell
+```text
 cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
@@ -482,7 +481,7 @@ What the launcher path should tell the player in plain language:
 
 Build the launcher artifact for the current platform with Cargo:
 
-```powershell
+```text
 cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml
 ```
 
@@ -523,7 +522,7 @@ The launch-screen setup wizard now has one lightweight, repeatable smoke path fo
 
 Run it with:
 
-```powershell
+```text
 cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke
 ```
 
@@ -664,7 +663,7 @@ Artifact-size references for those recommendations come from the official Ollama
 
 For the Docker-backed GPU path, the quickest Windows startup path is:
 
-```powershell
+```text
 cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
 
@@ -710,7 +709,7 @@ If you have two AI assistants open in VS Code, use them in different roles:
 
 For canonical replay-contract checks, run:
 
-```powershell
+```text
 docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts
 ```
 

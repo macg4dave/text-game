@@ -79,7 +79,7 @@ Before starting substantial work, read:
 ## Safety Limits
 
 - Do not attempt outbound remote access, remote shell access, or remote administration from this workspace unless the user explicitly asks for it.
-- This includes `ssh`, `scp`, `sftp`, remote `rsync`, `plink`, `pscp`, and PowerShell remoting commands such as `Enter-PSSession`, `New-PSSession`, or `Invoke-Command -ComputerName`.
+- This includes `ssh`, `scp`, `sftp`, remote `rsync`, `plink`, `pscp`, and Windows remoting commands such as `Enter-PSSession`, `New-PSSession`, or `Invoke-Command -ComputerName`.
 - Treat destructive or otherwise unsafe local shell commands as approval-gated by default. If the command is legitimately safe for this repo, prefer a narrow repo-level exception over broad allowlisting.
 - If remote access is genuinely needed, explain why and ask the user to run it themselves or explicitly relax the workspace hook first.
 
@@ -127,7 +127,7 @@ Before starting substantial work, read:
 
 - Launcher automation now belongs under `launcher/` in the Rust executable `SunRay`.
 - If touching launcher work, keep the matching launcher task cards in [BACKLOG.md](/g:/text-game/BACKLOG.md) updated in the same session.
-- Do not add new PowerShell, Bash, or batch launcher automation.
+- Do not add new shell-script launcher automation.
 - Migrate one legacy launcher script at a time: match behavior in `SunRay`, validate parity, then delete the legacy script.
 - Keep `SunRay` focused on orchestration. It is not a webview shell, installer, updater, package manager, or app-runtime rewrite.
 

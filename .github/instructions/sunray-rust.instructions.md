@@ -1,6 +1,6 @@
 ---
 applyTo: "launcher/**/*.rs,launcher/Cargo.toml,launcher/README.md"
-description: "Use for Rust work in launcher/SunRay, including subcommand design, parity migration from legacy PowerShell scripts, launcher harness changes, and shared Rust automation modules."
+description: "Use for Rust work in launcher/SunRay, including subcommand design, retirement of legacy launcher scripts, launcher harness changes, and shared Rust automation modules."
 ---
 
 # SunRay Rust Instructions
@@ -9,7 +9,7 @@ description: "Use for Rust work in launcher/SunRay, including subcommand design,
 
 Use these instructions for work in `launcher/` and the `SunRay` Rust executable.
 
-`SunRay` is the repo's Rust launcher and automation harness. It replaces legacy PowerShell orchestration a script at a time, but it does **not** replace the Node/TypeScript app runtime, Docker configuration, or gameplay logic.
+`SunRay` is the repo's Rust launcher and automation harness. It replaces retired shell-script orchestration one entrypoint at a time, but it does **not** replace the Node/TypeScript app runtime, Docker configuration, or gameplay logic.
 
 ## Required grounding before substantial Rust changes
 
@@ -50,7 +50,7 @@ If a change would move product/runtime responsibilities into Rust instead of orc
 - Migrate one legacy script at a time.
 - Match the current behavior in `SunRay` before deleting the legacy script.
 - Delete the migrated legacy script in the same migration slice after parity is validated.
-- Do not add new `.ps1`, `.sh`, or `.bat` automation.
+- Do not add new shell-script or batch automation.
 - Keep shared concerns in Rust modules rather than duplicating process/env/retry logic across commands.
 
 ## Rust implementation preferences for this repo
@@ -87,4 +87,4 @@ When the supported Rust launcher surface changes:
 - update `README.md` if user-facing commands or setup guidance changed
 - keep examples aligned with the current `SunRay` command surface
 
-Do not leave prompt assets, docs, and backlog notes disagreeing about whether PowerShell or Rust is the supported automation path.
+Do not leave prompt assets, docs, and backlog notes disagreeing about whether shell scripts or Rust are the supported automation path.

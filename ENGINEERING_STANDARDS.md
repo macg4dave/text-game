@@ -63,13 +63,13 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 ## Script Maintainability Policy
 
 - Repo automation lives in `launcher/` as the Rust executable `SunRay`, rooted at `launcher/Cargo.toml`.
-- New launcher, harness, smoke-test, and validation automation must be implemented in Rust, not in PowerShell, Bash, batch files, or other shell-script entrypoints.
+- New launcher, harness, smoke-test, and validation automation must be implemented in Rust, not in shell-script or batch entrypoints.
 - Shared automation behavior should live in Rust modules or crates rather than in shell helper libraries.
 - Rust commands may invoke Docker, npm, Node, browser-launch helpers, or other existing tools, but those dependencies are not part of the script-runtime rewrite unless a backlog item says otherwise.
 - Cross-command concerns such as dotenv loading, config precedence, Docker invocation, readiness polling, and common error formatting should have one shared Rust implementation whenever practical.
 - Script output should stay easy to debug: prefer consistent step logging, clear failure messages, and one canonical place to change shared behavior.
 - Treat mixed orchestration and implementation as a design defect. If a Rust command starts owning reusable retry policy, environment resolution, port probing, readiness logic, or other shared behavior, move that logic into shared Rust modules instead of another command file.
-- Legacy `.ps1` launcher surfaces are retired and must not be recreated as supported entrypoints.
+- Legacy launcher-script surfaces are retired and must not be recreated as supported entrypoints.
 - Keep launcher-owned fixtures and static automation assets under `launcher/` rather than reviving a shared `scripts/` tree.
 
 ## Launcher Boundary Policy

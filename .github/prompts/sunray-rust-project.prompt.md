@@ -23,7 +23,7 @@ Project-specific constraints
 - Do not turn `SunRay` into a webview shell, installer, updater, package manager, Electron replacement, or app-runtime rewrite.
 - Preserve command names and user-facing behavior unless explicitly allowed to change.
 - Migrate one legacy script at a time: reach parity in Rust first, then delete the matching legacy script.
-- Do not add new PowerShell, Bash, or batch automation.
+- Do not add new shell-script or batch automation.
 - Reuse shared Rust modules for process execution, env loading, logging, config, and error shaping.
 - Keep Docker, Node, npm, Electron, and the TypeScript app as invoked dependencies rather than reimplementing them in Rust.
 

@@ -158,13 +158,13 @@ No global blocker as of 2026-03-09:
 
 | ID | Queue | Phase | Priority | Task | Status | Depends On | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T65 | Now | P1 | P1 | Rust script-runtime migration | Review | None | Manual planning-doc consistency review + child task validation |
+| T65 | Now | P1 | P1 | Rust script-runtime migration | Done | None | Manual planning-doc consistency review + child task validation |
 | T65a | Now | P1 | P1 | SunRay workspace and command contract | Done | T65 | `cargo check --manifest-path launcher/Cargo.toml` + `cargo test --manifest-path launcher/Cargo.toml` + manual command-surface review |
 | T65b | Now | P1 | P1 | SunRay launcher and preflight parity | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
 | T65c | Now | P1 | P1 | SunRay local AI workflow harness migration | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + local provider smoke when available |
 | T65d | Now | P1 | P1 | SunRay validator command migration | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
 | T65e | Now | P1 | P1 | SunRay setup smoke migration | Done | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` |
-| T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Review | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
+| T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Done | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
 | T66 | Next | P1 | P2 | SunRay Rust-native cleanup | Done | None | Manual planning-doc consistency review + child task validation |
 | T66a | Now | P1 | P2 | SunRay command contract cleanup | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- --no-browser` + manual launcher-doc consistency review |
 | T66b | Next | P1 | P2 | SunRay start-dev orchestration split | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
@@ -199,7 +199,7 @@ No global blocker as of 2026-03-09:
 | T59a | Now | P1 | P1 | Canonical event schema and replay contract | Done | T57a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/server/http-contract.test.ts src/rules/validator.test.ts` |
 | T60 | Next | P1 | P1 | Memory classes and authority policy | Done | T06, T57, T59 | Manual planning-doc consistency review |
 | T60a | Next | P1 | P1 | Memory class contract and admission rules | Done | T57a, T59a, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
-| T60b | Later | P2 | P1 | Class-aware retrieval and summarization policy | Blocked | T60a, T13, T62b, T63a | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
+| T60b | Next | P2 | P1 | Class-aware retrieval and summarization policy | Ready | T60a, T13, T62b, T63a | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
 | T61 | Now | P1 | P1 | Compact turn schema boundary | Done | T06, T57 | Manual planning-doc consistency review |
 | T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Done | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Done | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
@@ -241,23 +241,23 @@ No global blocker as of 2026-03-09:
 | T69 | Now | P1 | P2 | VS Code dual-AI validation protocol | Done | T68a | Manual planning-doc consistency review + child task validation |
 | T69a | Now | P1 | P2 | Dual-AI builder and challenger workflow docs | Done | T69 | Manual doc consistency review + example prompt review |
 | T69b | Next | P1 | P2 | SunRay AI validation manifest and review bundle | Done | T68c, T69a, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only --report-json <path>` + manifest smoke review |
-| T69c | Next | P1 | P2 | Dual-AI adversarial walkthrough matrix | Blocked | T68b, T69b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
+| T69c | Next | P1 | P2 | Dual-AI adversarial walkthrough matrix | Ready | T68b, T69b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
 | T70 | Now | P1 | P1 | Clarification-safe turn input handling | Done | T57a, T58a, T64b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live AI smoke |
 | T71 | Now | P1 | P1 | Commit-aligned weak narration reconciliation | Done | T57c, T64b, T70 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live AI smoke |
 | T72 | Now | P1 | P1 | Sparse hot-summary memory admission | Done | T60a, T71 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/reducer.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
 | T13 | Later | P2 | P1 | Embeddings pipeline | Done | T07a, T60a, T62b | Manual embedding call verification |
 | T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Done | T02f | Manual embedding route verification |
-| T47 | Later | P2 | P1 | LiteLLM default route integration fixtures | Ready | T07a, T13a | LiteLLM route fixture run |
+| T47 | Next | P2 | P1 | LiteLLM default route integration fixtures | Ready | T07a, T13a | LiteLLM route fixture run |
 | T55 | Later | P2 | P2 | Config env resolution and diagnostics split | Ready | T02h | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/core/config.test.ts` |
 | T14 | Later | P2 | P1 | Retrieval and top-k ranking | Blocked | T13, T13a, T60b, T62c | Retrieval fixture check |
 | T15 | Later | P2 | P1 | Memory summarizer job | Blocked | T09, T60b, T62c, T63b | `npm test` |
 | T62b | Later | P2 | P1 | NPC importance tiers and long-lived memory admission | Done | T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T62c | Later | P2 | P1 | Partitioned retrieval for NPC, world, journal, and scene context | Blocked | T62b, T60b, T13 | Retrieval fixture check + `docker compose run --rm --no-deps app npm test` |
-| T16 | Later | P2 | P1 | Director spec format and versioning | Ready | T06, T58a | Schema validation check |
-| T17 | Later | P2 | P1 | Director enforcement in turn pipeline | Blocked | T16, T58b | Integration test |
-| T18 | Later | P2 | P2 | Director reload endpoint | Blocked | T16 | Manual reload verification |
-| T43 | Later | P2 | P1 | Budget config file and API contract | Blocked | D01, T07a, T09, T13a, T63a | `npm test` + manual budget API round-trip |
+| T16 | Next | P2 | P1 | Director spec format and versioning | Ready | T06, T58a | Schema validation check |
+| T17 | Later | P2 | P1 | Director enforcement in turn pipeline | Review | T16, T58b | Integration test |
+| T18 | Later | P2 | P2 | Director reload endpoint | Review | T16 | Manual reload verification |
+| T43 | Next | P2 | P1 | Budget config file and API contract | Ready | D01, T07a, T09, T13a, T63a | `npm test` + manual budget API round-trip |
 | T44 | Later | P2 | P2 | Budget controls UI | Blocked | T11, T43 | Manual budget UI round-trip |
 | T46 | Later | P2 | P1 | Save schema compatibility rules and migration fixture | Ready | T06, T09, T29, T59b | Save migration fixture run |
 | T30 | Later | P2 | P2 | Save import and export | Ready | T29 | Import/export compatibility check |
@@ -270,7 +270,7 @@ No global blocker as of 2026-03-09:
 | T36 | Later | P3 | P1 | Windows launcher playtest bundle | Ready | T35a, T12c, T29, T36b | Launcher bundle verification |
 | T38 | Later | P3 | P1 | Launcher installer packaging | Blocked | T36 | Installer smoke test |
 | T19 | Later | P4 | P1 | Quest schema and validation | Blocked | T16 | Schema validation check |
-| T20 | Later | P4 | P1 | Quest state transitions | Blocked | T19, T58b | `npm test` |
+| T20 | Later | P4 | P1 | Quest state transitions | Review | T19, T58b | `npm test` |
 | T21 | Later | P4 | P2 | Quest editor UI | Blocked | T19 | Manual editor smoke test |
 | T22 | Later | P4 | P2 | World state inspector UI | Blocked | T20 | Manual diff view check |
 | T23 | Later | P4 | P2 | Quest import and export | Blocked | T19 | Import or export smoke test |
@@ -1217,8 +1217,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T60b - Class-Aware Retrieval And Summarization Policy
 
-- Status: Blocked
-- Queue: Later
+- Status: Ready
+- Queue: Next
 - Phase: P2
 - Priority: P1
 - Owner Role: AI systems lead
@@ -1258,7 +1258,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - coordinate with budget work so any class-aware retrieval expansion is measurable rather than hand-waved
   - incorporate NPC-tier and partitioned-memory policy from `T62` so retrieval does not flatten transcript, NPC memory, world memory, player journal memory, and scene context into one ranking pool
   - align this policy with `T63a` so live context stays a small budgeted slice instead of becoming a second full-history prompt
-  - blocked on 2026-03-09 because `T13`, `T62b`, and `T63a` are not ready, so class-aware retrieval would be built on unstable memory and context dependencies
+  - moved to `Ready` on 2026-03-13 after `T13`, `T62b`, and `T63a` closed; the remaining work is now an implementation choice rather than a dependency blocker
+  - the smallest safe starting point is to replace the current flat `getRelevantMemories()` fallback and `createLiveTurnContext()` string bucketing with class-aware selectors that can keep canon and quest facts hot without re-admitting transcript-style recall by accident
 
 ### T61 - Compact Turn Schema Boundary
 
@@ -1765,6 +1766,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - if tooling only reports total token count with no per-bucket attribution, it is not enough for this issue
   - keep debug surfaces separate from canonical replay data; they explain context decisions but do not become new truth sources
   - prefer deterministic trace output so budget and replay fixtures can diff it safely
+  - partial groundwork already exists in `TurnExecutionTrace`, `LiveTurnContext`, and the `/api/turn` debug payload; the remaining gap is per-bucket token cost, excluded-entry reasons, and diffable retrieval traces rather than first-time trace plumbing
 
 ### T67 - Grounded DM Guide Recall Surface
 
@@ -2199,7 +2201,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T69c - Dual-AI Adversarial Walkthrough Matrix
 
-- Status: Blocked
+- Status: Ready
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -2229,7 +2231,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - each scenario maps to a replayable rerun command and a specific failure class the challenger is trying to catch
   - the matrix stays compact enough to remain a normal development tool rather than an occasional ceremony
 - Handoff Notes:
-  - blocked until both the walkthrough matrix base (`T68b`) and the launcher-side review bundle (`T69b`) exist
+  - moved to `Ready` on 2026-03-13 after both the walkthrough matrix base (`T68b`) and the launcher-side review bundle (`T69b`) closed
   - prefer a handful of high-signal scenarios over a broad unreadable matrix
 
 ### T70 - Clarification-Safe Turn Input Handling
@@ -3134,8 +3136,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T43 - Budget Config File And API Contract
 
-- Status: Blocked
-- Queue: Later
+- Status: Ready
+- Queue: Next
 - Phase: P2
 - Priority: P1
 - Owner Role: Tech lead
@@ -3179,11 +3181,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - keep this task focused on the budget contract and persistence boundary; budget editing in the browser belongs to `T44`
   - prefer a deterministic file format and validation path that automated fixture work can read without scraping UI text
   - align bucket-level memory budgets with `T63a` instead of hard-coding context slices in prompts or scripts
+  - moved to `Ready` on 2026-03-13 after `D01`, `T07a`, `T09`, `T13a`, and `T63a` all closed, so the remaining work is now a contained runtime-config implementation instead of a sequencing blocker
 
 ### T47 - LiteLLM Default Route Integration Fixtures
 
 - Status: Ready
-- Queue: Later
+- Queue: Next
 - Phase: P2
 - Priority: P1
 - Owner Role: AI systems lead
@@ -3217,6 +3220,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - roadmap and backlog currently require automated chat and embedding route coverage, but the active Phase 2 queue still relies on manual verification paths for `T07a` and `T13a`
   - start with a deterministic test or harness update before changing implementation, per the repo AI workflow policy
   - keep the fixture output keyed to `game-chat` and `game-embedding` so upstream model swaps behind LiteLLM do not invalidate the contract
+  - easy-win groundwork already exists in `scripts/validate-litellm-turn-route.ts` and `scripts/validate-litellm-embedding-route.ts`; the smallest completion path is to wrap those into one repeatable fixture command and add one explicit fallback-classification check instead of inventing a second route-smoke surface
 
 ### T44 - Budget Controls UI
 
@@ -3844,7 +3848,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T65 - Rust Script-Runtime Migration
 
-- Status: Review
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -3898,7 +3902,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - preserve current launcher and harness behavior where possible, but do not preserve shell syntax or `scripts/lib/*.ps1` as part of the long-term contract
   - `SunRay` is not a webview shell, not an installer, not a package manager, and not a rewrite of the app server
   - repo-wide blocking status was lifted on 2026-03-09 after the Rust command surface, harness path, validators, and browser smoke path all validated cleanly enough for unrelated backlog work to resume
-  - remaining closeout work is limited to shell-reference review in `T65f` and the Rust-native follow-up decomposition in `T66`
+  - closed on 2026-03-13 after `T65f` completed the active repo-surface audit: no `.ps1` files remain in the workspace, `SunRay` command metadata no longer carries legacy script-path fields, and supported docs now point only at the Rust launcher surface
+  - residual PowerShell search hits are limited to historical backlog audit notes plus manual Windows setup docs, not live launcher automation
 
 ### T65a - SunRay Workspace And Command Contract
 
@@ -4104,7 +4109,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T65f - Shell Reference Cleanup And Script Deletion
 
-- Status: Review
+- Status: Done
 - Queue: Now
 - Phase: P1
 - Priority: P1
@@ -4112,12 +4117,19 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Goal: Remove shell-script references from the supported tooling path once `SunRay` has parity and update repo-visible launcher copy to the new contract.
 - Scope:
   - update `package.json`, README guidance, backlog validation text used by still-open tasks, and any remaining launcher-copy references in `src/server/` or `src/ui/`
+  - remove active PowerShell-era wording from supported launcher metadata, repo operator docs, and agent prompt assets that still describe shell wrappers as the current path
   - remove obsolete `.ps1` entrypoints and `scripts/lib/*.ps1` after the Rust replacements are validated
   - update test fixtures that currently assert PowerShell launcher strings so they point at the Rust command surface
   - leave historical closeout notes intact where they are part of completed-task audit history, but stop using them as active guidance
 - Files to Touch:
   - BACKLOG.md
+  - AGENTS.md
+  - ARCHITECTURE.md
+  - ENGINEERING_STANDARDS.md
   - README.md
+  - ROADMAP.md
+  - TOOLS.md
+  - .github/
   - package.json
   - launcher/
   - scripts/
@@ -4145,7 +4157,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - this is the cleanup gate that actually retires the legacy `.ps1` surface; do not remove those files before parity work is validated
   - closeout work on 2026-03-09 removed the obsolete root-level launcher stub files under `launcher/`, switched the supported launcher copy in `src/server/` plus `src/ui/` to `cargo run --manifest-path launcher/Cargo.toml -- start-dev`, and updated the active launcher docs to point at `SunRay`
   - `cargo test --manifest-path launcher/Cargo.toml`, `docker compose run --rm --no-deps app npm run type-check`, focused UI or setup tests, and `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` all passed on 2026-03-09
-  - keep this task in `Review` until `T65e` gets its final interactive desktop-prototype recheck
+  - closed on 2026-03-13 after a repo-wide audit confirmed there are still no `.ps1` files in the workspace, `launcher/src/config.rs` dropped the last legacy script-path metadata, and the active repo guidance was rewritten to describe `SunRay` as the only supported automation surface
+  - validation on 2026-03-13 ran `cargo test --manifest-path launcher/Cargo.toml` and a final inventory sweep showing remaining PowerShell search hits only in `BACKLOG.md`, `BACKLOG_ARCHIVE.md`, `LiteLLM_install.md`, and `setup_local_a.i.md`
 
 ### T66 - SunRay Rust-native cleanup
 
@@ -4800,7 +4813,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 ### T16 - Director Spec Format And Versioning
 
 - Status: Ready
-- Queue: Later
+- Queue: Next
 - Phase: P2
 - Priority: P1
 - Owner Role: Gameplay systems lead
@@ -4830,10 +4843,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - `D02` was locked to JSON on 2026-03-08 to match the existing runtime path, tooling, and requirements references to `data/spec/director.json`
+  - partial groundwork already exists: `validateDirectorSpec()` now enforces structural director-spec validation, and the server already exposes `/api/director/spec` plus `/api/director/reload`
+  - the remaining gap is explicit spec-version ownership and startup-validation parity, because the current load path still trusts raw JSON structure more than a versioned authored contract
 
 ### T17 - Director Enforcement In Turn Pipeline
 
-- Status: Blocked
+- Status: Review
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -4864,10 +4879,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - coordinate with `T20` so quest progress and director framing read the same accepted outcome data
+  - moved to `Review` on 2026-03-13 after backlog audit found the runtime work already routes through `src/state/adjudication.ts`, where simulation-owned accepted consequences resolve before `applyDirectorRules()` updates pacing state
+  - focused coverage already exists in `src/state/adjudication.test.ts` for off-path success, stage-skipping rejection, and director progress handling; remaining closeout is to sync the card against the eventual versioned spec work in `T16` and any pacing-semantic refinement in `T58c`
 
 ### T18 - Director Reload Endpoint
 
-- Status: Blocked
+- Status: Review
 - Queue: Later
 - Phase: P2
 - Priority: P2
@@ -4896,6 +4913,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - keep this task about reload mechanics, not director editing UX
+  - moved to `Review` on 2026-03-13 after backlog audit found `/api/director/reload` already exists, reuses `validateDirectorSpec()`, and rejects invalid reloads without mutating the cached spec
+  - remaining closeout is startup-validation parity and explicit versioned-contract coverage from `T16`, because startup still loads `data/spec/director.json` via raw parse before reload-time validation runs
 
 ### T19 - Quest Schema And Validation
 
@@ -4928,10 +4947,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - keep this task focused on schema and validation; state transitions belong to `T20`
+  - partial groundwork already exists: `validateQuestSpec()` enforces structural quest validation, and the server already exposes `/api/quests/spec` plus `/api/quests/reload`
+  - the remaining gap is an explicit versioned authored contract and startup-validation parity, so later content tooling is not built on unversioned JSON conventions alone
 
 ### T20 - Quest State Transitions
 
-- Status: Blocked
+- Status: Review
 - Queue: Later
 - Phase: P4
 - Priority: P1
@@ -4961,6 +4982,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - coordinate with `T17` so director framing and quest progression do not duplicate authority
+  - moved to `Review` on 2026-03-13 after backlog audit found server-owned quest progression already runs through `resolveSimulationStateUpdates()` and `resolveQuestUpdates()` instead of trusting model-authored quest prose
+  - focused coverage already exists in `src/state/adjudication.test.ts` and `src/story/quest.test.ts`; remaining closeout is to land the explicit versioned quest-spec contract in `T19` and then rerun the card as an intentional end-to-end validation pass
 
 ### T21 - Quest Editor UI
 

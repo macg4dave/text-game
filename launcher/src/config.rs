@@ -15,39 +15,33 @@ pub enum SunrayCommand {
 pub struct CommandContract {
     pub name: &'static str,
     pub summary: &'static str,
-    pub legacy_script: &'static str,
     pub backlog_task: &'static str,
 }
 
 pub const COMMAND_CONTRACTS: [CommandContract; 5] = [
 	CommandContract {
 		name: "start-dev",
-		summary: "Launcher and Docker preflight entrypoint replacing scripts/start-dev.ps1.",
-		legacy_script: "scripts/start-dev.ps1",
+		summary: "Supported launcher and Docker preflight entrypoint.",
 		backlog_task: "T65b",
 	},
 	CommandContract {
 		name: "test-local-ai-workflow",
-		summary: "Local AI workflow harness replacing scripts/test-local-ai-workflow.ps1.",
-		legacy_script: "scripts/test-local-ai-workflow.ps1",
+		summary: "Local AI workflow harness.",
 		backlog_task: "T65c",
 	},
 	CommandContract {
 		name: "test-setup-browser-smoke",
-		summary: "Setup browser smoke harness replacing scripts/test-setup-browser-smoke.ps1.",
-		legacy_script: "scripts/test-setup-browser-smoke.ps1",
+		summary: "Setup browser smoke harness.",
 		backlog_task: "T65e",
 	},
 	CommandContract {
 		name: "validate-local-gpu-profile-matrix",
-		summary: "Local GPU matrix validator replacing scripts/validate-local-gpu-profile-matrix.ps1.",
-		legacy_script: "scripts/validate-local-gpu-profile-matrix.ps1",
+		summary: "Local GPU matrix validator.",
 		backlog_task: "T65d",
 	},
 	CommandContract {
 		name: "validate-litellm-default-config",
-		summary: "LiteLLM default-config validator replacing scripts/validate-litellm-default-config.ps1.",
-		legacy_script: "scripts/validate-litellm-default-config.ps1",
+		summary: "LiteLLM default-config validator.",
 		backlog_task: "T65d",
 	},
 ];
@@ -351,19 +345,19 @@ mod tests {
     };
 
     #[test]
-    fn command_contracts_keep_unique_names_and_scripts() {
+    fn command_contracts_keep_unique_names_and_non_empty_backlog_tasks() {
         let contracts = command_contracts();
         let names = contracts
             .iter()
             .map(|contract| contract.name)
             .collect::<BTreeSet<_>>();
-        let scripts = contracts
-            .iter()
-            .map(|contract| contract.legacy_script)
-            .collect::<BTreeSet<_>>();
 
         assert_eq!(contracts.len(), names.len());
-        assert_eq!(contracts.len(), scripts.len());
+        assert!(
+            contracts
+                .iter()
+                .all(|contract| contract.backlog_task.starts_with('T'))
+        );
     }
 
     #[test]

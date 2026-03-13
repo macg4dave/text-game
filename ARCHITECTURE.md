@@ -171,10 +171,10 @@ Current build/run contract:
 ## Script Structure Guidance
 
 - Automation lives in `launcher/` as the Rust executable `SunRay`, rooted at `launcher/Cargo.toml`.
-- New automation entrypoints should be Rust subcommands, not `.ps1`, `.sh`, or `.bat` files.
+- New automation entrypoints should be Rust subcommands, not shell-script wrappers or batch files.
 - Shared automation behavior should live in Rust modules inside that tooling runtime, with JSON or fixture assets beside it as needed.
 - Rust automation may invoke Docker, npm, Node, browser-launch helpers, and other existing tools as external processes, but this does not change the app runtime boundary.
-- Existing PowerShell entrypoints are no longer part of the supported runtime surface and should not be revived.
+- Existing legacy launcher entrypoints are no longer part of the supported runtime surface and should not be revived.
 - Keep launcher fixtures, validation assets, and shared automation helpers inside `launcher/` so the Rust tooling runtime owns its full support surface.
 
 ## Launcher Boundary
