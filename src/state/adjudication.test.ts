@@ -202,3 +202,165 @@ test("adjudicateTurnOutput keeps authored progression flags sticky so later obje
     }
   ]);
 });
+
+test("adjudicateTurnOutput accepts off-beat travel from quest prerequisites instead of current beat order alone", () => {
+  const player: Player = {
+    ...createPlayer(),
+    location: "Lantern Walk",
+    flags: ["beacon_inspected", "nila_guidance"],
+    quests: [
+      {
+        id: "ghostlight_relay",
+        status: "active",
+        summary: "Recover the tuning fork from the Closed Stacks"
+      }
+    ],
+    director_state: {
+      ...createPlayer().director_state,
+      current_beat_id: "beat-1",
+      current_beat_label: "Confirm the relay is real"
+    }
+  };
+
+  const turnOutput: TurnOutputPayload = {
+    schema_version: "turn-output/v1",
+    narrative: "You push past the crowd and head straight for the Closed Stacks.",
+    player_options: ["Search for the tuning fork"],
+    state_updates: {
+      location: "Closed Stacks",
+      inventory_add: ["tuning_fork"],
+      inventory_remove: [],
+      flags_add: ["tuning_fork_taken"],
+      flags_remove: [],
+      quests: []
+    },
+    director_updates: {
+      end_goal_progress: "Next step: Carry the tuning fork across Stormglass Causeway."
+    },
+    memory_updates: ["The player reached the Closed Stacks and secured the tuning fork."]
+  };
+
+  const adjudicated = adjudicateTurnOutput({
+    player,
+    turnOutput,
+    directorSpec: createDirectorSpec(),
+    questSpec: {
+      quests: [
+        {
+          id: "ghostlight_relay",
+          title: "Quiet the Ghostlight Relay",
+          stages: [
+            {
+              id: "stage-1",
+              label: "Inspect the sparking market beacon in Rooftop Market",
+              unlock_flags: ["beacon_inspected"]
+            },
+            {
+              id: "stage-2",
+              label: "Ask Nila Vale where the relay draws power",
+              required_flags: ["beacon_inspected"],
+              unlock_flags: ["nila_guidance"]
+            },
+            {
+              id: "stage-3",
+              label: "Recover the tuning fork from the Closed Stacks",
+              required_flags: ["nila_guidance"],
+              unlock_flags: ["tuning_fork_taken"]
+            },
+            {
+              id: "stage-4",
+              label: "Carry the tuning fork through Stormglass Causeway",
+              required_flags: ["tuning_fork_taken"],
+              unlock_flags: ["causeway_crossed"]
+            }
+          ]
+        }
+      ]
+    }
+  });
+
+  assert.deepEqual(adjudicated.acceptedConsequences.state_updates, {
+    location: "Closed Stacks",
+    inventory_add: ["tuning_fork"],
+    inventory_remove: [],
+    flags_add: ["tuning_fork_taken"],
+    flags_remove: [],
+    quests: [
+      {
+        id: "ghostlight_relay",
+        status: "active",
+        summary: "Carry the tuning fork through Stormglass Causeway"
+      }
+    ]
+  });
+});
+
+test("adjudicateTurnOutput rejects stage-skipping travel and progression when the authored prerequisites are missing", () => {
+  const player = createPlayer();
+  const turnOutput: TurnOutputPayload = {
+    schema_version: "turn-output/v1",
+    narrative: "You somehow appear inside the Relay Vault and throw the final switch.",
+    player_options: ["Retune the relay"],
+    state_updates: {
+      location: "Relay Vault",
+      inventory_add: [],
+      inventory_remove: [],
+      flags_add: ["vault_opened"],
+      flags_remove: [],
+      quests: []
+    },
+    director_updates: {
+      end_goal_progress: "The relay route is solved already."
+    },
+    memory_updates: ["The player was suddenly in the Relay Vault."]
+  };
+
+  const adjudicated = adjudicateTurnOutput({
+    player,
+    turnOutput,
+    directorSpec: createDirectorSpec(),
+    questSpec: {
+      quests: [
+        {
+          id: "ghostlight_relay",
+          title: "Quiet the Ghostlight Relay",
+          stages: [
+            {
+              id: "stage-1",
+              label: "Inspect the sparking market beacon in Rooftop Market",
+              unlock_flags: ["beacon_inspected"]
+            },
+            {
+              id: "stage-2",
+              label: "Ask Nila Vale where the relay draws power",
+              required_flags: ["beacon_inspected"],
+              unlock_flags: ["nila_guidance"]
+            },
+            {
+              id: "stage-3",
+              label: "Recover the tuning fork from the Closed Stacks",
+              required_flags: ["nila_guidance"],
+              unlock_flags: ["tuning_fork_taken"]
+            },
+            {
+              id: "stage-4",
+              label: "Carry the tuning fork through Stormglass Causeway",
+              required_flags: ["tuning_fork_taken"],
+              unlock_flags: ["causeway_crossed"]
+            },
+            {
+              id: "stage-5",
+              label: "Use the tuning fork to open the Relay Vault",
+              required_flags: ["causeway_crossed"],
+              unlock_flags: ["vault_opened"]
+            }
+          ]
+        }
+      ]
+    }
+  });
+
+  assert.equal(adjudicated.acceptedConsequences.state_updates, null);
+  assert.equal(adjudicated.acceptedConsequences.director_updates, null);
+  assert.deepEqual(adjudicated.acceptedConsequences.memory_updates, []);
+});

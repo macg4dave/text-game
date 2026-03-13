@@ -9,7 +9,7 @@ import type {
   TurnOutputPayload
 } from "../core/types.js";
 import { applyDirectorRules } from "../story/director.js";
-import { resolveQuestUpdates } from "../story/quest.js";
+import { resolveSimulationStateUpdates } from "./simulation.js";
 
 const MAX_ADMITTED_MEMORY_UPDATES = 8;
 
@@ -117,50 +117,11 @@ function adjudicateStateUpdates(
   proposed: TurnOutputPayload["state_updates"],
   questSpec: QuestSpec
 ): StateUpdateProposal {
-  const proposedInventoryAdd = uniqueStrings(proposed.inventory_add);
-  const proposedInventoryRemove = uniqueStrings(proposed.inventory_remove);
-  const proposedFlagsAdd = uniqueStrings(proposed.flags_add);
-  const proposedFlagsRemove = uniqueStrings(proposed.flags_remove);
-  const protectedQuestFlags = collectQuestProgressionFlags(questSpec);
-
-  const acceptedInventoryAdd = proposedInventoryAdd.filter(
-    (item) => !player.inventory.includes(item) && !proposedInventoryRemove.includes(item)
-  );
-  const acceptedInventoryRemove = proposedInventoryRemove.filter(
-    (item) => player.inventory.includes(item) && !acceptedInventoryAdd.includes(item)
-  );
-  const acceptedFlagsAdd = proposedFlagsAdd.filter(
-    (item) => !player.flags.includes(item) && !proposedFlagsRemove.includes(item)
-  );
-  const acceptedFlagsRemove = proposedFlagsRemove.filter(
-    (item) => player.flags.includes(item) && !acceptedFlagsAdd.includes(item) && !protectedQuestFlags.has(item)
-  );
-  const nextFlags = applyAcceptedFlags(player, {
-    location: proposed.location,
-    inventory_add: acceptedInventoryAdd,
-    inventory_remove: acceptedInventoryRemove,
-    flags_add: acceptedFlagsAdd,
-    flags_remove: acceptedFlagsRemove,
-    quests: []
+  return resolveSimulationStateUpdates({
+    player,
+    proposed,
+    questSpec
   });
-  const resolvedQuestSnapshot = resolveQuestUpdates({
-    questSpec,
-    existingQuests: player.quests,
-    flags: nextFlags
-  });
-  const acceptedQuestUpdates = resolvedQuestSnapshot.filter((quest) => {
-    const existing = player.quests.find((item) => item.id === quest.id);
-    return !existing || existing.status !== quest.status || existing.summary !== quest.summary;
-  });
-
-  return {
-    location: proposed.location,
-    inventory_add: acceptedInventoryAdd,
-    inventory_remove: acceptedInventoryRemove,
-    flags_add: acceptedFlagsAdd,
-    flags_remove: acceptedFlagsRemove,
-    quests: acceptedQuestUpdates
-  };
 }
 
 function applyAcceptedFlags(player: Player, stateUpdates: StateUpdateProposal): string[] {
@@ -239,23 +200,6 @@ function uniqueStrings(values: string[]): string[] {
   }
 
   return unique;
-}
-
-function collectQuestProgressionFlags(questSpec: QuestSpec): Set<string> {
-  const flags = new Set<string>();
-
-  for (const quest of questSpec.quests) {
-    for (const stage of quest.stages) {
-      for (const flag of stage.required_flags ?? []) {
-        flags.add(flag);
-      }
-      for (const flag of stage.unlock_flags ?? []) {
-        flags.add(flag);
-      }
-    }
-  }
-
-  return flags;
 }
 
 function directorStatesEqual(left: DirectorState, right: DirectorState): boolean {

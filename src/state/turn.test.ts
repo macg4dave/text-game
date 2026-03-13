@@ -89,6 +89,73 @@ function createQuestSpec(): QuestSpec {
   };
 }
 
+function createStorySampleDirectorSpec(): DirectorSpec {
+  return {
+    end_goal: "Quiet the Ghostlight Relay before it empties the district.",
+    acts: [
+      {
+        id: "act-1",
+        name: "Market Rumors",
+        beats: [
+          {
+            id: "beat-1",
+            label: "Confirm the relay is real",
+            unlock_flags: ["beacon_inspected"]
+          },
+          {
+            id: "beat-2",
+            label: "Find the way into the relay route",
+            required_flags: ["beacon_inspected"],
+            unlock_flags: ["nila_guidance"]
+          }
+        ]
+      }
+    ]
+  };
+}
+
+function createStorySampleQuestSpec(): QuestSpec {
+  return {
+    quests: [
+      {
+        id: "ghostlight_relay",
+        title: "Quiet the Ghostlight Relay",
+        stages: [
+          {
+            id: "stage-1",
+            label: "Inspect the sparking market beacon in Rooftop Market",
+            unlock_flags: ["beacon_inspected"]
+          },
+          {
+            id: "stage-2",
+            label: "Ask Nila Vale where the relay draws power",
+            required_flags: ["beacon_inspected"],
+            unlock_flags: ["nila_guidance"]
+          },
+          {
+            id: "stage-3",
+            label: "Recover the tuning fork from the Closed Stacks",
+            required_flags: ["nila_guidance"],
+            unlock_flags: ["tuning_fork_taken"]
+          },
+          {
+            id: "stage-4",
+            label: "Carry the tuning fork through Stormglass Causeway",
+            required_flags: ["tuning_fork_taken"],
+            unlock_flags: ["causeway_crossed"]
+          },
+          {
+            id: "stage-5",
+            label: "Use the tuning fork to open the Relay Vault",
+            required_flags: ["causeway_crossed"],
+            unlock_flags: ["vault_opened"]
+          }
+        ]
+      }
+    ]
+  };
+}
+
 test("system prompt frames model-emitted consequences as proposals instead of committed truth", () => {
   assert.match(SYSTEM_PROMPT, /propos/i);
   assert.match(SYSTEM_PROMPT, /do not present .* committed/i);
@@ -759,6 +826,221 @@ test("turn service persists only adjudicated state changes when proposals includ
   assert.equal(storedMemories[0]?.content, "The player reached the bridge.");
   assert.equal(committedEvents[0]?.supplemental?.presentation?.narrative, outcome.turnOutput.narrative);
   assert.deepEqual(committedEvents[0]?.supplemental?.proposal_presentation?.player_options, ["Study the tower lights"]);
+});
+
+test("turn service accepts authored off-beat travel from quest prerequisites even when the director beat is stale", async () => {
+  const player: Player = {
+    id: "player-ghostlight",
+    name: "Avery",
+    created_at: "2026-03-13T00:00:00.000Z",
+    location: "Lantern Walk",
+    summary: "Nila already pointed you toward the Closed Stacks.",
+    inventory: [],
+    flags: ["beacon_inspected", "nila_guidance"],
+    quests: [
+      {
+        id: "ghostlight_relay",
+        status: "active",
+        summary: "Recover the tuning fork from the Closed Stacks"
+      }
+    ],
+    director_state: {
+      end_goal: "Quiet the Ghostlight Relay before it empties the district.",
+      current_act_id: "act-1",
+      current_act: "Market Rumors",
+      current_beat_id: "beat-1",
+      current_beat_label: "Confirm the relay is real",
+      story_beats_remaining: 4,
+      end_goal_progress: "No one has proved the relay is more than panic.",
+      completed_beats: []
+    }
+  };
+
+  const persistedPlayers: Player[] = [];
+
+  const service = createTurnService({
+    addCommittedTurnEvent() {},
+    addEvent() {},
+    addMemories() {},
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "You push past the panic and head straight into the Closed Stacks.",
+        player_options: ["Search for the tuning fork"],
+        state_updates: {
+          location: "Closed Stacks",
+          inventory_add: ["tuning_fork"],
+          inventory_remove: [],
+          flags_add: ["tuning_fork_taken"],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "Next step: Carry the tuning fork through Stormglass Causeway."
+        },
+        memory_updates: ["The player reached the Closed Stacks and secured the tuning fork."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "head for the Closed Stacks before anyone stops you",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected the off-beat but authored move to persist");
+  }
+
+  assert.equal(persistedPlayer.location, "Closed Stacks");
+  assert.deepEqual(persistedPlayer.flags, ["beacon_inspected", "nila_guidance", "tuning_fork_taken"]);
+  assert.deepEqual(persistedPlayer.inventory, ["tuning_fork"]);
+  assert.deepEqual(persistedPlayer.quests, [
+    {
+      id: "ghostlight_relay",
+      status: "active",
+      summary: "Carry the tuning fork through Stormglass Causeway"
+    }
+  ]);
+});
+
+test("turn service rejects stage-skipping travel and progression before director framing can treat it as truth", async () => {
+  const player: Player = {
+    id: "player-ghostlight",
+    name: "Avery",
+    created_at: "2026-03-13T00:00:00.000Z",
+    location: "Rooftop Market",
+    summary: "The relay keeps barking fake evacuation orders.",
+    inventory: [],
+    flags: [],
+    quests: [
+      {
+        id: "ghostlight_relay",
+        status: "active",
+        summary: "Inspect the sparking market beacon in Rooftop Market"
+      }
+    ],
+    director_state: {
+      end_goal: "Quiet the Ghostlight Relay before it empties the district.",
+      current_act_id: "act-1",
+      current_act: "Market Rumors",
+      current_beat_id: "beat-1",
+      current_beat_label: "Confirm the relay is real",
+      story_beats_remaining: 4,
+      end_goal_progress: "No one has proved the relay is more than panic.",
+      completed_beats: []
+    }
+  };
+
+  const committedEvents: CanonicalTurnEventPayload[] = [];
+  const persistedPlayers: Player[] = [];
+
+  const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent);
+      }
+    },
+    addEvent() {},
+    addMemories() {},
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "You somehow appear inside the Relay Vault and wrench the final switch.",
+        player_options: ["Retune the relay"],
+        state_updates: {
+          location: "Relay Vault",
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: ["vault_opened"],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "The relay route is solved already."
+        },
+        memory_updates: ["The player was suddenly in the Relay Vault."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings() {
+      return [];
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const outcome = await service.executeTurn({
+    player,
+    input: "skip straight into the Relay Vault",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected the adjudicated player state to persist");
+  }
+
+  assert.equal(persistedPlayer.location, "Rooftop Market");
+  assert.deepEqual(persistedPlayer.flags, []);
+  assert.equal(persistedPlayer.director_state.end_goal_progress, player.director_state.end_goal_progress);
+  assert.equal(
+    outcome.turnOutput.narrative,
+    "You pause in Rooftop Market and take stock. The clearest lead is still to confirm the relay is real."
+  );
+  assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
+  assert.equal(committedEvents[0]?.committed.state_updates, null);
+  assert.equal(committedEvents[0]?.committed.director_updates, null);
+  assert.deepEqual(committedEvents[0]?.committed.memory_updates, []);
 });
 
 test("turn service returns a 500 outcome when model execution throws unexpectedly", async () => {

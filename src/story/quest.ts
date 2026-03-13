@@ -1,11 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { QuestDefinition, QuestSpec, QuestUpdate } from "../core/types.js";
+import type { QuestDefinition, QuestSpec, QuestStage, QuestUpdate } from "../core/types.js";
 import { requirementsMet } from "./director.js";
 
 const QUEST_PATH = path.resolve(process.cwd(), "data", "spec", "quests.json");
 
 let cachedQuests: QuestSpec | null = null;
+
+export interface QuestStageUnlockRule {
+  quest_id: string;
+  stage_id: string;
+  label: string;
+  required_flags: string[];
+  unlock_flag: string;
+  location_hint: string | null;
+}
 
 export function loadQuestSpec(): QuestSpec {
   if (cachedQuests) return cachedQuests;
@@ -48,6 +57,62 @@ export function resolveQuestUpdates({
   }
 
   return resolved;
+}
+
+export function collectQuestStageUnlockRules(questSpec: QuestSpec): Map<string, QuestStageUnlockRule> {
+  const rules = new Map<string, QuestStageUnlockRule>();
+
+  for (const quest of questSpec.quests) {
+    for (const stage of quest.stages) {
+      for (const unlockFlag of stage.unlock_flags ?? []) {
+        rules.set(unlockFlag, {
+          quest_id: quest.id,
+          stage_id: stage.id,
+          label: stage.label,
+          required_flags: [...(stage.required_flags ?? [])],
+          unlock_flag: unlockFlag,
+          location_hint: inferQuestStageLocation(stage)
+        });
+      }
+    }
+  }
+
+  return rules;
+}
+
+export function listReachableQuestLocations(questSpec: QuestSpec, flags: string[]): string[] {
+  const locations = new Set<string>();
+
+  for (const quest of questSpec.quests) {
+    for (const stage of quest.stages) {
+      const locationHint = inferQuestStageLocation(stage);
+      if (!locationHint || !requirementsMet(stage.required_flags, flags)) {
+        continue;
+      }
+
+      locations.add(locationHint);
+    }
+  }
+
+  return Array.from(locations);
+}
+
+export function inferQuestStageLocation(stage: Pick<QuestStage, "label">): string | null {
+  const label = stage.label.trim();
+  const prepositionMatch = label.match(
+    /\b(?:in|from|through|across|at)\s+(?:the\s+)?([A-Z][A-Za-z0-9'’-]*(?:\s+[A-Z][A-Za-z0-9'’-]*)*)/
+  );
+
+  if (prepositionMatch?.[1]) {
+    return prepositionMatch[1].trim();
+  }
+
+  const openMatch = label.match(/\bopen\s+(?:the\s+)?([A-Z][A-Za-z0-9'’-]*(?:\s+[A-Z][A-Za-z0-9'’-]*)*)/i);
+  if (openMatch?.[1]) {
+    return openMatch[1].trim();
+  }
+
+  return null;
 }
 
 function resolveQuestUpdate(

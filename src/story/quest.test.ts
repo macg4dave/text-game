@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { QuestSpec, QuestUpdate } from "../core/types.js";
-import { resolveQuestUpdates } from "./quest.js";
+import {
+  inferQuestStageLocation,
+  listReachableQuestLocations,
+  resolveQuestUpdates
+} from "./quest.js";
 
 function createQuestSpec(): QuestSpec {
   return {
@@ -123,4 +127,33 @@ test("resolveQuestUpdates supports the compromise ending as a server-committed c
       }
     ]
   );
+});
+
+test("inferQuestStageLocation extracts authored location hints from quest-stage labels", () => {
+  assert.equal(
+    inferQuestStageLocation({ label: "Recover the tuning fork from the Closed Stacks" }),
+    "Closed Stacks"
+  );
+  assert.equal(
+    inferQuestStageLocation({ label: "Carry the tuning fork through Stormglass Causeway" }),
+    "Stormglass Causeway"
+  );
+  assert.equal(
+    inferQuestStageLocation({ label: "Use the tuning fork to open the Relay Vault" }),
+    "Relay Vault"
+  );
+  assert.equal(inferQuestStageLocation({ label: "Ask Nila Vale where the relay draws power" }), null);
+});
+
+test("listReachableQuestLocations follows authored prerequisites instead of current beat order", () => {
+  assert.deepEqual(listReachableQuestLocations(createQuestSpec(), []), ["Rooftop Market"]);
+  assert.deepEqual(listReachableQuestLocations(createQuestSpec(), ["beacon_inspected"]), ["Rooftop Market"]);
+  assert.deepEqual(listReachableQuestLocations(createQuestSpec(), ["beacon_inspected", "nila_guidance"]), [
+    "Rooftop Market",
+    "Stormglass Causeway"
+  ]);
+  assert.deepEqual(listReachableQuestLocations(createQuestSpec(), ["beacon_inspected", "nila_guidance", "causeway_crossed"]), [
+    "Rooftop Market",
+    "Stormglass Causeway"
+  ]);
 });

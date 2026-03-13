@@ -216,7 +216,7 @@ No global blocker as of 2026-03-09:
 | T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Done | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Done | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T59c | Next | P1 | P1 | Canonical player-creation replay bootstrap | Done | T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
-| T58b | Later | P2 | P1 | Simulation-first consequence resolution | Ready | T58a, T57b, T07, T08 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
+| T58b | Later | P2 | P1 | Simulation-first consequence resolution | Done | T58a, T57b, T07, T08 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T58c | Later | P2 | P1 | Director framing and beat pacing policy | Blocked | T16, T58b | Schema validation check + integration test + replay fixture execution |
 | T51 | Next | P1 | P1 | Database storage and migration boundary split | Done | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
 | T52 | Next | P1 | P1 | Validator contract module split | Done | T06, T12c, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
@@ -843,7 +843,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T58b - Simulation-First Consequence Resolution
 
-- Status: Ready
+- Status: Done
 - Queue: Later
 - Phase: P2
 - Priority: P1
@@ -882,6 +882,11 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - do not collapse this into a beat helper; the point is to prevent `required_flags` and `unlock_flags` from becoming hidden railway points
   - keep simulation resolution deterministic enough for replay and fixture work
   - coordinate with `T20` so future quest transitions follow the same accepted-outcome contract
+  - completed on 2026-03-13 by extracting `src/state/simulation.ts` so adjudication now resolves travel and progression against authored quest prerequisites before director pacing runs
+  - `src/story/quest.ts` now exposes authored stage-location helpers used to infer reachable locations and to tie quest unlock flags such as `tuning_fork_taken` or `vault_opened` to server-known stage context instead of raw beat order
+  - the simulation layer intentionally falls back to the proposed location when a quest spec offers no authored location hints, preserving older compact fixtures while still rejecting stage-skipping jumps in authored content like `story_sample`
+  - focused deterministic coverage now proves both sides of the boundary: off-beat but authored travel to `Closed Stacks` succeeds from quest prerequisites even with a stale beat, while jumping straight to `Relay Vault` without `causeway_crossed` is rejected before director framing or memory admission
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/state/adjudication.test.ts src/story/quest.test.ts`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts`, and `docker compose run --rm --no-deps app npm test`
 
 ### T58c - Director Framing And Beat Pacing Policy
 
