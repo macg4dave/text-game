@@ -1,58 +1,56 @@
 {
-  "end_goal": "Uncover the source of the Eclipse Signal and shut it down.",
+  "end_goal": "Stop the Ghostlight Relay from emptying the district with false evacuation orders.",
   "acts": [
     {
       "id": "act_1",
-      "name": "Act I - The Signal Emerges",
+      "name": "Act I - Market Panic",
       "beats": [
         {
           "id": "a1_b1",
-          "label": "First proof the signal is real",
+          "label": "Inspect the sparking market beacon",
           "required_flags": [],
-          "unlock_flags": ["signal_confirmed"]
+          "unlock_flags": ["beacon_inspected"]
         },
         {
           "id": "a1_b2",
-          "label": "Find a lead on the signal source",
-          "required_flags": ["signal_confirmed"],
-          "unlock_flags": ["lead_found"]
+          "label": "Get route intel from Nila Vale",
+          "required_flags": ["beacon_inspected"],
+          "unlock_flags": ["nila_guidance"]
         },
         {
           "id": "a1_b3",
-          "label": "Reach the lead location",
-          "required_flags": ["lead_found"],
-          "unlock_flags": ["lead_location_reached"]
+          "label": "Secure the tuning fork in the Closed Stacks",
+          "required_flags": ["nila_guidance"],
+          "unlock_flags": ["tuning_fork_taken"]
         }
       ]
     },
     {
       "id": "act_2",
-      "name": "Act II - The Source Revealed",
+      "name": "Act II - The Relay Run",
       "beats": [
         {
           "id": "a2_b1",
-          "label": "Discover the signal generator",
-          "required_flags": ["lead_location_reached"],
-          "unlock_flags": ["generator_found"]
+          "label": "Cross Stormglass Causeway",
+          "required_flags": ["tuning_fork_taken"],
+          "unlock_flags": ["causeway_crossed"]
         },
         {
           "id": "a2_b2",
-          "label": "Gain access to the generator core",
-          "required_flags": ["generator_found"],
-          "unlock_flags": ["core_access"]
+          "label": "Open the Relay Vault",
+          "required_flags": ["causeway_crossed"],
+          "unlock_flags": ["vault_opened"]
         },
         {
           "id": "a2_b3",
-          "label": "Disable the signal",
-          "required_flags": ["core_access"],
-          "unlock_flags": ["signal_disabled"]
+          "label": "Choose the relay's fate",
+          "required_flags": ["vault_opened"],
+          "unlock_flags": ["relay_disabled", "relay_retuned"]
         }
       ]
     }
   ],
   "rules": {
-    "beats_per_act": 3,
-    "min_beats_before_act_change": 2,
     "max_beats_per_turn": 1
   }
 }

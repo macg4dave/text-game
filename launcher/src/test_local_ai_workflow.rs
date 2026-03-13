@@ -1,9 +1,10 @@
 use std::fs;
 use std::path::Path;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
+use clap::ValueEnum;
 use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -18,6 +19,49 @@ use crate::process::ProcessInvocation;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestLocalAiWorkflowOptions {
     pub selection_only: bool,
+    pub persona: Option<TestPlayerPersonaChoice>,
+    pub persona_seed: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum TestPlayerPersonaChoice {
+    CuriousExplorer,
+    CautiousSurvivor,
+    EmpatheticTalker,
+    PracticalFixer,
+}
+
+impl TestPlayerPersonaChoice {
+    fn display_name(self) -> &'static str {
+        match self {
+            Self::CuriousExplorer => "curious explorer",
+            Self::CautiousSurvivor => "cautious survivor",
+            Self::EmpatheticTalker => "empathetic talker",
+            Self::PracticalFixer => "practical fixer",
+        }
+    }
+
+    fn guidance(self) -> &'static str {
+        match self {
+            Self::CuriousExplorer => "inspects odd details first",
+            Self::CautiousSurvivor => "avoids risk unless pushed",
+            Self::EmpatheticTalker => "prefers NPC dialogue before item use",
+            Self::PracticalFixer => "uses tools and direct problem-solving",
+        }
+    }
+}
+
+const TEST_PLAYER_PERSONAS: [TestPlayerPersonaChoice; 4] = [
+    TestPlayerPersonaChoice::CuriousExplorer,
+    TestPlayerPersonaChoice::CautiousSurvivor,
+    TestPlayerPersonaChoice::EmpatheticTalker,
+    TestPlayerPersonaChoice::PracticalFixer,
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TestPlayerPersonaSelection {
+    persona: TestPlayerPersonaChoice,
+    source: &'static str,
 }
 
 #[derive(Debug, Default)]
@@ -112,9 +156,18 @@ pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
         report.fail(format!("Turn schema guardrail test failed: {error}"));
     }
 
+    let persona_selection = resolve_test_player_persona_selection(&options)?;
+
     if options.selection_only {
         return report.finish();
     }
+
+    println!(
+        "Test-player persona: {} ({}) via {}.",
+        persona_selection.persona.display_name(),
+        persona_selection.persona.guidance(),
+        persona_selection.source,
+    );
 
     if config.base_url.trim().is_empty() {
         report.fail("This harness needs a reachable AI base URL from the current provider config.");
@@ -139,7 +192,7 @@ pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
         report.fail(format!("Structured scene test failed: {error}"));
     }
 
-    if let Err(error) = test_game_turn_schema(&client, &config, &mut report) {
+    if let Err(error) = test_game_turn_schema(&client, &config, persona_selection.persona, &mut report) {
         report.fail(format!("Full game_turn test failed: {error}"));
     }
 
@@ -150,7 +203,8 @@ fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport
     let matrix_path = local_gpu_profile_matrix_path(repo_root);
     let matrix = load_local_gpu_profile_matrix(&matrix_path)?;
 
-    let auto_small = resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(10.0));
+    let auto_small =
+        resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(10.0));
     report.assert_equal("autoSmall.status", auto_small.status.as_str(), "selected");
     report.assert_equal(
         "autoSmall.profileId",
@@ -163,7 +217,8 @@ fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport
         "detected-vram",
     );
 
-    let auto_large = resolve_local_gpu_profile_selection(&matrix, "local-gpu-large", None, None, Some(12.0));
+    let auto_large =
+        resolve_local_gpu_profile_selection(&matrix, "local-gpu-large", None, None, Some(12.0));
     report.assert_equal("autoLarge.status", auto_large.status.as_str(), "selected");
     report.assert_equal(
         "autoLarge.profileId",
@@ -183,7 +238,11 @@ fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport
         None,
         Some(8.0),
     );
-    report.assert_equal("manualProfile.status", manual_profile.status.as_str(), "selected");
+    report.assert_equal(
+        "manualProfile.status",
+        manual_profile.status.as_str(),
+        "selected",
+    );
     report.assert_equal(
         "manualProfile.profileId",
         manual_profile.profile_id.as_deref().unwrap_or(""),
@@ -195,7 +254,8 @@ fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport
         "manual-profile",
     );
 
-    let manual_vram = resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, Some(21.0), None);
+    let manual_vram =
+        resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, Some(21.0), None);
     report.assert_equal("manualVram.status", manual_vram.status.as_str(), "selected");
     report.assert_equal(
         "manualVram.profileId",
@@ -208,7 +268,8 @@ fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport
         "manual-vram",
     );
 
-    let unsupported = resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(6.0));
+    let unsupported =
+        resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(6.0));
     report.assert_equal(
         "unsupported.status",
         unsupported.status.as_str(),
@@ -226,7 +287,11 @@ fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport
     );
 
     let unknown = resolve_local_gpu_profile_selection(&matrix, "local-gpu-large", None, None, None);
-    report.assert_equal("unknown.status", unknown.status.as_str(), "manual-selection-required");
+    report.assert_equal(
+        "unknown.status",
+        unknown.status.as_str(),
+        "manual-selection-required",
+    );
     report.assert_equal(
         "unknown.selectionSource",
         unknown.selection_source.as_str(),
@@ -265,7 +330,11 @@ fn test_turn_schema_guardrails(repo_root: &Path, report: &mut HarnessReport) -> 
     Ok(())
 }
 
-fn test_embeddings(client: &Client, config: &RepoAiConfig, report: &mut HarnessReport) -> Result<()> {
+fn test_embeddings(
+    client: &Client,
+    config: &RepoAiConfig,
+    report: &mut HarnessReport,
+) -> Result<()> {
     let response = invoke_api_json(
         client,
         &format!("{}/embeddings", config.base_url),
@@ -287,14 +356,22 @@ fn test_embeddings(client: &Client, config: &RepoAiConfig, report: &mut HarnessR
         .unwrap_or(0);
 
     if length == 0 {
-        return Err(anyhow!("Embeddings response did not include an embedding vector."));
+        return Err(anyhow!(
+            "Embeddings response did not include an embedding vector."
+        ));
     }
 
-    report.pass(format!("Embeddings endpoint returned a vector of length {length}."));
+    report.pass(format!(
+        "Embeddings endpoint returned a vector of length {length}."
+    ));
     Ok(())
 }
 
-fn test_scene_schema(client: &Client, config: &RepoAiConfig, report: &mut HarnessReport) -> Result<()> {
+fn test_scene_schema(
+    client: &Client,
+    config: &RepoAiConfig,
+    report: &mut HarnessReport,
+) -> Result<()> {
     let response = invoke_api_json(
         client,
         &format!("{}/chat/completions", config.base_url),
@@ -340,10 +417,17 @@ fn test_scene_schema(client: &Client, config: &RepoAiConfig, report: &mut Harnes
     Ok(())
 }
 
-fn test_game_turn_schema(client: &Client, config: &RepoAiConfig, report: &mut HarnessReport) -> Result<()> {
+fn test_game_turn_schema(
+    client: &Client,
+    config: &RepoAiConfig,
+    persona: TestPlayerPersonaChoice,
+    report: &mut HarnessReport,
+) -> Result<()> {
     let state_pack_json = r#"{"player":{"id":"test-player","name":"Wanderer","location":"Rooftop Market","inventory":[],"flags":[],"quests":[]},"summary":"","director":{"end_goal_progress":"Just beginning."},"director_spec":{"end_goal":"Recover the moon shard.","current_beat":{"id":"beat_1","label":"Hear the rumor"},"rules":["Keep the story moving."]},"quest_spec":{"quests":[]}}"#;
     let prompt = format!(
-        "STATE_PACK\n{state_pack_json}\n\nSHORT_HISTORY\nPLAYER: look around\n\nMEMORIES\n\nPLAYER_INPUT\nlook around"
+        "TEST_PLAYER_PERSONA\nname: {}\nguidance: {}\n\nSTATE_PACK\n{state_pack_json}\n\nSHORT_HISTORY\nPLAYER: look around\n\nMEMORIES\n\nPLAYER_INPUT\nlook around",
+        persona.display_name(),
+        persona.guidance(),
     );
 
     let response = invoke_api_json(
@@ -441,7 +525,9 @@ fn test_game_turn_schema(client: &Client, config: &RepoAiConfig, report: &mut Ha
         .unwrap_or_default()
         .is_empty()
     {
-        return Err(anyhow!("Game turn response did not include state_updates.location."));
+        return Err(anyhow!(
+            "Game turn response did not include state_updates.location."
+        ));
     }
 
     if parsed
@@ -475,12 +561,41 @@ fn test_game_turn_schema(client: &Client, config: &RepoAiConfig, report: &mut Ha
     Ok(())
 }
 
+fn resolve_test_player_persona_selection(
+    options: &TestLocalAiWorkflowOptions,
+) -> Result<TestPlayerPersonaSelection> {
+    if let Some(persona) = options.persona {
+        return Ok(TestPlayerPersonaSelection {
+            persona,
+            source: "explicit persona override",
+        });
+    }
+
+    if let Some(seed) = options.persona_seed {
+        return Ok(TestPlayerPersonaSelection {
+            persona: select_test_player_persona_from_seed(seed as u128),
+            source: "seeded selection",
+        });
+    }
+
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| anyhow!("System clock is before UNIX epoch: {error}"))?
+        .as_nanos();
+
+    Ok(TestPlayerPersonaSelection {
+        persona: select_test_player_persona_from_seed(seed),
+        source: "runtime selection",
+    })
+}
+
+fn select_test_player_persona_from_seed(seed: u128) -> TestPlayerPersonaChoice {
+    let index = (seed % TEST_PLAYER_PERSONAS.len() as u128) as usize;
+    TEST_PLAYER_PERSONAS[index]
+}
+
 fn invoke_api_json(client: &Client, uri: &str, body: Value, api_key: &str) -> Result<Value> {
-    let response = client
-        .post(uri)
-        .bearer_auth(api_key)
-        .json(&body)
-        .send()?;
+    let response = client.post(uri).bearer_auth(api_key).json(&body).send()?;
     let status = response.status();
     let payload = response.text()?;
     if !status.is_success() {
@@ -510,7 +625,11 @@ fn readiness_probe_url(config: &RepoAiConfig) -> String {
     }
 }
 
-fn wait_for_http_ready(uri: &str, timeout: Duration, expected_content: Option<&str>) -> Result<bool> {
+fn wait_for_http_ready(
+    uri: &str,
+    timeout: Duration,
+    expected_content: Option<&str>,
+) -> Result<bool> {
     let client = Client::builder().timeout(Duration::from_secs(5)).build()?;
     let deadline = Instant::now() + timeout;
 
@@ -518,7 +637,10 @@ fn wait_for_http_ready(uri: &str, timeout: Duration, expected_content: Option<&s
         if let Ok(response) = client.get(uri).send() {
             if response.status().is_success() {
                 let body = response.text().unwrap_or_default();
-                if expected_content.map(|needle| body.contains(needle)).unwrap_or(true) {
+                if expected_content
+                    .map(|needle| body.contains(needle))
+                    .unwrap_or(true)
+                {
                     return Ok(true);
                 }
             }
@@ -550,7 +672,11 @@ fn resolve_local_gpu_profile_selection(
     detected_vram_gb: Option<f64>,
 ) -> LocalGpuSelectionResult {
     if let Some(profile_id) = manual_profile_id.filter(|value| !value.trim().is_empty()) {
-        if let Some(profile) = matrix.profiles.iter().find(|profile| profile.id == profile_id) {
+        if let Some(profile) = matrix
+            .profiles
+            .iter()
+            .find(|profile| profile.id == profile_id)
+        {
             return LocalGpuSelectionResult {
                 status: "selected".to_string(),
                 selection_source: "manual-profile".to_string(),
@@ -606,13 +732,22 @@ fn resolve_local_gpu_profile_selection(
 
 fn find_profile_for_vram(matrix: &LocalGpuProfileMatrix, vram_gb: f64) -> Option<&LocalGpuProfile> {
     matrix.profiles.iter().find(|profile| {
-        vram_gb >= profile.min_vram_gb && profile.max_vram_gb.map(|max| vram_gb <= max).unwrap_or(true)
+        vram_gb >= profile.min_vram_gb
+            && profile
+                .max_vram_gb
+                .map(|max| vram_gb <= max)
+                .unwrap_or(true)
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{find_profile_for_vram, resolve_local_gpu_profile_selection, LocalGpuProfile, LocalGpuProfileMatrix};
+    use super::{
+        find_profile_for_vram, resolve_local_gpu_profile_selection,
+        resolve_test_player_persona_selection, select_test_player_persona_from_seed,
+        LocalGpuProfile, LocalGpuProfileMatrix, TestLocalAiWorkflowOptions,
+        TestPlayerPersonaChoice, TEST_PLAYER_PERSONAS,
+    };
 
     fn sample_matrix() -> LocalGpuProfileMatrix {
         LocalGpuProfileMatrix {
@@ -639,7 +774,8 @@ mod tests {
     #[test]
     fn detected_vram_selects_matching_profile() {
         let matrix = sample_matrix();
-        let selection = resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(10.0));
+        let selection =
+            resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(10.0));
         assert_eq!(selection.status, "selected");
         assert_eq!(selection.selection_source, "detected-vram");
         assert_eq!(selection.profile_id.as_deref(), Some("local-gpu-8gb"));
@@ -662,7 +798,8 @@ mod tests {
     #[test]
     fn unsupported_detected_vram_requires_manual_selection() {
         let matrix = sample_matrix();
-        let selection = resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(6.0));
+        let selection =
+            resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(6.0));
         assert_eq!(selection.status, "manual-selection-required");
         assert_eq!(selection.selection_source, "unsupported-vram");
         assert_eq!(selection.profile_id, None);
@@ -673,5 +810,49 @@ mod tests {
         let matrix = sample_matrix();
         let profile = find_profile_for_vram(&matrix, 24.0).expect("top tier profile");
         assert_eq!(profile.id, "local-gpu-20gb-plus");
+    }
+
+    #[test]
+    fn test_player_persona_seed_cycles_through_all_supported_personas() {
+        let selected = (0_u128..TEST_PLAYER_PERSONAS.len() as u128)
+            .map(select_test_player_persona_from_seed)
+            .map(|persona| persona.display_name())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            selected,
+            vec![
+                "curious explorer",
+                "cautious survivor",
+                "empathetic talker",
+                "practical fixer",
+            ]
+        );
+    }
+
+    #[test]
+    fn explicit_persona_override_beats_seeded_selection() {
+        let selection = resolve_test_player_persona_selection(&TestLocalAiWorkflowOptions {
+            selection_only: false,
+            persona: Some(TestPlayerPersonaChoice::PracticalFixer),
+            persona_seed: Some(0),
+        })
+        .expect("persona selection");
+
+        assert_eq!(selection.persona, TestPlayerPersonaChoice::PracticalFixer);
+        assert_eq!(selection.source, "explicit persona override");
+    }
+
+    #[test]
+    fn seeded_persona_selection_is_repeatable() {
+        let selection = resolve_test_player_persona_selection(&TestLocalAiWorkflowOptions {
+            selection_only: false,
+            persona: None,
+            persona_seed: Some(2),
+        })
+        .expect("persona selection");
+
+        assert_eq!(selection.persona, TestPlayerPersonaChoice::EmpatheticTalker);
+        assert_eq!(selection.source, "seeded selection");
     }
 }

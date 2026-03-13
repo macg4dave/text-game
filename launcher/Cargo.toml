@@ -5,6 +5,10 @@ edition = "2021"
 authors = ["text-game contributors"]
 description = "SunRay: Rust launcher and automation harness for text-game."
 
+[[bin]]
+name = "SunRay"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"

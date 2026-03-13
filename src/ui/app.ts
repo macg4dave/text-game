@@ -27,6 +27,12 @@ import {
   renderSessionSummary as renderTurnSurfaceSummary,
   renderTurnOptions
 } from "./turn-surface.js";
+import {
+  dismissTutorial,
+  incrementTutorialTurns,
+  readTutorialProgress,
+  renderTutorialPanel as renderTutorialView
+} from "./tutorial-view.js";
 
 let activeFatalUiError: FatalUiErrorState | null = null;
 
@@ -67,6 +73,12 @@ function initializeApp(): void {
   const launchNewGameButtonEl = getElement<HTMLButtonElement>("launch-new-game");
   const launchResumeButtonEl = getElement<HTMLButtonElement>("launch-resume");
   const launchResumeNoteEl = getElement<HTMLElement>("launch-resume-note");
+  const tutorialPanelEl = getElement<HTMLElement>("tutorial-panel");
+  const tutorialTitleEl = getElement<HTMLElement>("tutorial-title");
+  const tutorialSummaryEl = getElement<HTMLElement>("tutorial-summary");
+  const tutorialListEl = getElement<HTMLElement>("tutorial-list");
+  const tutorialFooterEl = getElement<HTMLElement>("tutorial-footer");
+  const tutorialDismissButtonEl = getElement<HTMLButtonElement>("tutorial-dismiss");
   const actionFieldEl = getElement<HTMLElement>("action-field");
   const saveSlotsPanelEl = getElement<HTMLElement>("save-slots-panel");
   const saveSlotsSummaryEl = getElement<HTMLElement>("save-slots-summary");
@@ -92,11 +104,16 @@ function initializeApp(): void {
     playerName: getStoredPlayerName(localStorage),
     fatalError: activeFatalUiError
   });
+  let tutorialProgress = readTutorialProgress(localStorage);
 
   nameEl.value = state.playerName;
 
   function addEntry(label: string, text: string, tone = "neutral"): void {
     appendLogEntry(logEl, { label, text, tone });
+    if (label === "Narrator" && tone === "narrator") {
+      tutorialProgress = incrementTutorialTurns(localStorage, tutorialProgress);
+      syncView();
+    }
   }
 
   function clearLog(): void {
@@ -138,6 +155,26 @@ function initializeApp(): void {
         fatalBlocked: Boolean(state.fatalError || activeFatalUiError),
         hasSavedSession: hasSavedSession(state),
         setupStatus: state.setupStatus
+      }
+    );
+  }
+
+  function renderTutorialPanel(): void {
+    renderTutorialView(
+      {
+        panelEl: tutorialPanelEl,
+        titleEl: tutorialTitleEl,
+        summaryEl: tutorialSummaryEl,
+        listEl: tutorialListEl,
+        footerEl: tutorialFooterEl,
+        dismissButtonEl: tutorialDismissButtonEl
+      },
+      {
+        hasEnteredFlow: state.hasEnteredFlow,
+        hasPlayer: Boolean(state.player),
+        setupBlocked: getRuntimePreflight()?.status === "action-required",
+        hasSavedSession: hasSavedSession(state),
+        progress: tutorialProgress
       }
     );
   }
@@ -356,6 +393,7 @@ function initializeApp(): void {
   function syncView(): void {
     renderLaunchPanel();
     renderSetupWizard();
+    renderTutorialPanel();
     renderPlaySurface();
     renderSaveSlots();
     renderSessionSummary();
@@ -454,6 +492,11 @@ function initializeApp(): void {
       setStatus("Resume failed", "error");
       setPending(false);
     });
+  });
+
+  tutorialDismissButtonEl.addEventListener("click", () => {
+    tutorialProgress = dismissTutorial(localStorage, tutorialProgress);
+    syncView();
   });
 
   saveSlotCreateButtonEl.addEventListener("click", () => {

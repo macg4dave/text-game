@@ -128,6 +128,13 @@ Do not assume:
 - World memory, NPC memory, and player journal memory should remain separate retrieval domains even if they share lower-level storage primitives.
 - Context assembly should be budgeted by bucket and remain inspectable enough to explain which facts entered the model context, why they were selected, and what token cost they consumed.
 
+## Guide Query Surface
+
+- The optional DM-guide helper should be a read-only surface separate from `/api/turn` and separate from the lightweight `/api/assist` text helper.
+- It should answer recall- and orientation-style questions by querying committed state, admitted memory, summaries, and replay-derived recap data rather than by improvising from raw narrator prose.
+- Guide answers must carry explicit uncertainty when grounding is weak or absent, and they must never mutate authoritative state or silently admit new memory facts.
+- Presentation may use a warm DM persona, but grounding and authority rules outrank style.
+
 ## First Decisions To Keep
 
 - Node.js + TypeScript app source, with browser authoring code under `src/ui/app.ts` emitted to `public/app.js`

@@ -34,7 +34,7 @@ export function getInitialDirectorState(spec: DirectorSpec): DirectorState {
     current_beat_id: firstBeat.id,
     current_beat_label: firstBeat.label,
     story_beats_remaining: totalBeats(spec),
-    end_goal_progress: "The signal is only rumors so far.",
+    end_goal_progress: `Next step: ${firstBeat.label}.`,
     completed_beats: []
   };
 }

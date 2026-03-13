@@ -108,7 +108,7 @@ This file contains archived task cards removed from BACKLOG.md on 2026-03-08 aft
   - README now includes a cross-platform Node.js and npm install guide for Windows, macOS, and Linux
   - the launcher now checks Docker, probes the configured AI path, translates local host AI URLs to Docker-reachable URLs when needed, starts the app container, waits for readiness, and opens the browser
   - this task is now treated as the seed of the supported player launch path, not only a developer convenience script
-  - fixed a Docker-on-Windows bind-mount failure from the `G:` workspace by baking app source into the image and persisting only `game.db` through a named Docker volume
+  - fixed a Docker-on-Windows bind-mount failure by baking app source into the image and persisting only `game.db` through a named Docker volume
   - tightened launcher readiness so it now waits for container health and verifies the actual player surface instead of accepting any HTTP responder on port 3000
   - fixed a Windows port-release race after `docker compose down`; the launcher now waits briefly for Docker or WSL listeners to release the configured port before failing
   - the launcher now auto-selects a nearby free port for the current run when the configured host port is already occupied by another local service
@@ -162,7 +162,7 @@ This file contains archived task cards removed from BACKLOG.md on 2026-03-08 aft
   - validated on 2026-03-08 with `docker compose build app`, `docker compose run --rm app npm run type-check`, `docker compose run --rm app npm test`, and a focused `docker run --rm text-game-app sh -lc 'npm exec tsx -- --test src/config.test.ts'` check because the current Docker-shell `npm test` output still reports only the older test count even after the new test is present in the built image
   - refreshed emitted `public/app.js` from the rebuilt Docker image because local `npm` is not installed in this shell environment
   - final closeout validation on 2026-03-08 re-ran `docker compose run --rm app npm run type-check` and `docker compose run --rm app npm test` successfully from the main workspace
-  - final launcher validation on 2026-03-08 used a clean temp repo copy on `C:` so Docker bind-mount behavior from `G:` would not affect the result: with `AI_PROVIDER=openai-compatible` and no API key, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` started the app and `/api/state` returned a blocked preflight containing `missing_api_key`; with `AI_PROVIDER=litellm` and `LITELLM_PROXY_URL=http://127.0.0.1:4011`, the launcher failed before container startup with `Configured local AI endpoint did not respond`
+  - final launcher validation on 2026-03-08 used a clean temp repo copy to avoid workspace-specific Docker bind-mount behavior during the result check: with `AI_PROVIDER=openai-compatible` and no API key, `powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser` started the app and `/api/state` returned a blocked preflight containing `missing_api_key`; with `AI_PROVIDER=litellm` and `LITELLM_PROXY_URL=http://127.0.0.1:4011`, the launcher failed before container startup with `Configured local AI endpoint did not respond`
 
 ### T42 - Module-First Source And Script Layout
 
@@ -732,7 +732,7 @@ This file contains archived task cards removed from BACKLOG.md on 2026-03-08 aft
 - Handoff Notes:
   - user explicitly assigned implementation on 2026-03-08 after confirming a Docker-first default, easy developer overrides, and GPU passthrough support
   - treat NVIDIA on Docker Desktop and WSL2 as the first officially supported GPU path for the optional local inference override
-  - implemented a repo-owned LiteLLM sidecar image in `Dockerfile.litellm` so startup no longer depends on fragile single-file bind mounts from the `G:` workspace drive
+  - implemented a repo-owned LiteLLM sidecar image in `Dockerfile.litellm` so startup no longer depends on fragile single-file bind mounts from the workspace path
   - default `docker-compose.yml` now starts the app plus LiteLLM sidecar, and `docker-compose.gpu.yml` adds an optional Ollama backend with Docker GPU reservations
   - `scripts/start-dev.ps1` now supports `-AiStack hosted` and `-AiStack local-gpu`; both launcher modes force the supported LiteLLM stack instead of inheriting stale direct-provider `.env` experiments
   - validated on 2026-03-08 with `docker compose config`, `docker compose -f docker-compose.yml -f docker-compose.gpu.yml config`, `$env:PORT='3300'; docker compose up --build -d`, `Invoke-WebRequest http://127.0.0.1:3300/api/state?name=ComposeSmoke`, `$env:PORT='3301'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -NoBrowser`, `$env:PORT='3302'; docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build`, `Invoke-WebRequest http://127.0.0.1:3302/api/state?name=GpuSmoke`, and `$env:PORT='3303'; powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 -AiStack local-gpu -NoBrowser`

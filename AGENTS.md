@@ -29,10 +29,13 @@ Before starting substantial work, read:
 1. Read the assigned or selected task card.
 2. Confirm dependencies are satisfied.
 3. For AI-related work, start by adding or tightening a test, fixture, or scripted harness step that defines the expected behavior before changing implementation.
-4. Keep edits inside `Files to Touch` unless the task card is updated first.
-5. If TypeScript source changed, run `npm run type-check` in Docker before the listed validation commands.
-6. Update docs affected by the change.
-7. Move the task to `Review` or `Done`.
+4. For AI auto-tests run from VS Code, execute `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` before and after the change, and prefer a replayable live smoke command with `--persona-seed` or `--persona` when provider-visible behavior changed.
+5. If two VS Code AIs are available, use one as the builder and one as the challenger; the challenger must name a specific failure mode and one additional rerun command instead of just approving the change.
+6. Record the exact AI harness command used for validation in `BACKLOG.md` handoff notes when that run is part of the evidence for the change, including persona or seed details and builder versus challenger labeling when the dual-AI loop was used.
+7. Keep edits inside `Files to Touch` unless the task card is updated first.
+8. If TypeScript source changed, run `npm run type-check` in Docker before the listed validation commands.
+9. Update docs affected by the change.
+10. Move the task to `Review` or `Done`.
 
 ## Status Rules
 
@@ -72,6 +75,29 @@ Before starting substantial work, read:
 - Run `npm` and `node` commands in Docker for this project; do not execute them directly on the host.
 - Prefer deterministic behavior and small, verifiable edits.
 - Treat `src/**/*.ts` as the authoring surface, including browser code under `src/ui/`. `public/app.js` is emitted build output and should not be hand-edited unless a task explicitly requires validating generated assets.
+
+## Safety Limits
+
+- Do not attempt outbound remote access, remote shell access, or remote administration from this workspace unless the user explicitly asks for it.
+- This includes `ssh`, `scp`, `sftp`, remote `rsync`, `plink`, `pscp`, and PowerShell remoting commands such as `Enter-PSSession`, `New-PSSession`, or `Invoke-Command -ComputerName`.
+- Treat destructive or otherwise unsafe local shell commands as approval-gated by default. If the command is legitimately safe for this repo, prefer a narrow repo-level exception over broad allowlisting.
+- If remote access is genuinely needed, explain why and ask the user to run it themselves or explicitly relax the workspace hook first.
+
+## Build And Test
+
+- For TypeScript changes, run `docker compose run --rm --no-deps app npm run type-check` before the task-specific validation.
+- Run focused tests in Docker with `docker compose run --rm --no-deps app npx tsx --test <path-to-test-files>`.
+- Rebuild the browser asset with `docker compose run --rm --no-deps app npm run build:client` when `src/ui/**` changes.
+- Run the replay contract check with `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts` for replay-affecting changes.
+- Validate launcher or Rust changes with `cargo check --manifest-path launcher/Cargo.toml` and `cargo test --manifest-path launcher/Cargo.toml`, plus the relevant `cargo run --manifest-path launcher/Cargo.toml -- <subcommand>` path.
+- Use `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` for deterministic AI contract checks and `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` for the launch-screen setup smoke path when those surfaces are affected.
+- When live AI smoke is part of validation in VS Code, prefer `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona-seed <number>` or an explicit `--persona <...>` override so another agent can replay the same turn style.
+- When the optional dual-AI VS Code loop is used, the second AI should select one additional rerun command or replay check; do not treat a second assistant's approval as validation by itself.
+
+## Common Pitfalls
+
+- The Docker app image bakes in source code instead of bind-mounting it, so source changes usually require a rebuild before containerized validation reflects them.
+- `public/app.js` and `dist/**` are generated outputs. Edit `src/ui/app.ts` or other `src/**` files, then rebuild instead of patching emitted artifacts directly.
 
 ## Module Boundary Rules
 

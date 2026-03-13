@@ -13,6 +13,7 @@
     "sunray": "cargo run --manifest-path launcher/Cargo.toml --",
     "sunray:check": "cargo check --manifest-path launcher/Cargo.toml",
     "sunray:test": "cargo test --manifest-path launcher/Cargo.toml",
+    "sunray:build-release": "cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml",
     "sunray:start-dev": "cargo run --manifest-path launcher/Cargo.toml -- start-dev",
     "sunray:test-local-ai-workflow": "cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow",
     "sunray:test-setup-browser-smoke": "cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke",

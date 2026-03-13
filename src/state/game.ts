@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { getDb } from "../core/db.js";
 import { getInitialDirectorState, loadDirectorSpec } from "../story/director.js";
+import { loadQuestSpec, resolveQuestUpdates } from "../story/quest.js";
 import { AUTHORITATIVE_STATE_SCHEMA_VERSION } from "../core/types.js";
 import type {
   CanonicalEventPayload,
@@ -29,6 +30,12 @@ export function getOrCreatePlayer({ playerId, name }: { playerId?: string; name?
   const id = playerId || crypto.randomUUID();
   const now = new Date().toISOString();
   const directorSpec = loadDirectorSpec();
+  const questSpec = loadQuestSpec();
+  const initialQuests = resolveQuestUpdates({
+    questSpec,
+    existingQuests: [],
+    flags: []
+  });
   const newPlayer: PlayerRow = {
     id,
     name: name || "Wanderer",
@@ -38,7 +45,7 @@ export function getOrCreatePlayer({ playerId, name }: { playerId?: string; name?
     director_state: JSON.stringify(getInitialDirectorState(directorSpec)),
     inventory: JSON.stringify([]),
     flags: JSON.stringify([]),
-    quests: JSON.stringify([])
+    quests: JSON.stringify(initialQuests)
   };
 
   db.prepare(

@@ -143,8 +143,22 @@ The authoritative local-GPU profile matrix for manual larger-model tuning now li
 On Windows, the launcher wraps the same compiled Docker path and opens the browser for you:
 
 ```powershell
+cargo run --manifest-path launcher/Cargo.toml --
+```
+
+That no-argument launcher path now defaults to the same behavior as `start-dev`. You can still call the explicit subcommand if you want:
+
+```powershell
 cargo run --manifest-path launcher/Cargo.toml -- start-dev
 ```
+
+If you want a launcher binary you can hand to end users, build the Windows release executable:
+
+```powershell
+cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml
+```
+
+That produces `SunRay.exe` at [launcher/target/release/SunRay.exe](/g:/text-game/launcher/target/release/SunRay.exe).
 
 Launcher note as of 2026-03-09:
 
@@ -307,7 +321,7 @@ The launcher:
 - starts the default LiteLLM sidecar and GPU-backed Ollama service for the supported Docker path
 - blocks early if host NVIDIA tooling or the Docker NVIDIA runtime is missing
 - checks that the repo `data/` path is writable and warns or blocks early when disk headroom is too low
-- checks for a default browser handler before auto-opening the play surface unless you use `-NoBrowser`
+- checks for a default browser handler before auto-opening the play surface unless you use `start-dev --no-browser`
 - clears any previous `text-game` compose app container before starting the fresh app instance
 - automatically picks a free local port for that run if the configured port is already occupied by another service
 - starts the app and any required Compose dependencies through `docker compose`
@@ -321,8 +335,8 @@ Current disk-headroom policy for launcher and runtime preflight:
 
 Useful flags:
 
-- `-NoBrowser` skips opening the webpage
-- `-Rebuild` forces a Docker image rebuild before launch
+- `start-dev --no-browser` skips opening the webpage
+- `start-dev --rebuild` forces a Docker image rebuild before launch
 
 ## Script Layout
 
@@ -345,7 +359,9 @@ Current automation direction:
 
 When you add automation behavior, extend `launcher/SunRay` rather than adding another shell helper or wrapper.
 
-You can inspect the current Rust command surface with `cargo run --manifest-path launcher/Cargo.toml -- --help` or `npm run sunray -- --help`.
+You can inspect the current Rust command surface with `cargo run --manifest-path launcher/Cargo.toml -- --help` or `npm run sunray -- --help`. Running `SunRay` with no subcommand now starts the default launcher flow, so `SunRay.exe` and `cargo run --manifest-path launcher/Cargo.toml --` both target `start-dev` with default options. Command-specific launch flags now stay on `start-dev`, for example `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` or `npm run sunray:start-dev -- --no-browser`.
+
+For a release launcher artifact, use `cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml` or `npm run sunray:build-release`. The supported Windows binary path is [launcher/target/release/SunRay.exe](/g:/text-game/launcher/target/release/SunRay.exe).
 
 The current Rust launcher respects `PORT` from your shell session or `.env`. If that port is already taken by another local service, the launcher falls back to a nearby free port for that run and prints the chosen URL before opening the browser.
 
@@ -511,6 +527,7 @@ The browser UI includes:
 For a Windows-only local model setup, use [setup_local_a.i.md](/g:/text-game/setup_local_a.i.md).
 
 For local AI regression checks, use `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow`.
+You can force the live smoke into one test-player style with `--persona practical-fixer` or make persona choice repeatable with `--persona-seed 7`.
 
 For the launch-screen setup smoke harness, use `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke`.
 
@@ -675,12 +692,36 @@ Use a test-first loop as the default workflow for prompt, schema, adapter, retri
 
 1. Add or tighten a test, fixture, replay case, or harness assertion that captures the desired behavior.
 2. Run `npm run type-check` and that focused check first so the missing behavior or coverage gap is visible.
-3. Run `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow` before changing AI behavior when a compatible local provider is available. Use `--selection-only` when you only need the deterministic contract checks.
+3. Run `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow` before changing AI behavior when a compatible local provider is available. Use `--selection-only` when you only need the deterministic contract checks. For repeatable live AI smoke, you can add `--persona-seed <number>` or force one style with `--persona <curious-explorer|cautious-survivor|empathetic-talker|practical-fixer>`.
 4. Make the smallest change.
 5. Re-run `npm run type-check`, then re-run the focused check, then re-run the same local AI harness immediately after the change.
 6. Only move on to broader app testing after the type-check, focused check, and harness all pass.
 
 If `npm` is available on your machine, the same check is exposed as `npm run test:local-ai`.
+
+### VS Code AI auto-test usage
+
+When you are driving AI checks from VS Code, keep the loop boring and repeatable:
+
+- Run the TypeScript-side focused validation from a Docker-backed terminal when the task touches `src/**`.
+- Run the deterministic guardrail first: `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- If the task changes live model-visible behavior and a compatible local provider is available, run one replayable live smoke next:
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona-seed 7`
+  - or `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona practical-fixer`
+- Re-run the same deterministic command and the same seeded or explicit-persona command after the implementation change.
+- Record the exact harness command that passed in your backlog handoff notes so the next agent can replay it without guesswork.
+
+Use `--selection-only` when you are validating contract drift, schema boundaries, or other deterministic request-side checks. Use `--persona-seed` when you want human-ish but repeatable turn style during live smoke. Use `--persona` when the play style itself is part of the scenario you are validating.
+
+If you discover that one manual AI smoke run is no longer enough, add or update backlog work for a broader walkthrough suite instead of silently expanding the local ritual. Tiny process goblins love undocumented test steps.
+
+If you have two AI assistants open in VS Code, use them in different roles:
+
+- `Builder`: implements or proposes the change, states the expected contract, and names the focused tests plus the baseline harness commands already run.
+- `Challenger`: reviews the task, diff, and builder evidence as if the builder might be wrong, then picks one concrete failure mode and one additional rerun command.
+- Good challenger prompts are direct. Example: `Review this change as the challenger. Assume the builder may be wrong. From this diff and these passing commands, name the most likely regression and the one rerun command you want next.`
+- Do not treat two AI assistants agreeing with each other as a pass. The pass condition is still the rerunnable command output.
+- When you record the result in `BACKLOG.md`, note the exact command, whether it was deterministic or live smoke, the persona or seed if used, and whether the command came from the builder path or the challenger rerun.
 
 For canonical replay-contract checks, run:
 

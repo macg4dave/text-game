@@ -148,7 +148,7 @@ Exit gate:
 Owner: AI systems lead
 
 Outcome:
-- The launched game remembers prior context compactly and stays coherent across longer sessions.
+- The launched game remembers prior context compactly, stays coherent across longer sessions, and can answer grounded guide questions about what the player already knows.
 
 Entry gate:
 - Phase 1 exit gate met.
@@ -160,6 +160,7 @@ Exit gate:
 - Live model context is assembled from budgeted memory buckets rather than from one expanding prompt, and raw history remains cold unless explicitly retrieved.
 - Scene- and chapter-level summary artifacts are versioned so recap logic can be recomputed from canonical records when needed.
 - Context-entry accounting and retrieval traces make it possible to inspect what entered the turn context and why.
+- Players can ask an optional guide surface grounded questions about known places, NPCs, goals, and prior discoveries without spending a story turn or mutating state.
 - Director rules are loaded from versioned specs and can be reloaded without app reinstall.
 - Director enforcement runs server-side before authoritative state is committed.
 - Director enforcement frames accepted outcomes after simulation resolution instead of acting as the primary plausibility gate for player actions.
@@ -260,6 +261,7 @@ Exit gate:
 ### Next
 
 - Add memory retrieval and director control without increasing player-facing setup friction.
+- Add an optional DM-style guide for grounded recall and orientation once memory retrieval, partitioning, and summaries are stable.
 - Separate freeform intent interpretation, simulation resolution, and pacing before later director-spec and quest-progression work hardens the wrong gameplay boundary.
 - Keep the turn-output schema compact so later validator, memory, and director work extends server-owned logic instead of growing model contract complexity.
 - Add a deterministic schema-contract guardrail so later prompt or validator work fails loudly when it tries to smuggle gameplay design back into model fields.

@@ -162,6 +162,62 @@ test("session controller bootstrap loads setup and focuses the player name field
   assert.equal(focusedName, true);
 });
 
+test("session controller bootstrap invites resume when a browser session is already saved", async () => {
+  const state = createInitialAppState({
+    playerId: "player-saved",
+    playerName: "Avery",
+    fatalError: null
+  });
+  const statuses: string[] = [];
+
+  const controller = createSessionController({
+    state,
+    storage: windowlessStorage([["playerId", "player-saved"]]),
+    getActiveFatalUiError: () => null,
+    getPlayerNameInput: () => "Avery",
+    setPlayerNameInput() {},
+    getSaveSlotLabelInput: () => "",
+    setSaveSlotLabelInput() {},
+    getTurnInput: () => "",
+    setTurnInput() {},
+    rememberPlayerName() {
+      state.playerName = "Avery";
+    },
+    setStatus(text) {
+      statuses.push(text);
+    },
+    setPending(value) {
+      state.pending = value;
+    },
+    addEntry() {},
+    setAssist() {},
+    setOptions() {},
+    clearLog() {},
+    render() {},
+    focusInput() {},
+    focusName() {},
+    getRuntimePreflight: () => state.setupStatus?.preflight || null,
+    async fetchJson<T>(url: string, _options?: RequestInit): Promise<HttpJsonResult<T>> {
+      if (url === "/api/setup/status") {
+        return createJsonResult<T>(createSetupPayload() as T);
+      }
+
+      assert.equal(url, "/api/save-slots");
+      return createJsonResult<T>(({ slots: [] } as unknown) as T);
+    },
+    formatErrorMessage(data, fallback) {
+      if (Array.isArray(data?.detail)) {
+        return data.detail.join(", ");
+      }
+      return data?.detail || data?.error || fallback;
+    }
+  });
+
+  await controller.bootstrap();
+
+  assert.deepEqual(statuses, ["Checking supported setup", "Resume or start new"]);
+});
+
 test("session controller startGameFlow loads the player and adds the opening guide entry", async () => {
   const state = createInitialAppState({
     playerId: "player-old",
@@ -247,6 +303,130 @@ test("session controller startGameFlow loads the player and adds the opening gui
   assert.deepEqual(entries, ["Avery arrives in Rooftop Market. Try \"look around\" or any short action to begin."]);
   assert.equal(focusedInput, true);
   assert.deepEqual(pending, [true, true, false]);
+});
+
+test("session controller startGameFlow resumes the saved browser session with resume guidance", async () => {
+  const state = createInitialAppState({
+    playerId: "player-saved",
+    playerName: "Avery",
+    fatalError: null
+  });
+  state.setupStatus = createSetupPayload().setup;
+
+  const entries: string[] = [];
+  const requestedUrls: string[] = [];
+
+  const controller = createSessionController({
+    state,
+    storage: windowlessStorage([["playerId", "player-saved"]]),
+    getActiveFatalUiError: () => null,
+    getPlayerNameInput: () => "Avery",
+    setPlayerNameInput() {},
+    getSaveSlotLabelInput: () => "",
+    setSaveSlotLabelInput() {},
+    getTurnInput: () => "",
+    setTurnInput() {},
+    rememberPlayerName() {
+      state.playerName = "Avery";
+    },
+    setStatus() {},
+    setPending(value) {
+      state.pending = value;
+    },
+    addEntry(_label, text) {
+      entries.push(text);
+    },
+    setAssist() {},
+    setOptions() {},
+    clearLog() {},
+    render() {},
+    focusInput() {},
+    focusName() {},
+    getRuntimePreflight: () => state.setupStatus?.preflight || null,
+    async fetchJson<T>(url: string, _options?: RequestInit): Promise<HttpJsonResult<T>> {
+      requestedUrls.push(url);
+      assert.equal(url, "/api/state?playerId=player-saved&name=Avery");
+      return createJsonResult<T>(createStateResponse() as T);
+    },
+    formatErrorMessage(data, fallback) {
+      if (Array.isArray(data?.detail)) {
+        return data.detail.join(", ");
+      }
+      return data?.detail || data?.error || fallback;
+    }
+  });
+
+  await controller.startGameFlow("resume");
+
+  assert.equal(state.hasEnteredFlow, true);
+  assert.equal(state.playerId, "player-123");
+  assert.deepEqual(requestedUrls, ["/api/state?playerId=player-saved&name=Avery"]);
+  assert.deepEqual(entries, [
+    'Back in Rooftop Market. Continue where you left off or try "look around" to get your bearings.'
+  ]);
+});
+
+test("session controller startGameFlow keeps onboarding on the launch screen when setup is still blocked", async () => {
+  const state = createInitialAppState({
+    playerId: "player-saved",
+    playerName: "Avery",
+    fatalError: null
+  });
+  state.setupStatus = createSetupPayload("action-required").setup;
+
+  const entries: string[] = [];
+  const statuses: string[] = [];
+  const requestedUrls: string[] = [];
+
+  const controller = createSessionController({
+    state,
+    storage: windowlessStorage([["playerId", "player-saved"]]),
+    getActiveFatalUiError: () => null,
+    getPlayerNameInput: () => "Avery",
+    setPlayerNameInput() {},
+    getSaveSlotLabelInput: () => "",
+    setSaveSlotLabelInput() {},
+    getTurnInput: () => "",
+    setTurnInput() {},
+    rememberPlayerName() {
+      state.playerName = "Avery";
+    },
+    setStatus(text) {
+      statuses.push(text);
+    },
+    setPending(value) {
+      state.pending = value;
+    },
+    addEntry(_label, text) {
+      entries.push(text);
+    },
+    setAssist() {},
+    setOptions() {},
+    clearLog() {},
+    render() {},
+    focusInput() {},
+    focusName() {},
+    getRuntimePreflight: () => state.setupStatus?.preflight || null,
+    async fetchJson<T>(url: string, _options?: RequestInit): Promise<HttpJsonResult<T>> {
+      requestedUrls.push(url);
+      assert.equal(url, "/api/setup/status?refresh=1");
+      return createJsonResult<T>(createSetupPayload("action-required") as T);
+    },
+    formatErrorMessage(data, fallback) {
+      if (Array.isArray(data?.detail)) {
+        return data.detail.join(", ");
+      }
+      return data?.detail || data?.error || fallback;
+    }
+  });
+
+  await controller.startGameFlow("new");
+
+  assert.equal(state.hasEnteredFlow, false);
+  assert.equal(state.player, null);
+  assert.deepEqual(entries, []);
+  assert.deepEqual(requestedUrls, ["/api/setup/status?refresh=1"]);
+  assert.deepEqual(statuses, ["Starting new game", "Setup required"]);
 });
 
 test("session controller loadSaveSlot loads a named save and refreshes the live session", async () => {
@@ -374,3 +554,28 @@ test("session controller loadSaveSlot loads a named save and refreshes the live 
   assert.deepEqual(fetchUrls, ["/api/save-slots/load", "/api/state?playerId=player-loaded&name=Avery"]);
   assert.match(entries[0] || "", /Loaded \"Bridge Checkpoint\"/i);
 });
+
+function windowlessStorage(entries: Iterable<[string, string]> = []): Storage {
+  const storage = new Map<string, string>(entries);
+
+  return {
+    getItem(key) {
+      return storage.get(key) ?? null;
+    },
+    setItem(key, value) {
+      storage.set(key, value);
+    },
+    removeItem(key) {
+      storage.delete(key);
+    },
+    clear() {
+      storage.clear();
+    },
+    key() {
+      return null;
+    },
+    get length() {
+      return storage.size;
+    }
+  };
+}

@@ -163,6 +163,26 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 - Authority-boundary changes are not complete unless the test, fixture, or harness path proves at least one rejected model proposal does not leak into committed state, replay data, or player-facing narrative.
 - Compact-schema changes should keep a rerunnable deterministic guardrail path, such as a focused unit test plus the `launcher/SunRay` local AI workflow harness selection-only contract check, so request-side schema drift is caught without relying on provider behavior.
 
+### VS Code AI Auto-Test Usage Policy
+
+- In VS Code, treat `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` as the default deterministic gate for AI-facing work before and after implementation.
+- If the change affects prompt behavior, retrieval behavior, scene framing, or other provider-visible output and a compatible local provider is available, follow the deterministic gate with one live `test-local-ai-workflow` smoke run.
+- Prefer reproducible live smoke inputs in VS Code. Use `--persona-seed <number>` for repeatable coverage or `--persona <curious-explorer|cautious-survivor|empathetic-talker|practical-fixer>` when a specific play style is the thing under test.
+- Runtime-random persona selection is acceptable for exploratory local checks, but final validation and handoff notes should use a named persona or seed so another agent can replay the same path.
+- Record the exact AI harness command used for validation, including any persona or seed override, in `BACKLOG.md` handoff notes whenever that run is part of the evidence for the change.
+- Final AI validation evidence should record the exact command, whether it was deterministic or live smoke, the persona or seed if used, any named scenario id if available, and a short result summary.
+- When a broader AI walkthrough, multi-persona sweep, or longer scripted playtest is needed, capture it as backlog work instead of improvising an untracked one-off validation ritual in the editor.
+
+### VS Code Dual-AI Review Policy
+
+- If two AI assistants are available in VS Code, use them as `builder` and `challenger`, not as two generic approval sources.
+- The builder should state the intended contract, the focused tests already run, and the exact baseline harness commands before asking for a challenge review.
+- The challenger should review the task, diff, and validation evidence with the assumption that the builder may be wrong, then name at least one concrete failure mode and one additional rerun command.
+- Do not treat agreement between assistants as evidence. Only rerunnable tests, fixtures, replay checks, and harness commands count as validation.
+- If the challenger raises a credible regression risk, tighten or add a deterministic artifact before treating the change as complete whenever practical.
+- When this dual-AI loop is used, handoff notes should label which command or observation came from the builder path and which came from the challenger-selected rerun.
+- Keep the workflow tool-agnostic. The repo may automate harnesses and review bundles, but validation policy must not depend on undocumented VS Code extension APIs.
+
 ## Telemetry Contract
 
 Each `/api/turn` should record, at minimum:

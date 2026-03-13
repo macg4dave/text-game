@@ -23,7 +23,11 @@ impl ValidationReport {
     }
 
     fn require_string(&mut self, name: &str, value: Option<&str>) -> bool {
-        if value.map(str::trim).filter(|value| !value.is_empty()).is_some() {
+        if value
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_some()
+        {
             true
         } else {
             self.fail(format!("{name} must be a non-empty string."));
@@ -101,11 +105,12 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
         report.pass("Matrix version is 1.");
     }
 
-    let default_profile_id = if report.require_string("defaultProfileId", matrix.default_profile_id.as_deref()) {
-        matrix.default_profile_id.as_deref()
-    } else {
-        None
-    };
+    let default_profile_id =
+        if report.require_string("defaultProfileId", matrix.default_profile_id.as_deref()) {
+            matrix.default_profile_id.as_deref()
+        } else {
+            None
+        };
 
     if matrix.profiles.is_empty() {
         report.fail("profiles must contain at least one profile.");
@@ -118,7 +123,10 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
     for (index, profile) in matrix.profiles.iter().enumerate() {
         let path_prefix = format!("profiles[{index}]");
         let id_ok = report.require_string(&format!("{path_prefix}.id"), profile.id.as_deref());
-        report.require_string(&format!("{path_prefix}.displayName"), profile.display_name.as_deref());
+        report.require_string(
+            &format!("{path_prefix}.displayName"),
+            profile.display_name.as_deref(),
+        );
         report.require_string(
             &format!("{path_prefix}.recommendedChatModel"),
             profile.recommended_chat_model.as_deref(),
@@ -140,7 +148,9 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
         if status_ok {
             match profile.verification_status.as_deref().unwrap() {
                 "verified" | "heuristic" => {}
-                _ => report.fail(format!("{path_prefix}.verificationStatus must be verified or heuristic.")),
+                _ => report.fail(format!(
+                    "{path_prefix}.verificationStatus must be verified or heuristic."
+                )),
             }
         }
 
@@ -151,7 +161,9 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
 
         if let (Some(min), Some(max)) = (profile.min_vram_gb, profile.max_vram_gb) {
             if min > max {
-                report.fail(format!("{path_prefix}.maxVramGb must be greater than or equal to minVramGb."));
+                report.fail(format!(
+                    "{path_prefix}.maxVramGb must be greater than or equal to minVramGb."
+                ));
             }
         }
 
@@ -178,7 +190,9 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
                     route.alias_target.as_deref(),
                 );
             }
-            None => report.fail(format!("{path_prefix}.recommendedEmbeddingRoute must be an object.")),
+            None => report.fail(format!(
+                "{path_prefix}.recommendedEmbeddingRoute must be an object."
+            )),
         }
 
         if profile
@@ -188,7 +202,9 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
             .unwrap_or(false)
         {
         } else {
-            report.fail(format!("{path_prefix}.ollamaPullModels must be a non-empty array."));
+            report.fail(format!(
+                "{path_prefix}.ollamaPullModels must be a non-empty array."
+            ));
         }
 
         if profile
@@ -198,10 +214,17 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
             .unwrap_or(false)
         {
         } else {
-            report.fail(format!("{path_prefix}.skuExamples must be a non-empty array."));
+            report.fail(format!(
+                "{path_prefix}.skuExamples must be a non-empty array."
+            ));
         }
 
-        if profile.notes.as_ref().map(|values| !values.is_empty()).unwrap_or(false) {
+        if profile
+            .notes
+            .as_ref()
+            .map(|values| !values.is_empty())
+            .unwrap_or(false)
+        {
         } else {
             report.fail(format!("{path_prefix}.notes must be a non-empty array."));
         }
@@ -215,14 +238,23 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
     }
 
     if !matrix.profiles.is_empty() {
-        for profile in matrix.profiles.iter().take(matrix.profiles.len().saturating_sub(1)) {
+        for profile in matrix
+            .profiles
+            .iter()
+            .take(matrix.profiles.len().saturating_sub(1))
+        {
             if profile.max_vram_gb.is_none() {
                 report.fail("Only the last profile may use a null maxVramGb.");
                 break;
             }
         }
 
-        if matrix.profiles.last().and_then(|profile| profile.max_vram_gb).is_some() {
+        if matrix
+            .profiles
+            .last()
+            .and_then(|profile| profile.max_vram_gb)
+            .is_some()
+        {
             report.fail("The last profile must use a null maxVramGb for the open-ended top tier.");
         }
     }
@@ -265,7 +297,9 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
                 }
             }
         }
-        None => report.fail("litellm.local-gpu.config.yaml must declare '# active_profile_id: <profile-id>'."),
+        None => report.fail(
+            "litellm.local-gpu.config.yaml must declare '# active_profile_id: <profile-id>'.",
+        ),
     }
 
     if let Some(default_profile_id) = default_profile_id {
@@ -278,7 +312,10 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
                 &mut report,
                 &litellm_config_text,
                 "game-chat",
-                &["model: os.environ/LITELLM_LOCAL_GPU_CHAT_TARGET", "api_base: os.environ/LITELLM_LOCAL_GPU_CHAT_API_BASE"],
+                &[
+                    "model: os.environ/LITELLM_LOCAL_GPU_CHAT_TARGET",
+                    "api_base: os.environ/LITELLM_LOCAL_GPU_CHAT_API_BASE",
+                ],
             );
             expect_litellm_alias_target(
                 &mut report,
@@ -300,7 +337,10 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
                     "LITELLM_LOCAL_GPU_CHAT_TARGET".to_string(),
                     format!(
                         "ollama_chat/{}",
-                        default_profile.recommended_chat_model.as_deref().unwrap_or_default()
+                        default_profile
+                            .recommended_chat_model
+                            .as_deref()
+                            .unwrap_or_default()
                     ),
                 ),
                 (
@@ -309,7 +349,10 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
                 ),
             ]);
 
-            let route = default_profile.recommended_embedding_route.as_ref().unwrap();
+            let route = default_profile
+                .recommended_embedding_route
+                .as_ref()
+                .unwrap();
             if route.mode.as_deref() == Some("hosted") {
                 expected_defaults.insert(
                     "LITELLM_LOCAL_GPU_EMBEDDING_TARGET".to_string(),
@@ -366,7 +409,10 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
             if litellm_config_text.contains(&marker) {
                 report.pass(format!("LiteLLM config keeps marker '{}'.", marker));
             } else {
-                report.fail(format!("litellm.local-gpu.config.yaml is missing the marker '{}'.", marker));
+                report.fail(format!(
+                    "litellm.local-gpu.config.yaml is missing the marker '{}'.",
+                    marker
+                ));
             }
         }
     }
@@ -410,7 +456,10 @@ fn find_comment_value(text: &str, key: &str) -> Option<String> {
     let prefix = format!("# {key}:");
     text.lines()
         .map(str::trim)
-        .find_map(|line| line.strip_prefix(&prefix).map(|value| value.trim().to_string()))
+        .find_map(|line| {
+            line.strip_prefix(&prefix)
+                .map(|value| value.trim().to_string())
+        })
         .filter(|value| !value.is_empty())
 }
 
@@ -502,7 +551,10 @@ LITELLM_LOCAL_GPU_EMBEDDING_API_BASE: "${LITELLM_LOCAL_GPU_EMBEDDING_API_BASE:-}
     #[test]
     fn comment_value_parser_reads_active_profile() {
         let text = "# active_profile_id: local-gpu-8gb\n";
-        assert_eq!(find_comment_value(text, "active_profile_id").as_deref(), Some("local-gpu-8gb"));
+        assert_eq!(
+            find_comment_value(text, "active_profile_id").as_deref(),
+            Some("local-gpu-8gb")
+        );
     }
 
     #[test]

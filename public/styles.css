@@ -374,6 +374,59 @@ button {
   padding: 16px;
 }
 
+.tutorial-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  border-color: rgba(143, 61, 18, 0.18);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(248, 239, 228, 0.98) 100%);
+}
+
+.tutorial-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tutorial-header h3 {
+  margin: 2px 0 0;
+  font-size: 1.2rem;
+}
+
+.tutorial-header button {
+  padding: 8px 12px;
+}
+
+#tutorial-summary,
+.tutorial-footer,
+#tutorial-list p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+#tutorial-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+#tutorial-list li {
+  padding-left: 4px;
+}
+
+#tutorial-list strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--accent-strong);
+}
+
+.tutorial-footer {
+  font-size: 0.94rem;
+}
+
 .save-slots-panel {
   display: grid;
   gap: 14px;
@@ -841,8 +894,13 @@ button {
   }
 
   .save-slots-create-row button,
-  .save-slot-actions button {
+  .save-slot-actions button,
+  .tutorial-header button {
     width: 100%;
+  }
+
+  .tutorial-header {
+    flex-direction: column;
   }
 
   .log {

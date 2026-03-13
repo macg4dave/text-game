@@ -15,7 +15,15 @@ pub fn run() -> Result<()> {
 
     write_step("Running TypeScript type-check for the browser smoke harness");
     docker_compose(&repo_root)
-        .with_args(["run", "--rm", "--no-deps", "app", "npm", "run", "type-check"])
+        .with_args([
+            "run",
+            "--rm",
+            "--no-deps",
+            "app",
+            "npm",
+            "run",
+            "type-check",
+        ])
         .run_checked()?;
 
     write_step("Running the targeted setup browser smoke tests");
@@ -36,7 +44,15 @@ pub fn run() -> Result<()> {
 
     write_step("Rebuilding the browser bundle to confirm the current UI still compiles");
     docker_compose(&repo_root)
-        .with_args(["run", "--rm", "--no-deps", "app", "npm", "run", "build:client"])
+        .with_args([
+            "run",
+            "--rm",
+            "--no-deps",
+            "app",
+            "npm",
+            "run",
+            "build:client",
+        ])
         .run_checked()?;
 
     println!();
@@ -53,9 +69,15 @@ fn docker_compose(repo_root: &Path) -> ProcessInvocation {
         .with_args([
             "compose",
             "-f",
-            repo_root.join("docker-compose.yml").to_string_lossy().as_ref(),
+            repo_root
+                .join("docker-compose.yml")
+                .to_string_lossy()
+                .as_ref(),
             "-f",
-            repo_root.join("docker-compose.gpu.yml").to_string_lossy().as_ref(),
+            repo_root
+                .join("docker-compose.gpu.yml")
+                .to_string_lossy()
+                .as_ref(),
         ])
         .in_dir(repo_root)
 }

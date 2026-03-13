@@ -1,26 +1,43 @@
 {
   "quests": [
     {
-      "id": "signal_investigation",
-      "title": "Echoes of the Eclipse",
-      "summary": "Trace the origin of the Eclipse Signal.",
+      "id": "ghostlight_relay",
+      "title": "Quiet the Ghostlight Relay",
       "stages": [
         {
           "id": "q1_stage1",
-          "label": "Confirm the signal is real",
-          "unlock_flags": ["signal_confirmed"]
+          "label": "Inspect the sparking market beacon in Rooftop Market",
+          "unlock_flags": ["beacon_inspected"]
         },
         {
           "id": "q1_stage2",
-          "label": "Locate the source",
-          "required_flags": ["signal_confirmed"],
-          "unlock_flags": ["lead_found"]
+          "label": "Ask Nila Vale where the relay draws power",
+          "required_flags": ["beacon_inspected"],
+          "unlock_flags": ["nila_guidance"]
         },
         {
           "id": "q1_stage3",
-          "label": "Reach the source",
-          "required_flags": ["lead_found"],
-          "unlock_flags": ["lead_location_reached"]
+          "label": "Recover the tuning fork from the Closed Stacks",
+          "required_flags": ["nila_guidance"],
+          "unlock_flags": ["tuning_fork_taken"]
+        },
+        {
+          "id": "q1_stage4",
+          "label": "Carry the tuning fork across Stormglass Causeway",
+          "required_flags": ["tuning_fork_taken"],
+          "unlock_flags": ["causeway_crossed"]
+        },
+        {
+          "id": "q1_stage5",
+          "label": "Use the tuning fork to open the Relay Vault",
+          "required_flags": ["causeway_crossed"],
+          "unlock_flags": ["vault_opened"]
+        },
+        {
+          "id": "q1_stage6",
+          "label": "Choose whether to disable or retune the Ghostlight Relay",
+          "required_flags": ["vault_opened"],
+          "unlock_flags": ["relay_disabled", "relay_retuned"]
         }
       ]
     }

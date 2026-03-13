@@ -56,7 +56,12 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - NPC continuity must use a significance pipeline, not a raw chat-log replay. The system must distinguish transcript or event-log data, structured encounter facts, thresholded long-lived NPC memory, and short-lived scene context.
 - NPC memory persistence must be tiered and significance-gated. Stable identity such as names should be cheap to persist, while richer relationship or history recall should require cumulative importance and player re-engagement.
 - NPC memory, world memory, and player journal memory must remain separate stores or classes of recall, and durable canon must be stored as structured facts or summaries rather than as raw dialogue prose.
+- The player flow should provide an optional DM-guide surface for recall-oriented questions about known places, NPCs, goals, and previously discovered facts.
+- DM-guide answers must be grounded in committed state, admitted memory, summaries, or replay-derived recap data; when the system cannot support an answer confidently, it must say so plainly instead of inventing details.
+- DM-guide responses are advisory and read-only. They must not consume the normal story-turn path or mutate authoritative state, quest progress, director state, or durable memory.
 - Web UI with text log, turn input, session controls, suggestion chips, and a local debug panel.
+- The first session must include concise in-app guidance for the first few turns, covering freeform input, suggested options, save controls, and setup recovery without requiring the README.
+- First-session tutorial guidance must step aside after the player becomes familiar, either through a few successful turns or an explicit dismissal, while leaving save and repair actions visible.
 - The main player flow must expose named save slots so players can create, overwrite, inspect, and load checkpoints without browsing files or using a terminal.
 - Save-slot errors must use plain language that distinguishes missing, incompatible, or corrupted saves well enough for non-technical players to recover.
 - The setup flow must offer a small set of safe end-user profiles plus validated advanced overrides for developer-oriented configuration changes.
@@ -109,6 +114,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - `/api/turn` accepts a versioned turn-input payload, runs a story turn, and returns the versioned turn-output payload plus the versioned authoritative player state.
 - `/api/turn` must preserve the authority boundary: model-proposed consequences must remain distinguishable from committed truth, and player-facing narrative must not claim quest, world, or memory changes the server did not accept.
 - Replay fidelity must come from committed event semantics and authoritative state transitions; preserving exact narrator prose is secondary to preserving deterministic outcomes.
+- `/api/guide` accepts a player-authored recall or orientation question and returns a read-only grounded answer with enough certainty or source metadata for the UI to distinguish grounded recall from uncertainty.
 - `/api/assist` provides local text assistance.
 
 ## Configuration

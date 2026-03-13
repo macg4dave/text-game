@@ -6,6 +6,7 @@
 
 - `SunRay` is the supported automation surface for this repo.
 - `SunRay` is one binary with focused subcommands, not a pile of wrapper aliases.
+- Running `SunRay` with no subcommand now defaults to the `start-dev` launcher flow.
 - Launcher-owned assets and fixtures should live under `launcher/assets/`.
 - `SunRay` is not a webview shell.
 - `SunRay` is not an installer.
@@ -39,15 +40,23 @@
 
 Use Cargo directly:
 
+- `cargo run --manifest-path launcher/Cargo.toml --`
 - `cargo run --manifest-path launcher/Cargo.toml -- --help`
+- `cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml`
 - `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`
 - `cargo run --manifest-path launcher/Cargo.toml -- start-dev --rebuild`
+- `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona practical-fixer`
+- `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona-seed 7`
+
+Windows release builds from the supported command now produce `launcher/target/release/SunRay.exe`.
+Launching `SunRay.exe` directly now behaves like `SunRay.exe start-dev`.
 
 Or use the repo convenience scripts:
 
 - `npm run sunray -- --help`
 - `npm run sunray:check`
 - `npm run sunray:test`
+- `npm run sunray:build-release`
 - `npm run sunray:start-dev -- --no-browser`
 - `npm run sunray:test-setup-browser-smoke`
 - `npm run sunray:validate-local-gpu-profile-matrix`
@@ -55,3 +64,5 @@ Or use the repo convenience scripts:
 - `npm run sunray:start-desktop-prototype`
 
 `start-dev`, `test-local-ai-workflow`, `test-setup-browser-smoke`, `validate-local-gpu-profile-matrix`, `validate-litellm-default-config`, and `start-desktop-prototype` now run through Rust.
+
+The full `test-local-ai-workflow` smoke now picks one test-player persona before the live AI turn check starts. You can let it choose at runtime, force a specific persona with `--persona`, or make the choice repeatable with `--persona-seed`. The supported personas are `curious-explorer`, `cautious-survivor`, `empathetic-talker`, and `practical-fixer`.

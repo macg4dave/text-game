@@ -164,10 +164,11 @@ No global blocker as of 2026-03-09:
 | T65d | Now | P1 | P1 | SunRay validator command migration | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
 | T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Review | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
 | T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Review | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
-| T66 | Next | P1 | P2 | SunRay Rust-native cleanup | Ready | None | Manual planning-doc consistency review + child task validation |
-| T66a | Next | P1 | P2 | SunRay command contract cleanup | Ready | T66 | `cargo test --manifest-path launcher/Cargo.toml` + manual launcher-doc consistency review |
-| T66b | Next | P1 | P2 | SunRay start-dev orchestration split | Ready | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
+| T66 | Next | P1 | P2 | SunRay Rust-native cleanup | In Progress | None | Manual planning-doc consistency review + child task validation |
+| T66a | Now | P1 | P2 | SunRay command contract cleanup | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- --no-browser` + manual launcher-doc consistency review |
+| T66b | Next | P1 | P2 | SunRay start-dev orchestration split | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
 | T66c | Next | P1 | P2 | SunRay shared probe and smoke helper extraction | Ready | T66b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` |
+| T66d | Now | P1 | P2 | SunRay Windows exe release path | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml` + manual launcher-doc consistency review |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Done | T02 | `docker compose run --rm --no-deps app npm run test:config` + manual Docker Ollama smoke |
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
 | T02e | Now | P0 | P1 | AI test-first workflow policy | Done | T02d | Manual doc consistency review |
@@ -200,17 +201,17 @@ No global blocker as of 2026-03-09:
 | T61 | Now | P1 | P1 | Compact turn schema boundary | Done | T06, T57 | Manual planning-doc consistency review |
 | T61a | Now | P1 | P1 | Compact proposal schema and validator contract | Done | T06, T57 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/server/http-contract.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T61b | Next | P1 | P1 | Schema evolution guardrails and fixture policy | Done | T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts src/state/turn.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
-| T12 | Next | P1 | P1 | New game onboarding | In Progress | T06 | Manual new-game flow check |
+| T12 | Next | P1 | P1 | New game onboarding | Done | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/session-controller.test.ts src/ui/launch-view.test.ts src/ui/setup-view.test.ts src/ui/setup-browser-smoke.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` + local `/api/setup/status` and `/api/state` smoke |
 | T12b | Next | P1 | P1 | First-run setup wizard and connection test | Done | T02f, T11, T12 | Manual first-run flow check |
 | T11b | Next | P1 | P2 | Turn surface renderer extraction | Done | T11a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T12d | Next | P1 | P2 | First-run setup browser smoke harness | Done | T12b | Browser setup smoke path |
 | T12c | Next | P1 | P1 | Guided recovery actions and advanced setup details | Done | T12b, T01c, T02i, T04a, T02j | `docker compose build app` + `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/setup-status.test.ts src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + `docker compose run --rm --no-deps app npm test` |
 | T29 | Next | P1 | P1 | Save slots UI | Done | T08, T09 | Manual save/load check |
-| T34 | Next | P1 | P1 | Tutorial and first-run guidance | Blocked | T11, T12 | Manual onboarding smoke test |
+| T34 | Next | P1 | P1 | Tutorial and first-run guidance | Done | T11, T12 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/tutorial-view.test.ts` + `docker compose run --rm --no-deps app npm run build:client` + launcher-path onboarding smoke |
 | T64 | Now | P1 | P1 | MVP sample story arc definition and delivery slices | Done | None | Manual planning-doc consistency review |
 | T64a | Now | P1 | P1 | story_sample brief and acceptance criteria | Done | None | Manual planning-doc consistency review |
-| T64b | Next | P1 | P1 | story_sample authored content slice | Blocked | T34, T57c | Manual story-arc smoke test |
-| T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Blocked | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
+| T64b | Next | P1 | P1 | story_sample authored content slice | Done | T34, T57c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/story/quest.test.ts src/state/adjudication.test.ts src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` + live `/api/state` and guided `/api/turn` smoke |
+| T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Ready | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
 | T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Done | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Done | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Done | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
@@ -227,6 +228,18 @@ No global blocker as of 2026-03-09:
 | T63a | Next | P2 | P1 | Live context hierarchy and retrieval budget contract | Blocked | T60a, T61a, T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T63b | Next | P2 | P1 | Summary compression and versioned memory artifacts | Blocked | T63a, T59b, T62b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
 | T63c | Next | P2 | P1 | Memory context observability and replay tooling | Blocked | T63a, T59b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
+| T67 | Later | P2 | P2 | Grounded DM guide recall surface | Done | T59, T60, T62, T63 | Manual planning-doc consistency review + child task validation |
+| T67a | Later | P2 | P2 | Guide query contract and grounding policy | Blocked | T14, T59b, T60b, T62c, T63b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts src/state/**/*.test.ts src/rules/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T67b | Later | P2 | P2 | Guide retrieval and answer synthesis | Blocked | T47, T63c, T67a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts src/state/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T67c | Later | P2 | P2 | Guide UI surface and turn-safe presentation | Blocked | T67b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
+| T68 | Now | P1 | P2 | VS Code AI auto-test workflow and operator guidance | Done | None | Manual planning-doc consistency review + child task validation |
+| T68a | Now | P1 | P2 | VS Code AI auto-test rules and usage docs | Done | T68 | Manual doc consistency review |
+| T68b | Next | P1 | P2 | SunRay scripted AI walkthrough matrix | Blocked | T64c, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
+| T68c | Next | P1 | P2 | AI validation reporting and seed-capture contract | Done | T68a | Manual planning-doc consistency review + example handoff-note review |
+| T69 | Now | P1 | P2 | VS Code dual-AI validation protocol | Done | T68a | Manual planning-doc consistency review + child task validation |
+| T69a | Now | P1 | P2 | Dual-AI builder and challenger workflow docs | Done | T69 | Manual doc consistency review + example prompt review |
+| T69b | Next | P1 | P2 | SunRay AI validation manifest and review bundle | Blocked | T68c, T69a, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + manifest smoke review |
+| T69c | Next | P1 | P2 | Dual-AI adversarial walkthrough matrix | Blocked | T68b, T69b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
 | T12a | Later | P1 | P3 | Rate limiting and abuse guard | Ready | T07 | `npm test` |
 | T13 | Later | P2 | P1 | Embeddings pipeline | Blocked | T07a, T60a, T62b | Manual embedding call verification |
 | T13a | Later | P2 | P1 | LiteLLM embedding alias integration | Ready | T02f | Manual embedding route verification |
@@ -651,7 +664,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T64b - story_sample Authored Content Slice
 
-- Status: Blocked
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -675,7 +688,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - T34
   - T57c
 - Validation:
-  - manual story-arc smoke test
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/story/quest.test.ts src/state/adjudication.test.ts src/state/turn.test.ts src/rules/validator.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`
+  - live `/api/state` bootstrap smoke plus guided `/api/turn` walkthrough to the Relay Vault choice beat
 - Definition of Done:
   - the `story_sample` arc is playable end to end through the supported turn path
   - the authored path exercises dialogue, movement, item use, and a final resolution choice
@@ -683,11 +699,15 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - keep the slice narrow; this task is not the general quest-authoring system
   - coordinate with `T64c` so the authored branch coverage is stable enough for a golden walkthrough fixture
-  - blocked on 2026-03-09 because `T34` is blocked pending completion of onboarding validation in `T12`
+  - unblocked on 2026-03-13 after `T34` and `T57c` were completed; current implementation focus is authored content plus the smallest server-owned quest progression needed for the supported slice
+  - completed on 2026-03-13 with the authored `Ghostlight Relay` arc in `data/spec/director.json` and `data/spec/quests.json`, a new server-owned `resolveQuestUpdates` helper in `src/story/quest.ts`, and adjudication rules that derive quest progress from accepted flags while keeping authored progression flags sticky once earned
+  - new players now bootstrap into the authored quest path from `src/state/game.ts`, and focused coverage in `src/story/quest.test.ts` plus `src/state/adjudication.test.ts` proves active-objective start, progress advancement, compromise completion, and non-regressing authored progression
+  - live launcher-path smoke on 2026-03-13 confirmed fresh sessions now start in `Rooftop Market` with the `ghostlight_relay` objective, and a guided turn sequence reached the Relay Vault choice beat through the supported `/api/turn` path without quest backsliding
+  - `T64c` should now capture one deterministic golden walkthrough and replay fixture for a committed final ending, because live model phrasing at the last choice still varies even though the authored path and server-owned progression are in place
 
 ### T64c - Baseline Story Arc Walkthrough And Golden Replay Fixture
 
-- Status: Blocked
+- Status: Ready
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -720,7 +740,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - keep the fixture grounded in committed semantics; exact prose may vary as long as the accepted outcome is stable
   - prefer one canonical success path first; broader branch coverage can come later once the baseline replay target is stable
-  - blocked on 2026-03-09 because `T64b` cannot start until `T34` is unblocked and the authored content slice exists
+  - ready on 2026-03-13 now that `T64b` authored the `Ghostlight Relay` content slice and the live supported turn path can reach the Relay Vault choice beat
 
 ### T58 - Player Agency And Pacing Boundary
 
@@ -1716,6 +1736,466 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - keep debug surfaces separate from canonical replay data; they explain context decisions but do not become new truth sources
   - prefer deterministic trace output so budget and replay fixtures can diff it safely
 
+### T67 - Grounded DM Guide Recall Surface
+
+- Status: Done
+- Queue: Later
+- Phase: P2
+- Priority: P2
+- Owner Role: AI systems lead
+- Goal: Let players ask a friendly DM-style guide grounded questions about what they already know without spending a normal story turn or mutating truth.
+- Scope:
+  - define the guide as a read-only recall and orientation surface rather than an alternate turn path
+  - ground guide answers in committed state, admitted memory, summaries, and replay-derived recap data instead of raw prose improvisation
+  - keep the guide separate from the lightweight `/api/assist` text helper and from authoritative turn resolution
+- Files to Touch:
+  - BACKLOG.md
+  - ROADMAP.md
+  - REQUIREMENTS.md
+  - ARCHITECTURE.md
+- Do Not Touch:
+  - src/
+  - public/
+  - data/spec/
+  - packaging/
+- Dependencies:
+  - T59
+  - T60
+  - T62
+  - T63
+- Child Tasks:
+  - T67a
+  - T67b
+  - T67c
+- Validation:
+  - manual planning-doc consistency review
+  - child task validation listed on each child card
+- Definition of Done:
+  - the guide feature is grounded in planning docs and decomposed into implementation-ready child tasks
+  - user-visible scope, phase placement, and authority rules are explicit before implementation starts
+  - later guide work can build on stable memory and retrieval contracts instead of inventing a parallel recall path
+- Handoff Notes:
+  - user assigned this issue on 2026-03-13 after identifying a player need for a pleasant DM-guide that can answer recall questions such as where a town was or where an NPC was met
+  - parent issue closeout on 2026-03-13 confirmed the planning docs align on a read-only guide surface: `REQUIREMENTS.md` now gives the player flow an optional DM-guide and a `/api/guide` contract, `ARCHITECTURE.md` keeps the guide separate from `/api/turn` and `/api/assist`, and `ROADMAP.md` places grounded guide recall in Phase 2 after memory retrieval foundations are stable
+  - the remaining implementation surface is explicit: `T67a` owns the guide contract and grounding rules, `T67b` owns retrieval plus answer synthesis, and `T67c` owns the player-facing UI surface
+  - use the child tasks, not this parent card, as the execution gate for later backend, AI, and UI work
+
+### T67a - Guide Query Contract And Grounding Policy
+
+- Status: Blocked
+- Queue: Later
+- Phase: P2
+- Priority: P2
+- Owner Role: Backend lead
+- Goal: Define the read-only guide question contract and grounding rules so recall help stays useful without becoming a second authority channel.
+- Scope:
+  - add a versioned guide request and response contract for recall or orientation questions about known places, NPCs, goals, and prior discoveries
+  - require answers to declare uncertainty when the committed state, admitted memory, summaries, or recap records do not support a confident answer
+  - keep guide queries outside normal turn progression, authoritative mutation, and durable memory admission
+  - add deterministic fixtures proving the guide does not invent unsupported facts
+- Files to Touch:
+  - BACKLOG.md
+  - REQUIREMENTS.md
+  - ARCHITECTURE.md
+  - src/core/
+  - src/server/
+  - src/rules/
+  - src/state/
+- Do Not Touch:
+  - public/
+  - data/spec/
+  - packaging/
+- Dependencies:
+  - T14
+  - T59b
+  - T60b
+  - T62c
+  - T63b
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts src/state/**/*.test.ts src/rules/**/*.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Definition of Done:
+  - the guide request and response shape is explicit and versioned
+  - guide answers are read-only and cannot mutate authoritative state or committed memory
+  - at least one focused fixture proves an unsupported question returns explicit uncertainty instead of fabricated recall
+  - later synthesis and UI work can build on one stable guide contract
+- Handoff Notes:
+  - keep the contract narrow; this surface is for recall and orientation, not for freeform hidden turns or omniscient hinting
+  - if the answer cannot be grounded in committed knowledge, the contract should prefer a clear admission of uncertainty over personality
+  - separate answer grounding metadata from player-facing prose so the UI can label uncertainty cleanly
+
+### T67b - Guide Retrieval And Answer Synthesis
+
+- Status: Blocked
+- Queue: Later
+- Phase: P2
+- Priority: P2
+- Owner Role: AI systems lead
+- Goal: Answer guide questions with concise DM-style wording grounded in committed game knowledge instead of transcript replay or free invention.
+- Scope:
+  - retrieve the smallest useful set of committed state, admitted memory, summaries, and recap artifacts for each guide question
+  - synthesize a guide answer that prefers direct grounded facts, can acknowledge uncertainty, and can recap known locations, NPC ties, or current goals when supported
+  - keep the guide provider-neutral and cheaper than a full story turn by using bounded context and a narrower response contract
+  - add recall fixtures covering at least one location question, one NPC question, and one current-goal recap
+- Files to Touch:
+  - BACKLOG.md
+  - src/ai/
+  - src/server/
+  - src/state/
+  - src/rules/
+  - launcher/
+- Do Not Touch:
+  - public/
+  - data/spec/
+  - packaging/
+- Dependencies:
+  - T47
+  - T63c
+  - T67a
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/server/**/*.test.ts src/state/**/*.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+- Definition of Done:
+  - guide answers are assembled from grounded retrieval instead of broad transcript replay
+  - supported recall questions about places, NPCs, and goals return stable bounded answers
+  - unsupported questions remain explicit about uncertainty and do not invent canon
+  - the guide path stays provider-neutral and compatible with the existing local AI workflow harness
+- Handoff Notes:
+  - keep persona thin and post-grounding; style should not outrank answer fidelity
+  - avoid turning this into a generic lore chatbot or a hidden debug console
+  - reuse the retrieval partitions from earlier memory work instead of creating a second ranking system
+
+### T67c - Guide UI Surface And Turn-Safe Presentation
+
+- Status: Blocked
+- Queue: Later
+- Phase: P2
+- Priority: P2
+- Owner Role: Product/UI lead
+- Goal: Add an optional in-app DM-guide panel so players can ask recall questions without leaving the play surface or confusing guide output with story truth.
+- Scope:
+  - add a player-facing guide entry point that submits questions without consuming the normal story turn input
+  - keep guide history visually distinct from the turn log so advisory recall answers are not mistaken for committed narration
+  - surface loading, empty-state, and uncertainty states clearly in plain language
+  - keep the guide usable on desktop and mobile without displacing the main turn flow
+- Files to Touch:
+  - BACKLOG.md
+  - src/ui/
+  - src/server/
+- Do Not Touch:
+  - public/app.js
+  - data/spec/
+  - packaging/
+- Dependencies:
+  - T67b
+- Validation:
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts`
+  - `docker compose run --rm --no-deps app npm run build:client`
+- Definition of Done:
+  - players can ask the guide from the main play surface without spending a story turn
+  - guide answers are labeled clearly enough that they are not confused with authoritative turn narration
+  - the UI handles unknown or weakly grounded answers without feeling broken
+  - the surface remains optional and does not hide or replace the main play controls
+- Handoff Notes:
+  - do not bury this in the debug surface; it is player-facing help
+  - preserve the distinction between recall help and progression hints unless a later task explicitly broadens scope
+  - keep the visual treatment distinct enough that the guide feels helpful without impersonating canonical story output
+
+### T68 - VS Code AI Auto-Test Workflow And Operator Guidance
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Codify how AI-facing validation should be run from VS Code today while breaking out the larger future automation work into explicit backlog tasks.
+- Scope:
+  - add one consistent VS Code-oriented usage policy for deterministic AI checks and replayable live smoke runs
+  - document when to use `--selection-only`, `--persona-seed`, and `--persona`
+  - create follow-on backlog tasks for broader walkthrough automation and validation reporting instead of leaving them as implicit future work
+- Files to Touch:
+  - BACKLOG.md
+  - ENGINEERING_STANDARDS.md
+  - README.md
+  - AGENTS.md
+- Do Not Touch:
+  - src/
+  - public/
+  - launcher/src/
+  - data/spec/
+- Dependencies:
+  - T02e
+  - T65c
+- Child Tasks:
+  - T68a
+  - T68b
+  - T68c
+- Validation:
+  - manual planning-doc consistency review
+  - child task validation listed on each child card
+- Definition of Done:
+  - the repo documents one repeatable VS Code AI auto-test loop for current work
+  - deterministic and live-smoke usage guidance is aligned across contributor docs and agent instructions
+  - larger follow-on AI auto-test work is captured as explicit backlog tasks instead of undocumented intent
+- Handoff Notes:
+  - user requested this on 2026-03-13 after the local AI workflow harness gained persona controls for live smoke validation
+  - this parent issue is intentionally narrow: it documents the current VS Code workflow and captures the next larger automation slices without claiming those future suites already exist
+  - roadmap sequencing did not change in this session, so backlog plus policy-doc sync was sufficient
+
+### T68a - VS Code AI Auto-Test Rules And Usage Docs
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Update the repo instructions so agents and humans use the same repeatable AI validation loop from VS Code.
+- Scope:
+  - add VS Code-oriented AI validation guidance to engineering standards
+  - document current command usage in the README
+  - align AGENTS.md with the same deterministic-first and replayable-live-smoke expectations
+- Files to Touch:
+  - BACKLOG.md
+  - ENGINEERING_STANDARDS.md
+  - README.md
+  - AGENTS.md
+- Do Not Touch:
+  - src/
+  - public/
+  - launcher/src/
+- Dependencies:
+  - T68
+- Validation:
+  - manual doc consistency review
+- Definition of Done:
+  - the docs explain when to use deterministic-only AI validation versus live smoke
+  - the docs explain how persona seeds and explicit personas should be used for replayable VS Code validation
+  - future agents can tell what exact command should be recorded in handoff notes
+- Handoff Notes:
+  - completed on 2026-03-13 by aligning `ENGINEERING_STANDARDS.md`, `README.md`, `AGENTS.md`, and this backlog card around the same VS Code auto-test workflow
+  - final guidance keeps `--selection-only` as the default deterministic gate and treats `--persona-seed` or `--persona` as the preferred replayable live-smoke controls
+
+### T68b - SunRay Scripted AI Walkthrough Matrix
+
+- Status: Blocked
+- Queue: Next
+- Phase: P1
+- Priority: P2
+- Owner Role: AI systems lead
+- Goal: Expand the current local AI harness from one smoke-turn check into a small scripted walkthrough matrix that VS Code-driven agent testing and secondary-AI review can rerun consistently.
+- Scope:
+  - define a compact walkthrough suite that exercises the MVP story slice across more than one turn
+  - cover deterministic contract checks plus at least a small persona or seed matrix for live provider runs
+  - keep the walkthrough contract compatible with the existing `SunRay test-local-ai-workflow` path instead of inventing a second AI harness surface
+  - emit stable scenario ids and short pass or fail summaries that handoff notes or a second AI can reference without pasting raw console output
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - launcher/
+  - data/spec/
+  - relevant focused tests or fixtures
+- Do Not Touch:
+  - public/app.js
+  - packaging/
+- Dependencies:
+  - T64c
+  - T65c
+- Validation:
+  - `cargo test --manifest-path launcher/Cargo.toml`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - repeatable live walkthrough smoke against a compatible local provider
+- Definition of Done:
+  - the AI harness can run more than one meaningful scripted validation path through the current story slice
+  - the walkthrough uses replayable persona or seed controls instead of ad hoc randomness for handoff validation
+  - named walkthrough scenarios are stable enough that later reporting or dual-AI review can cite them directly
+  - future agents no longer need to improvise a broader AI playtest loop in VS Code
+- Handoff Notes:
+  - blocked until `T64c` establishes the baseline story walkthrough fixture that the broader AI test sweep should build on
+  - when this starts, keep the output compact and reviewable; the follow-on dual-AI protocol should consume named scenarios and summaries, not giant raw transcripts
+
+### T68c - AI Validation Reporting And Seed-Capture Contract
+
+- Status: Done
+- Queue: Next
+- Phase: P1
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Make AI validation handoff notes more replayable by defining what command, persona, seed, scenario id, and result details must be captured after VS Code-driven AI tests.
+- Scope:
+  - define a small reporting contract for AI validation summaries in backlog handoff notes
+  - document the minimum evidence for deterministic checks and live smoke runs
+  - define the extra fields to record when a second VS Code AI is used as a challenger or reviewer
+  - keep the reporting requirement lightweight enough for normal task work while making reruns obvious for the next agent
+- Files to Touch:
+  - BACKLOG.md
+  - ENGINEERING_STANDARDS.md
+  - AGENTS.md
+  - README.md
+- Do Not Touch:
+  - src/
+  - launcher/src/
+  - data/spec/
+- Dependencies:
+  - T68a
+- Validation:
+  - manual planning-doc consistency review
+  - example handoff-note review
+- Definition of Done:
+  - backlog handoff expectations clearly name what AI validation details should be recorded
+  - agents can distinguish exploratory random smoke runs from final replayable validation evidence
+  - if a dual-AI review loop is used, the notes can distinguish builder evidence from challenger-selected reruns without requiring full chat transcripts
+  - future AI-task notes become more reproducible without requiring a heavyweight reporting system
+- Handoff Notes:
+  - completed on 2026-03-13 by tightening the reporting contract across `BACKLOG.md`, `ENGINEERING_STANDARDS.md`, `README.md`, and `AGENTS.md`
+  - final reporting guidance now expects exact commands, named persona or seed when used, a short result summary, and builder versus challenger labeling when the optional two-AI VS Code protocol is used
+
+### T69 - VS Code Dual-AI Validation Protocol
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Define a practical way to use two VS Code AI assistants as builder and challenger around the existing harnesses without mistaking AI agreement for real validation.
+- Scope:
+  - document an operator-mediated builder and challenger workflow around the deterministic and live-smoke AI harnesses
+  - keep the protocol editor- and provider-neutral instead of depending on undocumented VS Code extension APIs
+  - capture follow-on automation work for review bundles and adversarial walkthroughs as explicit child tasks
+- Files to Touch:
+  - BACKLOG.md
+  - ENGINEERING_STANDARDS.md
+  - README.md
+  - AGENTS.md
+- Do Not Touch:
+  - src/
+  - public/
+  - launcher/src/
+  - data/spec/
+- Dependencies:
+  - T68a
+- Child Tasks:
+  - T69a
+  - T69b
+  - T69c
+- Validation:
+  - manual planning-doc consistency review
+  - child task validation listed on each child card
+- Definition of Done:
+  - the repo documents one concrete two-AI VS Code testing protocol that wraps the existing harnesses
+  - the protocol makes it explicit that rerunnable commands, not AI agreement, are the validation evidence
+  - follow-on automation work is captured explicitly instead of staying as vague editor workflow ideas
+- Handoff Notes:
+  - user requested this on 2026-03-13 as a better way to use two VS Code AIs for testing without inventing hidden manual rituals
+  - the resulting protocol is intentionally operator-mediated: the repo can automate harnesses and report bundles, but it should not depend on private VS Code extension control surfaces
+
+### T69a - Dual-AI Builder And Challenger Workflow Docs
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Document how two VS Code AIs should be used as distinct builder and challenger roles during AI-facing validation.
+- Scope:
+  - define what the builder must provide before asking for a second-AI review
+  - define what the challenger must do beyond generic approval, including naming one concrete failure mode and one additional rerun command
+  - document what evidence should be recorded when the dual-AI workflow is used
+- Files to Touch:
+  - BACKLOG.md
+  - ENGINEERING_STANDARDS.md
+  - README.md
+  - AGENTS.md
+- Do Not Touch:
+  - src/
+  - public/
+  - launcher/src/
+- Dependencies:
+  - T69
+- Validation:
+  - manual doc consistency review
+  - example prompt review
+- Definition of Done:
+  - the repo explains how to use two VS Code AIs without collapsing into rubber-stamp agreement
+  - the challenger role is explicit about trying to disprove assumptions and nominate a replayable rerun
+  - the handoff guidance says what builder and challenger evidence should be captured
+- Handoff Notes:
+  - completed on 2026-03-13 by aligning `ENGINEERING_STANDARDS.md`, `README.md`, `AGENTS.md`, and this backlog card around a builder-versus-challenger loop
+  - the protocol keeps the deterministic harness as the first gate and treats the second AI as an adversarial reviewer that chooses or demands one more rerunnable check
+
+### T69b - SunRay AI Validation Manifest And Review Bundle
+
+- Status: Blocked
+- Queue: Next
+- Phase: P1
+- Priority: P2
+- Owner Role: AI systems lead
+- Goal: Generate a compact machine-readable validation bundle from `SunRay test-local-ai-workflow` so a second AI can review the same scenario and evidence without depending on editor-specific APIs or raw console transcripts.
+- Scope:
+  - define a repo-owned manifest or report format with scenario id, exact command, persona or seed, and short pass or fail summary fields
+  - keep the bundle consumable by humans or a second AI from a file or terminal output instead of a VS Code extension integration
+  - align the format with the future walkthrough matrix so review bundles do not become a dead-end one-off report
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - launcher/
+- Do Not Touch:
+  - src/
+  - public/
+  - data/spec/
+- Dependencies:
+  - T68c
+  - T69a
+  - T65c
+- Validation:
+  - `cargo test --manifest-path launcher/Cargo.toml`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - manifest smoke review
+- Definition of Done:
+  - the harness can emit a stable review bundle with enough context for a second AI or human to understand what ran
+  - the bundle names exact commands, personas or seeds, and scenario ids without requiring copied editor chat history
+  - the output remains tool-agnostic so VS Code usage is supported without becoming a hard dependency
+- Handoff Notes:
+  - blocked until the repo is ready to invest in launcher-side output shaping instead of documentation-only workflow guidance
+  - keep this file-first and automation-first; do not depend on scripting VS Code itself
+
+### T69c - Dual-AI Adversarial Walkthrough Matrix
+
+- Status: Blocked
+- Queue: Next
+- Phase: P1
+- Priority: P2
+- Owner Role: AI systems lead
+- Goal: Define a small named matrix of adversarial AI walkthrough scenarios so a second VS Code AI can challenge changes against specific regression classes instead of giving generic approval.
+- Scope:
+  - define a compact scenario matrix covering authority drift, grounding loss, pacing regression, and off-path action handling
+  - map each scenario to the preferred deterministic checks, live-smoke command, and expected review focus
+  - keep the matrix small enough for routine use and aligned to the existing `SunRay test-local-ai-workflow` path
+- Files to Touch:
+  - BACKLOG.md
+  - README.md
+  - launcher/
+  - relevant focused tests or fixtures
+- Do Not Touch:
+  - public/app.js
+  - packaging/
+- Dependencies:
+  - T68b
+  - T69b
+- Validation:
+  - `cargo test --manifest-path launcher/Cargo.toml`
+  - `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - repeatable live walkthrough smoke against a compatible local provider
+- Definition of Done:
+  - dual-AI review can point to named challenge scenarios instead of ad hoc prompts
+  - each scenario maps to a replayable rerun command and a specific failure class the challenger is trying to catch
+  - the matrix stays compact enough to remain a normal development tool rather than an occasional ceremony
+- Handoff Notes:
+  - blocked until both the walkthrough matrix base (`T68b`) and the launcher-side review bundle (`T69b`) exist
+  - prefer a handful of high-signal scenarios over a broad unreadable matrix
+
 ### T02g - GPU Tier Matrix And Local Model Profiles
 
 - Status: Done
@@ -2050,7 +2530,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T12 - New Game Onboarding
 
-- Status: In Progress
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -2066,6 +2546,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - REQUIREMENTS.md
   - public/index.html
   - src/ui/app.ts
+  - src/ui/session-controller.test.ts
   - public/styles.css
 - Do Not Touch:
   - src/ai/service.ts
@@ -2073,7 +2554,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Dependencies:
   - T06
 - Validation:
-  - manual new-game flow check
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/ui/session-controller.test.ts src/ui/launch-view.test.ts src/ui/setup-view.test.ts src/ui/setup-browser-smoke.test.ts`
+  - `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`
+  - local `/api/setup/status` and `/api/state?name=T12Smoke` smoke against the launcher-started app
 - Definition of Done:
   - a first-time player can start or resume without needing external docs mid-session
   - onboarding copy avoids developer jargon
@@ -2084,6 +2568,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - the first-screen copy, toolbar labels, and input labels were rewritten in `public/index.html` and `public/styles.css` to remove more developer-facing wording from the initial player flow while keeping the existing debug panel intact
   - validation on 2026-03-08 ran `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npm run build:client`, `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`, and HTTP smoke checks against `/` plus `/api/state` on the launched app
   - resumed on 2026-03-09 to finish the remaining onboarding validation work from the supported Rust launcher path and confirm both launch actions behave cleanly end to end
+  - completed on 2026-03-13 by adding focused controller coverage in `src/ui/session-controller.test.ts` for saved-session bootstrap messaging, resume handoff copy, and blocked-start gating so onboarding is no longer relying only on manual read-through
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/ui/session-controller.test.ts src/ui/launch-view.test.ts src/ui/setup-view.test.ts src/ui/setup-browser-smoke.test.ts`, and `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` with local smoke requests confirming `setup.status = ready` and first-session creation at `/api/state?name=T12Smoke`
+  - `T34` is now unblocked and can use the launch-to-first-turn onboarding flow as a stable base for tutorial copy
 
 ### T12b - First-Run Setup Wizard And Connection Test
 
@@ -2278,7 +2765,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T34 - Tutorial And First-Run Guidance
 
-- Status: Blocked
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -2293,6 +2780,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - REQUIREMENTS.md
   - public/index.html
   - src/ui/app.ts
+  - src/ui/tutorial-view.ts
+  - src/ui/tutorial-view.test.ts
   - public/styles.css
 - Do Not Touch:
   - data/spec/
@@ -2302,15 +2791,22 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - T11
   - T12
 - Validation:
-  - manual onboarding smoke test
+  - `docker compose run --rm --no-deps app npm run type-check`
+  - `docker compose run --rm --no-deps app npx tsx --test src/ui/tutorial-view.test.ts`
+  - `docker compose run --rm --no-deps app npm run build:client`
+  - launcher-path onboarding smoke against `/` and `/api/state?name=T34Smoke`
 - Definition of Done:
   - a first-time player can understand the first three turns without external docs
   - tutorial copy is concise enough to stay readable during launch
   - tutorial and recovery guidance do not hide save or repair actions
 - Handoff Notes:
   - keep this focused on clarity, not lore dumping
-  - blocked on 2026-03-09 because `T12` still needs final onboarding validation before the onboarding surface is a stable base for tutorial follow-up work
+  - unblocked on 2026-03-13 after `T12` closed with focused onboarding controller coverage plus launcher-path setup and state smoke validation
   - task card path updated on 2026-03-09 to use the current browser authoring surface `src/ui/app.ts` instead of the legacy `public/app.ts` note
+  - resumed on 2026-03-13 with a focused browser-side tutorial subview so first-session guidance can evolve without turning `src/ui/app.ts` into another mixed view bucket
+  - completed on 2026-03-13 by adding `src/ui/tutorial-view.ts` plus focused tests, wiring a first-session tutorial panel into the play surface, and persisting guide progress in browser storage so the help steps aside after a few successful turns or an explicit dismissal
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/ui/tutorial-view.test.ts`, and `docker compose run --rm --no-deps app npm run build:client`
+  - launcher-path smoke on 2026-03-13 confirmed the served root page includes `tutorial-panel` and `tutorial-dismiss` markup and that `/api/state?name=T34Smoke` still creates a fresh player session successfully
 
 ### T02c - Windows Local AI Smoke-Test Path
 
@@ -3244,6 +3740,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - `package.json` now points `npm run test:local-ai` at the Rust command surface instead of the PowerShell harness, and README guidance now treats the Rust command as the supported path
   - validation on 2026-03-09 ran `cargo check --manifest-path launcher/Cargo.toml`, `cargo test --manifest-path launcher/Cargo.toml`, `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`, and a full `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow` smoke against the configured local Ollama-compatible provider
   - closeout fix on 2026-03-09 moved the local GPU matrix into `launcher/assets/`, switched the deterministic guardrail path from the deleted `scripts/validate-turn-schema.ts` helper to the existing focused TypeScript test surface, and reran `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
+  - follow-up on 2026-03-13 added repeatable test-player persona controls to the live smoke path: `--persona` now forces one of `curious-explorer`, `cautious-survivor`, `empathetic-talker`, or `practical-fixer`, while `--persona-seed` makes the per-run persona choice repeatable without changing the deterministic `--selection-only` contract checks
 
 ### T65d - SunRay Validator Command Migration
 
@@ -3401,6 +3898,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - T66a
   - T66b
   - T66c
+  - T66d
 - Validation:
   - Manual planning-doc consistency review
   - Child task validation listed on each child card
@@ -3414,8 +3912,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T66a - SunRay Command Contract Cleanup
 
-- Status: Ready
-- Queue: Next
+- Status: Done
+- Queue: Now
 - Phase: P1
 - Priority: P2
 - Owner Role: Tech lead
@@ -3437,6 +3935,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - T66
 - Validation:
   - `cargo test --manifest-path launcher/Cargo.toml`
+  - `cargo run --manifest-path launcher/Cargo.toml -- --no-browser`
   - Manual launcher-doc consistency review
 - Definition of Done:
   - runtime-facing launcher types no longer need deleted script names to describe themselves
@@ -3444,10 +3943,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - historical migration context remains available without polluting the supported command contract
 - Handoff Notes:
   - keep this task about command-contract cleanup, not orchestration refactors
+  - user assigned follow-up on 2026-03-13 to make `SunRay.exe` launch the `start-dev` flow by default when no explicit subcommand is provided
+  - completed on 2026-03-13 by moving the `start-dev` launch flags to the root CLI surface, defaulting no-subcommand execution to the launcher flow, and updating the launcher docs to describe `SunRay.exe` as the default `start-dev` entrypoint
+  - validation on 2026-03-13 reran `cargo test --manifest-path launcher/Cargo.toml` and `cargo run --manifest-path launcher/Cargo.toml -- --no-browser`; the no-arg launcher path started the Docker-backed app successfully and reported readiness on `http://127.0.0.1:3100/`
+  - follow-up cleanup in `T66b` on 2026-03-13 narrowed `--no-browser` and `--rebuild` back to the explicit `start-dev` subcommand while keeping the no-arg default launcher flow
 
 ### T66b - SunRay Start-Dev Orchestration Split
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -3459,6 +3962,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - preserve the existing launcher behavior and recovery language unless a deliberate copy update is part of the split
 - Files to Touch:
   - BACKLOG.md
+  - README.md
+  - launcher/README.md
   - launcher/src/start_dev.rs
   - launcher/src/
 - Do Not Touch:
@@ -3476,6 +3981,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - behavior remains compatible with the supported Docker launcher path
 - Handoff Notes:
   - apply the repo sentence test here; if a file's job needs the word `and`, keep splitting
+  - completed on 2026-03-13 by splitting `launcher/src/start_dev.rs` into focused `start_dev/` modules for compose wiring, issue formatting, preflight checks, probes, and runtime orchestration, leaving the command file as the launcher composition root
+  - the supported launcher flags now live on `start-dev` instead of the root CLI surface, so `SunRay` with no subcommand launches with default options while `SunRay start-dev --no-browser` and `SunRay start-dev --rebuild` remain the explicit opt-in variants
+  - Rust unit coverage now exercises the narrowed CLI contract plus the extracted compose, issue-formatting, provider-preflight, port-selection, and probe helpers instead of relying on shell-oriented validation for those paths
+  - validation on 2026-03-13 reran `cargo test --manifest-path launcher/Cargo.toml` and `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`; the launcher selected fallback port `3100`, reached app readiness, and printed the existing app preflight diagnostics successfully
 
 ### T66c - SunRay Shared Probe And Smoke Helper Extraction
 
@@ -3512,6 +4021,43 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - Rust-owned assets and deterministic smoke paths remain discoverable under `launcher/`
 - Handoff Notes:
   - keep this task about shared launcher infrastructure, not about redesigning the Electron or Docker contracts
+
+### T66d - SunRay Windows Exe Release Path
+
+- Status: Done
+- Queue: Now
+- Phase: P1
+- Priority: P2
+- Owner Role: Tech lead
+- Goal: Make the supported Windows launcher build produce one obvious `SunRay.exe` artifact path that is easy to hand to end users.
+- Scope:
+  - ensure the Rust launcher builds to a clearly named Windows executable instead of only the lowercase crate-default binary name
+  - document one supported release-build command and the resulting executable path for launcher distribution
+  - add a small repo convenience entrypoint for building the release executable from the existing toolchain
+- Files to Touch:
+  - BACKLOG.md
+  - launcher/Cargo.toml
+  - launcher/README.md
+  - README.md
+  - package.json
+- Do Not Touch:
+  - launcher/src/start_dev.rs
+  - packaging/electron/
+  - docker-compose.yml
+- Dependencies:
+  - T66
+- Validation:
+  - `cargo test --manifest-path launcher/Cargo.toml`
+  - `cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml`
+  - Manual launcher-doc consistency review
+- Definition of Done:
+  - release builds emit `SunRay.exe` under one documented Cargo output path
+  - repo docs point to the release-build command and artifact path without requiring users to inspect Cargo internals
+  - the change stays within the existing Rust launcher surface rather than adding a new shell wrapper
+- Handoff Notes:
+  - keep this focused on the launcher executable artifact path, not broader installer or packaging work
+  - completed on 2026-03-13 by giving the Rust launcher an explicit `[[bin]]` name of `SunRay`, adding the repo convenience command `npm run sunray:build-release`, and documenting the stable Windows artifact path at `launcher/target/release/SunRay.exe`
+  - validation on 2026-03-13 reran `cargo test --manifest-path launcher/Cargo.toml` and `cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml`; the built executable exists at `launcher/target/release/SunRay.exe`
 
 ### T54 - Setup View Model And Recovery Policy Split
 
