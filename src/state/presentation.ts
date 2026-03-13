@@ -144,10 +144,33 @@ function buildCommittedNarrative(
   }
 
   if (!sentences.length) {
-    return "You press the attempt, but nothing new is committed yet.";
+    return buildNoCommitNarrative(player);
   }
 
   return sentences.join(" ");
+}
+
+function buildNoCommitNarrative(player: Player): string {
+  const lead = getCurrentLead(player);
+  if (lead) {
+    return `You pause in ${player.location} and take stock. The clearest lead is still to ${lead}.`;
+  }
+
+  return `You pause in ${player.location} and take stock, but nothing else changes yet.`;
+}
+
+function getCurrentLead(player: Player): string | null {
+  const beatLabel = player.director_state.current_beat_label?.trim();
+  if (beatLabel) {
+    return lowerCaseFirstCharacter(beatLabel.replace(/[.]+$/, ""));
+  }
+
+  const questSummary = player.quests[0]?.summary?.trim();
+  if (questSummary) {
+    return lowerCaseFirstCharacter(questSummary.replace(/[.]+$/, ""));
+  }
+
+  return null;
 }
 
 function formatList(values: string[]): string {
@@ -160,4 +183,12 @@ function formatList(values: string[]): string {
   }
 
   return `${values.slice(0, -1).join(", ")}, and ${values.at(-1) ?? ""}`;
+}
+
+function lowerCaseFirstCharacter(value: string): string {
+  if (!value) {
+    return value;
+  }
+
+  return value.charAt(0).toLowerCase() + value.slice(1);
 }

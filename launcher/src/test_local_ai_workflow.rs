@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::Path;
-use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
 use clap::ValueEnum;
@@ -10,11 +9,11 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::config::{
-    local_gpu_profile_matrix_path, resolve_repo_ai_config, resolve_workspace_root_from,
-    RepoAiConfig,
+    local_gpu_profile_matrix_path, resolve_repo_ai_config, resolve_workspace_root, RepoAiConfig,
 };
 use crate::env::load_repo_env;
-use crate::process::ProcessInvocation;
+use crate::start_dev::compose::docker_compose;
+use crate::start_dev::probes::wait_for_http_ready;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestLocalAiWorkflowOptions {
@@ -137,7 +136,7 @@ struct LocalGpuSelectionResult {
 }
 
 pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
-    let repo_root = resolve_workspace_root_from(&std::env::current_dir()?)?;
+    let repo_root = resolve_workspace_root()?;
     let repo_env = load_repo_env(&repo_root)?;
     let config = resolve_repo_ai_config(&repo_env, false);
     let mut report = HarnessReport::default();
@@ -192,7 +191,9 @@ pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
         report.fail(format!("Structured scene test failed: {error}"));
     }
 
-    if let Err(error) = test_game_turn_schema(&client, &config, persona_selection.persona, &mut report) {
+    if let Err(error) =
+        test_game_turn_schema(&client, &config, persona_selection.persona, &mut report)
+    {
         report.fail(format!("Full game_turn test failed: {error}"));
     }
 
@@ -307,9 +308,8 @@ fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport
 }
 
 fn test_turn_schema_guardrails(repo_root: &Path, report: &mut HarnessReport) -> Result<()> {
-    let capture = ProcessInvocation::new("docker")
+    docker_compose(repo_root)
         .with_args([
-            "compose",
             "run",
             "--rm",
             "--no-deps",
@@ -320,11 +320,7 @@ fn test_turn_schema_guardrails(repo_root: &Path, report: &mut HarnessReport) -> 
             "src/state/turn.test.ts",
         ])
         .in_dir(repo_root)
-        .capture()?;
-
-    if capture.exit_code != Some(0) {
-        return Err(anyhow!(combine_capture_output(&capture)));
-    }
+        .capture_checked()?;
 
     report.pass("Turn schema guardrail check passed.");
     Ok(())
@@ -623,41 +619,6 @@ fn readiness_probe_url(config: &RepoAiConfig) -> String {
     } else {
         config.base_url.clone()
     }
-}
-
-fn wait_for_http_ready(
-    uri: &str,
-    timeout: Duration,
-    expected_content: Option<&str>,
-) -> Result<bool> {
-    let client = Client::builder().timeout(Duration::from_secs(5)).build()?;
-    let deadline = Instant::now() + timeout;
-
-    while Instant::now() < deadline {
-        if let Ok(response) = client.get(uri).send() {
-            if response.status().is_success() {
-                let body = response.text().unwrap_or_default();
-                if expected_content
-                    .map(|needle| body.contains(needle))
-                    .unwrap_or(true)
-                {
-                    return Ok(true);
-                }
-            }
-        }
-
-        thread::sleep(Duration::from_secs(1));
-    }
-
-    Ok(false)
-}
-
-fn combine_capture_output(capture: &crate::process::ProcessCapture) -> String {
-    [capture.stdout.trim(), capture.stderr.trim()]
-        .into_iter()
-        .filter(|segment| !segment.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 fn load_local_gpu_profile_matrix(path: &Path) -> Result<LocalGpuProfileMatrix> {

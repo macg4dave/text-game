@@ -1,0 +1,300 @@
+{
+  "fixture_id": "story_sample_ghostlight_relay_v1",
+  "description": "Canonical 10-turn Ghostlight Relay walkthrough using committed semantic outcomes rather than narrator prose.",
+  "player": {
+    "id": "story-sample-player",
+    "name": "Avery",
+    "created_at": "2026-03-13T00:00:00.000Z",
+    "location": "Rooftop Market",
+    "summary": "",
+    "inventory": [],
+    "flags": [],
+    "quests": [
+      {
+        "id": "ghostlight_relay",
+        "status": "active",
+        "summary": "Inspect the sparking market beacon in Rooftop Market"
+      }
+    ],
+    "director_state": {
+      "end_goal": "Stop the Ghostlight Relay from emptying the district with false evacuation orders.",
+      "current_act_id": "act_1",
+      "current_act": "Act I - Market Panic",
+      "current_beat_id": "a1_b1",
+      "current_beat_label": "Inspect the sparking market beacon",
+      "story_beats_remaining": 6,
+      "end_goal_progress": "Next step: Inspect the sparking market beacon.",
+      "completed_beats": []
+    }
+  },
+  "turns": [
+    {
+      "input": "inspect the sparking market beacon",
+      "occurred_at": "2026-03-13T00:01:00.000Z",
+      "outcome_summary": "The beacon's false orders are proven real.",
+      "committed": {
+        "state_updates": {
+          "location": "Rooftop Market",
+          "inventory_add": [],
+          "inventory_remove": [],
+          "flags_add": ["beacon_inspected"],
+          "flags_remove": [],
+          "quests": [
+            {
+              "id": "ghostlight_relay",
+              "status": "active",
+              "summary": "Ask Nila Vale where the relay draws power"
+            }
+          ]
+        },
+        "director_updates": {
+          "end_goal_progress": "You confirm the relay is hijacking the district speakers from somewhere deeper in the ward."
+        },
+        "memory_updates": [
+          "The market beacon is broadcasting false evacuation orders tied to the Ghostlight Relay."
+        ]
+      }
+    },
+    {
+      "input": "question Nila Vale about the relay route",
+      "occurred_at": "2026-03-13T00:02:00.000Z",
+      "outcome_summary": "Nila points you toward the Closed Stacks.",
+      "committed": {
+        "state_updates": {
+          "location": "Rooftop Market",
+          "inventory_add": [],
+          "inventory_remove": [],
+          "flags_add": ["nila_guidance"],
+          "flags_remove": [],
+          "quests": [
+            {
+              "id": "ghostlight_relay",
+              "status": "active",
+              "summary": "Recover the tuning fork from the Closed Stacks"
+            }
+          ]
+        },
+        "director_updates": {
+          "end_goal_progress": "Nila reveals that a tuning fork in the Closed Stacks can unseal the relay route."
+        },
+        "memory_updates": [
+          "Nila Vale says the relay route can be opened with a tuning fork hidden in the Closed Stacks."
+        ]
+      }
+    },
+    {
+      "input": "head into the Closed Stacks",
+      "occurred_at": "2026-03-13T00:03:00.000Z",
+      "outcome_summary": "You reach the sealed archive approach.",
+      "committed": {
+        "state_updates": {
+          "location": "Closed Stacks",
+          "inventory_add": [],
+          "inventory_remove": [],
+          "flags_add": [],
+          "flags_remove": [],
+          "quests": []
+        },
+        "director_updates": {
+          "end_goal_progress": "You reach the Closed Stacks where the relay's access tool was hidden away."
+        },
+        "memory_updates": [
+          "The Closed Stacks still hold the warded tools that once serviced the relay line."
+        ]
+      }
+    },
+    {
+      "input": "take the tuning fork from the warded case",
+      "occurred_at": "2026-03-13T00:04:00.000Z",
+      "outcome_summary": "You secure the tuning fork needed for the relay vault.",
+      "committed": {
+        "state_updates": {
+          "location": "Closed Stacks",
+          "inventory_add": ["tuning_fork"],
+          "inventory_remove": [],
+          "flags_add": ["tuning_fork_taken"],
+          "flags_remove": [],
+          "quests": [
+            {
+              "id": "ghostlight_relay",
+              "status": "active",
+              "summary": "Carry the tuning fork across Stormglass Causeway"
+            }
+          ]
+        },
+        "director_updates": {
+          "end_goal_progress": "With the tuning fork in hand, the relay route across Stormglass Causeway is finally reachable."
+        },
+        "memory_updates": [
+          "You recovered the relay tuning fork from the Closed Stacks."
+        ]
+      }
+    },
+    {
+      "input": "return to Stormglass Causeway",
+      "occurred_at": "2026-03-13T00:05:00.000Z",
+      "outcome_summary": "You approach the exposed causeway with the relay tool.",
+      "committed": {
+        "state_updates": {
+          "location": "Stormglass Causeway",
+          "inventory_add": [],
+          "inventory_remove": [],
+          "flags_add": [],
+          "flags_remove": [],
+          "quests": []
+        },
+        "director_updates": {
+          "end_goal_progress": "You reach Stormglass Causeway and can now make the relay run."
+        },
+        "memory_updates": []
+      }
+    },
+    {
+      "input": "cross Stormglass Causeway with the tuning fork",
+      "occurred_at": "2026-03-13T00:06:00.000Z",
+      "outcome_summary": "You survive the causeway and reach the vault approach.",
+      "committed": {
+        "state_updates": {
+          "location": "Relay Vault Approach",
+          "inventory_add": [],
+          "inventory_remove": [],
+          "flags_add": ["causeway_crossed"],
+          "flags_remove": [],
+          "quests": [
+            {
+              "id": "ghostlight_relay",
+              "status": "active",
+              "summary": "Use the tuning fork to open the Relay Vault"
+            }
+          ]
+        },
+        "director_updates": {
+          "end_goal_progress": "You reach the relay approach and only the vault door still stands between you and the false signal."
+        },
+        "memory_updates": [
+          "You crossed Stormglass Causeway and reached the relay vault approach."
+        ]
+      }
+    },
+    {
+      "input": "inspect the relay vault door",
+      "occurred_at": "2026-03-13T00:07:00.000Z",
+      "outcome_summary": "You identify where the tuning fork has to be applied.",
+      "committed": {
+        "state_updates": {
+          "location": "Relay Vault Approach",
+          "inventory_add": [],
+          "inventory_remove": [],
+          "flags_add": [],
+          "flags_remove": [],
+          "quests": []
+        },
+        "director_updates": {
+          "end_goal_progress": "The vault lock resonates with the tuning fork's pitch; one precise strike should open it."
+        },
+        "memory_updates": []
+      }
+    },
+    {
+      "input": "use the tuning fork to open the relay vault",
+      "occurred_at": "2026-03-13T00:08:00.000Z",
+      "outcome_summary": "The relay vault opens and the core can be changed.",
+      "committed": {
+        "state_updates": {
+          "location": "Relay Vault",
+          "inventory_add": [],
+          "inventory_remove": [],
+          "flags_add": ["vault_opened"],
+          "flags_remove": [],
+          "quests": [
+            {
+              "id": "ghostlight_relay",
+              "status": "active",
+              "summary": "Choose whether to disable or retune the Ghostlight Relay"
+            }
+          ]
+        },
+        "director_updates": {
+          "end_goal_progress": "The relay core is exposed; your final choice will decide whether the district loses the network or keeps a safer version of it."
+        },
+        "memory_updates": [
+          "You opened the Relay Vault and exposed the Ghostlight core."
+        ]
+      }
+    },
+    {
+      "input": "study the relay core before choosing",
+      "occurred_at": "2026-03-13T00:09:00.000Z",
+      "outcome_summary": "You learn the relay can be retuned instead of destroyed.",
+      "committed": {
+        "state_updates": {
+          "location": "Relay Vault",
+          "inventory_add": [],
+          "inventory_remove": [],
+          "flags_add": [],
+          "flags_remove": [],
+          "quests": []
+        },
+        "director_updates": {
+          "end_goal_progress": "You discover the relay can be retuned to carry truthful district warnings instead of being shut down outright."
+        },
+        "memory_updates": [
+          "The Ghostlight Relay can be retuned into a truthful warning network instead of destroyed."
+        ]
+      }
+    },
+    {
+      "input": "retune the Ghostlight Relay to broadcast real warnings",
+      "occurred_at": "2026-03-13T00:10:00.000Z",
+      "outcome_summary": "You retune the relay and preserve the district warning network.",
+      "committed": {
+        "state_updates": {
+          "location": "Relay Vault",
+          "inventory_add": [],
+          "inventory_remove": [],
+          "flags_add": ["relay_retuned"],
+          "flags_remove": [],
+          "quests": [
+            {
+              "id": "ghostlight_relay",
+              "status": "complete",
+              "summary": "Choose whether to disable or retune the Ghostlight Relay"
+            }
+          ]
+        },
+        "director_updates": {
+          "end_goal_progress": "The Ghostlight Relay now carries truthful warnings, and the district keeps its signal network without the panic loop."
+        },
+        "memory_updates": [
+          "You retuned the Ghostlight Relay so the district keeps a truthful warning network."
+        ]
+      }
+    }
+  ],
+  "expected_final_state": {
+    "location": "Relay Vault",
+    "inventory": ["tuning_fork"],
+    "flags": [
+      "beacon_inspected",
+      "nila_guidance",
+      "tuning_fork_taken",
+      "causeway_crossed",
+      "vault_opened",
+      "relay_retuned"
+    ],
+    "quests": [
+      {
+        "id": "ghostlight_relay",
+        "status": "complete",
+        "summary": "Choose whether to disable or retune the Ghostlight Relay"
+      }
+    ],
+    "director_state": {
+      "current_act_id": "act_2",
+      "current_beat_id": "a2_b3",
+      "story_beats_remaining": 0,
+      "completed_beats": ["a1_b1", "a1_b2", "a1_b3", "a2_b1", "a2_b2", "a2_b3"]
+    },
+    "end_goal_progress": "The Ghostlight Relay now carries truthful warnings, and the district keeps its signal network without the panic loop."
+  }
+}

@@ -300,7 +300,7 @@ test("session controller startGameFlow loads the player and adds the opening gui
   assert.equal(state.hasEnteredFlow, true);
   assert.equal(state.player?.id, "player-123");
   assert.equal(storage.get("playerId"), "player-123");
-  assert.deepEqual(entries, ["Avery arrives in Rooftop Market. Try \"look around\" or any short action to begin."]);
+  assert.deepEqual(entries, ["Avery arrives in Rooftop Market. Try \"find the signal\" or another short action to begin."]);
   assert.equal(focusedInput, true);
   assert.deepEqual(pending, [true, true, false]);
 });
@@ -362,7 +362,7 @@ test("session controller startGameFlow resumes the saved browser session with re
   assert.equal(state.playerId, "player-123");
   assert.deepEqual(requestedUrls, ["/api/state?playerId=player-saved&name=Avery"]);
   assert.deepEqual(entries, [
-    'Back in Rooftop Market. Continue where you left off or try "look around" to get your bearings.'
+    'Back in Rooftop Market. Continue where you left off or pick up the current lead: "find the signal."'
   ]);
 });
 

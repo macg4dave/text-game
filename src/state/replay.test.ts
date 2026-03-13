@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -16,6 +17,53 @@ process.env.GAME_DB_PATH = path.join(tempDirectory, "game.db");
 const dbModule = await import("../core/db.js");
 const gameModule = await import("./game.js");
 const replayModule = await import("./replay.js");
+const committedEventModule = await import("./committed-event.js");
+
+const storySampleFixture = JSON.parse(
+  fs.readFileSync(path.resolve(process.cwd(), "data", "story_sample_walkthrough.json"), "utf8")
+) as {
+  fixture_id: string;
+  player: Player;
+  turns: Array<{
+    input: string;
+    occurred_at: string;
+    outcome_summary: string;
+    committed: Parameters<typeof committedEventModule.createCommittedTurnEventPayload>[0]["committed"];
+  }>;
+  expected_final_state: {
+    location: string;
+    inventory: string[];
+    flags: string[];
+    quests: Player["quests"];
+    director_state: {
+      current_act_id: string;
+      current_beat_id: string;
+      story_beats_remaining: number;
+      completed_beats: string[];
+    };
+    end_goal_progress: string;
+  };
+};
+
+function seedPlayerRow(player: Player): void {
+  dbModule
+    .getDb()
+    .prepare(
+      `INSERT INTO players (id, name, created_at, location, summary, director_state, inventory, flags, quests)
+       VALUES (@id, @name, @created_at, @location, @summary, @director_state, @inventory, @flags, @quests)`
+    )
+    .run({
+      id: player.id,
+      name: player.name,
+      created_at: player.created_at,
+      location: player.location,
+      summary: player.summary,
+      director_state: JSON.stringify(player.director_state),
+      inventory: JSON.stringify(player.inventory),
+      flags: JSON.stringify(player.flags),
+      quests: JSON.stringify(player.quests)
+    });
+}
 
 function createPlayer(): Player {
   return {
@@ -50,7 +98,23 @@ test("canonical committed events persist separately from transcript rows and rep
   dbModule.resetDb();
 
   const player = createPlayer();
-  gameModule.getOrCreatePlayer({ playerId: player.id, name: player.name });
+  seedPlayerRow(player);
+  gameModule.addCommittedTurnEvent(
+    committedEventModule.createPlayerCreatedEventPayload({
+      eventId: "event-player-created",
+      occurredAt: player.created_at,
+      player: {
+        schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+        ...player
+      },
+      supplemental: {
+        presentation: {
+          narrative: null,
+          player_options: []
+        }
+      }
+    })
+  );
 
   gameModule.addEvent(player.id, "player", "touch the lantern");
   gameModule.addEvent(player.id, "narrator", "The signal lantern hummed when touched.");
@@ -184,6 +248,60 @@ test("replay requires a canonical player-created event before applying committed
     () => replayModule.replayCommittedTurnEvents({ events: turnOnlyEvents }),
     /Replay requires a canonical player-created event/
   );
+});
+
+test("story_sample walkthrough fixture replays to the canonical Ghostlight Relay ending", () => {
+  dbModule.resetDb();
+  seedPlayerRow(storySampleFixture.player);
+
+  gameModule.addCommittedTurnEvent(
+    committedEventModule.createPlayerCreatedEventPayload({
+      eventId: `${storySampleFixture.fixture_id}-player-created`,
+      occurredAt: storySampleFixture.player.created_at,
+      player: {
+        schema_version: AUTHORITATIVE_STATE_SCHEMA_VERSION,
+        ...storySampleFixture.player
+      },
+      supplemental: {
+        presentation: {
+          narrative: null,
+          player_options: []
+        }
+      }
+    })
+  );
+
+  storySampleFixture.turns.forEach((turn, index) => {
+    gameModule.addCommittedTurnEvent(
+      committedEventModule.createCommittedTurnEventPayload({
+        eventId: `${storySampleFixture.fixture_id}-turn-${index + 1}`,
+        playerId: storySampleFixture.player.id,
+        occurredAt: turn.occurred_at,
+        input: turn.input,
+        outcome: {
+          status: "accepted",
+          summary: turn.outcome_summary,
+          rejection_reason: null
+        },
+        committed: turn.committed,
+        rulesetVersion: "story-rules/v1"
+      })
+    );
+  });
+
+  const replayed = replayModule.replayCommittedTurnEvents({
+    events: gameModule.getCommittedTurnEvents(storySampleFixture.player.id)
+  });
+
+  assert.equal(replayed.location, storySampleFixture.expected_final_state.location);
+  assert.deepEqual(replayed.inventory, storySampleFixture.expected_final_state.inventory);
+  assert.deepEqual(replayed.flags, storySampleFixture.expected_final_state.flags);
+  assert.deepEqual(replayed.quests, storySampleFixture.expected_final_state.quests);
+  assert.equal(replayed.director_state.current_act_id, storySampleFixture.expected_final_state.director_state.current_act_id);
+  assert.equal(replayed.director_state.current_beat_id, storySampleFixture.expected_final_state.director_state.current_beat_id);
+  assert.equal(replayed.director_state.story_beats_remaining, storySampleFixture.expected_final_state.director_state.story_beats_remaining);
+  assert.deepEqual(replayed.director_state.completed_beats, storySampleFixture.expected_final_state.director_state.completed_beats);
+  assert.equal(replayed.director_state.end_goal_progress, storySampleFixture.expected_final_state.end_goal_progress);
 });
 
 test.after(() => {

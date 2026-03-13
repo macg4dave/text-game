@@ -1,14 +1,14 @@
-mod compose;
+pub(crate) mod compose;
 mod issues;
-mod output;
+pub(crate) mod output;
 mod preflight;
-mod probes;
+pub(crate) mod probes;
 mod runtime;
 
 use anyhow::Result;
 use clap::Args;
 
-use crate::config::{resolve_repo_ai_config, resolve_workspace_root_from, RepoAiConfig};
+use crate::config::{resolve_repo_ai_config, resolve_workspace_root, RepoAiConfig};
 use crate::env::load_repo_env;
 use crate::process::ProcessInvocation;
 
@@ -26,7 +26,7 @@ pub struct StartDevOptions {
 }
 
 pub fn run(options: StartDevOptions) -> Result<()> {
-    let repo_root = resolve_workspace_root_from(&std::env::current_dir()?)?;
+    let repo_root = resolve_workspace_root()?;
     let repo_env = load_repo_env(&repo_root)?;
     let mut config = resolve_provider_config(&repo_env);
 

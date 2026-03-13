@@ -217,10 +217,11 @@ export function createSessionController(context: SessionControllerContext) {
         return;
       }
 
+      const suggestedAction = getSuggestedOpeningAction(player);
       const guideMessage =
         mode === "resume"
-          ? `Back in ${player.location}. Continue where you left off or try "look around" to get your bearings.`
-          : `${player.name} arrives in ${player.location}. Try "look around" or any short action to begin.`;
+          ? `Back in ${player.location}. Continue where you left off or pick up the current lead: "${suggestedAction}."`
+          : `${player.name} arrives in ${player.location}. Try "${suggestedAction}" or another short action to begin.`;
       context.addEntry("Guide", guideMessage, "system");
       context.setStatus(mode === "resume" ? "Game resumed" : "New game ready", "ok");
     } catch (error) {
@@ -530,4 +531,21 @@ export function createSessionController(context: SessionControllerContext) {
     context.render();
     context.setPending(false);
   }
+}
+
+function getSuggestedOpeningAction(player: PlayerState): string {
+  const beatLabel = player.director_state?.current_beat_label?.trim();
+  if (!beatLabel) {
+    return "look around";
+  }
+
+  return lowerCaseFirstCharacter(beatLabel.replace(/[.]+$/, ""));
+}
+
+function lowerCaseFirstCharacter(value: string): string {
+  if (!value) {
+    return value;
+  }
+
+  return value.charAt(0).toLowerCase() + value.slice(1);
 }

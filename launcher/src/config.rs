@@ -285,15 +285,45 @@ fn parse_port(value: &str) -> u16 {
         .unwrap_or(3000)
 }
 
+pub fn resolve_workspace_root() -> Result<PathBuf, SunrayError> {
+    let mut search_roots = Vec::new();
+    if let Ok(current_dir) = std::env::current_dir() {
+        search_roots.push(current_dir);
+    }
+
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(exe_dir) = current_exe.parent() {
+            let exe_dir = exe_dir.to_path_buf();
+            if !search_roots.contains(&exe_dir) {
+                search_roots.push(exe_dir);
+            }
+        }
+    }
+
+    resolve_workspace_root_from_candidates(search_roots)
+}
+
 pub fn resolve_workspace_root_from(start_dir: &Path) -> Result<PathBuf, SunrayError> {
-    for candidate in start_dir.ancestors() {
-        if is_workspace_root(candidate) {
-            return Ok(candidate.to_path_buf());
+    resolve_workspace_root_from_candidates([start_dir.to_path_buf()])
+}
+
+fn resolve_workspace_root_from_candidates<I>(start_dirs: I) -> Result<PathBuf, SunrayError>
+where
+    I: IntoIterator<Item = PathBuf>,
+{
+    let mut attempted = Vec::new();
+
+    for start_dir in start_dirs {
+        attempted.push(start_dir.clone());
+        for candidate in start_dir.ancestors() {
+            if is_workspace_root(candidate) {
+                return Ok(candidate.to_path_buf());
+            }
         }
     }
 
     Err(SunrayError::WorkspaceRootNotFound {
-        start_dir: start_dir.to_path_buf(),
+        start_dirs: attempted,
     })
 }
 
@@ -353,6 +383,20 @@ mod tests {
                 .join("assets")
                 .join("local-gpu-profile-matrix.json")
         ));
+    }
+
+    #[test]
+    fn workspace_root_resolves_from_release_exe_directory_shape() {
+        let root = resolve_workspace_root_from(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("target")
+                .join("release")
+                .as_path(),
+        )
+        .expect("workspace root should resolve from launcher/target/release");
+
+        assert!(root.join("package.json").exists());
+        assert!(root.join("BACKLOG.md").exists());
     }
 
     #[test]

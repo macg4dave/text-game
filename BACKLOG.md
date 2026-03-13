@@ -164,10 +164,10 @@ No global blocker as of 2026-03-09:
 | T65d | Now | P1 | P1 | SunRay validator command migration | Done | T65a | `cargo run --manifest-path launcher/Cargo.toml -- validate-local-gpu-profile-matrix` + `cargo run --manifest-path launcher/Cargo.toml -- validate-litellm-default-config` |
 | T65e | Now | P1 | P1 | SunRay setup smoke and desktop wrapper migration | Review | T65a, T65b | `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` + `cargo run --manifest-path launcher/Cargo.toml -- start-desktop-prototype` |
 | T65f | Now | P1 | P1 | Shell reference cleanup and script deletion | Review | T65b, T65c, T65d, T65e | `cargo test --manifest-path launcher/Cargo.toml` + manual doc and launcher-copy consistency review |
-| T66 | Next | P1 | P2 | SunRay Rust-native cleanup | In Progress | None | Manual planning-doc consistency review + child task validation |
+| T66 | Next | P1 | P2 | SunRay Rust-native cleanup | Done | None | Manual planning-doc consistency review + child task validation |
 | T66a | Now | P1 | P2 | SunRay command contract cleanup | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- --no-browser` + manual launcher-doc consistency review |
 | T66b | Next | P1 | P2 | SunRay start-dev orchestration split | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` |
-| T66c | Next | P1 | P2 | SunRay shared probe and smoke helper extraction | Ready | T66b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` |
+| T66c | Next | P1 | P2 | SunRay shared probe and smoke helper extraction | Done | T66b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` |
 | T66d | Now | P1 | P2 | SunRay Windows exe release path | Done | T66 | `cargo test --manifest-path launcher/Cargo.toml` + `cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml` + manual launcher-doc consistency review |
 | T02c | Now | P0 | P2 | Windows local AI smoke-test path | Done | T02 | `docker compose run --rm --no-deps app npm run test:config` + manual Docker Ollama smoke |
 | T02d | Now | P0 | P2 | Local AI workflow regression harness | Done | T02c | `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1` |
@@ -177,7 +177,7 @@ No global blocker as of 2026-03-09:
 | T02g | Next | P0 | P1 | GPU tier matrix and local model profiles | Done | T02f | Matrix review |
 | T06 | Next | P1 | P1 | Turn input, output, and state schemas | Done | T02 | `npm test` |
 | T07 | Next | P1 | P1 | Turn handler and model orchestration | Done | T06, T57a, T58a | `npm test` |
-| T07a | Next | P1 | P1 | LiteLLM default chat route for turn generation | Ready | T02f, T07 | Manual turn submission against LiteLLM |
+| T07a | Next | P1 | P1 | LiteLLM default chat route for turn generation | Done | T02f, T07 | Manual turn submission against LiteLLM |
 | T08 | Next | P1 | P1 | Deterministic state reducer | Done | T06, T57a, T58a | `npm test` |
 | T09 | Next | P1 | P1 | Event log persistence and replay | Done | T04, T08, T57b, T59a | Replay fixture execution |
 | T10 | Next | P1 | P1 | Output validator and sanitizer | Done | T06, T57a, T61a | `npm test` |
@@ -211,7 +211,7 @@ No global blocker as of 2026-03-09:
 | T64 | Now | P1 | P1 | MVP sample story arc definition and delivery slices | Done | None | Manual planning-doc consistency review |
 | T64a | Now | P1 | P1 | story_sample brief and acceptance criteria | Done | None | Manual planning-doc consistency review |
 | T64b | Next | P1 | P1 | story_sample authored content slice | Done | T34, T57c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/story/quest.test.ts src/state/adjudication.test.ts src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` + live `/api/state` and guided `/api/turn` smoke |
-| T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Ready | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
+| T64c | Next | P1 | P1 | Baseline story arc walkthrough and golden replay fixture | Done | T64b, T59b | Replay fixture execution + manual 10-turn story smoke |
 | T57b | Next | P1 | P1 | Server consequence adjudication and commit policy | Done | T57a, T07, T08, T10 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T57c | Next | P1 | P1 | Post-commit narration and authority-drift fixtures | Done | T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T59b | Next | P1 | P1 | Committed outcome event persistence and replay fixture | Done | T59a, T57b, T09 | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
@@ -221,7 +221,7 @@ No global blocker as of 2026-03-09:
 | T51 | Next | P1 | P1 | Database storage and migration boundary split | Ready | T06 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts migrate` + `docker compose run --rm --no-deps app npx tsx src/core/db.ts reset` |
 | T52 | Next | P1 | P1 | Validator contract module split | Ready | T06, T12c, T61a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/validator.test.ts` + `docker compose run --rm --no-deps app npm test` |
 | T53 | Next | P1 | P1 | Launcher entrypoint and script library split | Dropped | T02h, T12c | Superseded by `T65` |
-| T54 | Next | P1 | P2 | Setup view model and recovery policy split | Ready | T11a, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
+| T54 | Next | P1 | P2 | Setup view model and recovery policy split | Done | T11a, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T62 | Next | P2 | P1 | NPC memory significance pipeline | Done | T59, T60 | Manual planning-doc consistency review |
 | T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Ready | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `powershell -ExecutionPolicy Bypass -File scripts/test-local-ai-workflow.ps1 -SelectionOnly` |
 | T63 | Next | P2 | P1 | Memory storage hierarchy and context-budget policy | Done | T59, T60, T61, T62 | Manual planning-doc consistency review |
@@ -707,7 +707,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T64c - Baseline Story Arc Walkthrough And Golden Replay Fixture
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -741,6 +741,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - keep the fixture grounded in committed semantics; exact prose may vary as long as the accepted outcome is stable
   - prefer one canonical success path first; broader branch coverage can come later once the baseline replay target is stable
   - ready on 2026-03-13 now that `T64b` authored the `Ghostlight Relay` content slice and the live supported turn path can reach the Relay Vault choice beat
+  - completed on 2026-03-13 by adding `data/story_sample_walkthrough.json` as the canonical 10-turn Ghostlight Relay path, `scripts/replay-fixture.ts` as the rerunnable replay check, and focused `src/state/replay.test.ts` coverage that replays the same committed-event fixture to the retuned-relay ending
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/replay.test.ts`, and `docker compose run --rm --no-deps app npx tsx scripts/replay-fixture.ts`; the fixture replayed to `Relay Vault` with the canonical retuned-relay completion and zero remaining beats
+  - manual live smoke on 2026-03-13 used the same 10 guided inputs through `http://127.0.0.1:3100/api/turn` after `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`; the supported path completed `ghostlight_relay` at `Relay Vault` with the retuned ending, but intermediate live flags and director beat progression still varied from the deterministic fixture, so the committed-event fixture remains the regression source of truth for later replay, save, and budget work
 
 ### T58 - Player Agency And Pacing Boundary
 
@@ -3869,7 +3872,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T66 - SunRay Rust-native cleanup
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -3909,6 +3912,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - `T65` closed the migration blocker; `T66` is follow-up quality work and must not reintroduce shell wrappers
   - keep changes scoped to automation structure and launcher-copy ownership rather than expanding into Docker, Electron, or app-runtime redesign
+  - completed on 2026-03-13 after `T66a` through `T66d` removed legacy command-contract wording, split `start-dev` orchestration into focused modules, extracted shared smoke helpers, and locked the supported Windows `SunRay.exe` release path
+  - final closeout review confirmed the remaining Rust launcher helpers now live in shared Rust modules instead of per-command shell-style copies, while the user-facing command surface stayed unchanged
 
 ### T66a - SunRay Command Contract Cleanup
 
@@ -3988,7 +3993,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T66c - SunRay Shared Probe And Smoke Helper Extraction
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -4021,6 +4026,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - Rust-owned assets and deterministic smoke paths remain discoverable under `launcher/`
 - Handoff Notes:
   - keep this task about shared launcher infrastructure, not about redesigning the Electron or Docker contracts
+  - completed on 2026-03-13 by reusing the extracted `start_dev` compose, probe, and output helpers from `test_local_ai_workflow`, `test_setup_browser_smoke`, and `start_desktop_prototype`, plus a new checked capture path in `launcher/src/process.rs` for command-oriented child-process failures
+  - validation on 2026-03-13 ran `cargo test --manifest-path launcher/Cargo.toml`, `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`, and `cargo run --manifest-path launcher/Cargo.toml -- test-setup-browser-smoke` with `CARGO_TARGET_DIR=%TEMP%/text-game-sunray-target` on Windows to avoid the known `launcher/target` execution-permission issue on this workspace drive
 
 ### T66d - SunRay Windows Exe Release Path
 
@@ -4058,10 +4065,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - keep this focused on the launcher executable artifact path, not broader installer or packaging work
   - completed on 2026-03-13 by giving the Rust launcher an explicit `[[bin]]` name of `SunRay`, adding the repo convenience command `npm run sunray:build-release`, and documenting the stable Windows artifact path at `launcher/target/release/SunRay.exe`
   - validation on 2026-03-13 reran `cargo test --manifest-path launcher/Cargo.toml` and `cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml`; the built executable exists at `launcher/target/release/SunRay.exe`
+  - follow-up fix on 2026-03-13 made launcher repo discovery fall back to the executable directory when the current working directory is outside the repo, so double-clicked or externally launched `SunRay.exe` still finds `G:\\text-game`, starts the Docker stack, and reaches the app URL instead of failing workspace resolution
+  - replayable validation for that regression on 2026-03-13 used `cargo test --manifest-path launcher/Cargo.toml`, `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser`, `cargo build --release --target-dir launcher/target --manifest-path launcher/Cargo.toml`, and `& 'G:\\text-game\\launcher\\target\\release\\SunRay.exe' start-dev --no-browser` from `G:\\`; both launcher paths resolved the repo and reported readiness at `http://127.0.0.1:3100/`
 
 ### T54 - Setup View Model And Recovery Policy Split
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -4096,6 +4105,9 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - anti-monolith audit on 2026-03-08 found `src/ui/setup-view.ts` combining setup wizard state mapping, preflight issue mapping, recovery-action classification, and DOM rendering
   - `T34` and `T36b` are likely to deepen this surface, so finish the split before those tasks add more UI behavior
   - preserve `data-recovery-action` ids during the extraction so the current click wiring stays stable
+  - completed on 2026-03-13 by extracting recovery-action selection into `src/ui/setup-recovery-policy.ts`, moving pure setup and preflight view-model builders into `src/ui/setup-view-model.ts`, and leaving `src/ui/setup-view.ts` focused on DOM rendering plus stable re-exports for the existing callers and tests
+  - added `src/ui/setup-recovery-policy.test.ts` to pin the launcher-copy, smaller-profile, and GPU-repair action mix so later onboarding work can extend policy without reopening the renderer
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/ui/setup-recovery-policy.test.ts src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts`, and `docker compose run --rm --no-deps app npm run build:client`
 
 ### T55 - Config Env Resolution And Diagnostics Split
 
@@ -4174,7 +4186,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T07a - LiteLLM Default Chat Route For Turn Generation
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -4205,6 +4217,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - card restored on 2026-03-08 during backlog consistency cleanup
   - keep follow-on automated route coverage in `T47` instead of expanding this task into a fixture suite
+  - completed on 2026-03-13 by refactoring `src/ai/service.ts` into an explicit adapter factory with injectable client dependencies, which keeps provider-specific request execution inside the AI adapter boundary while making the LiteLLM alias path directly testable
+  - added `getAiRouteSummary()` in `src/core/config.ts` plus focused coverage in `src/ai/service.test.ts` and `src/core/config.test.ts` so the repo now proves both that turn generation sends the configured `game-chat` alias into chat completions and that the default LiteLLM alias route resolves correctly from config
+  - added `scripts/validate-litellm-turn-route.ts` as the repeatable manual validation path for a running app; it boots or resumes a session, submits a real turn, and prints the resolved provider, base URL, aliases, request id, and narrative preview for the exercised route
+  - deterministic AI harness baseline before implementation on 2026-03-13 ran `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` and passed with provider `ollama`, base URL `http://127.0.0.1:11434/v1`, chat model `gemma3:4b`, and embedding model `embeddinggemma`
+  - post-change validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/ai/service.test.ts src/core/config.test.ts src/state/turn.test.ts src/server/turn-route.test.ts`, and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`; all passed
+  - live LiteLLM route validation on 2026-03-13 used `cargo run --manifest-path launcher/Cargo.toml -- start-dev --no-browser` and `docker compose run --rm --no-deps app npx tsx scripts/validate-litellm-turn-route.ts --server http://host.docker.internal:3100 --input "inspect the sparking market beacon"`; the script reported provider `litellm`, base URL `http://litellm:4000`, chat model `game-chat`, embedding model `game-embedding`, `usesDefaultLiteLLMAliases: true`, request id `f4633bc0-7490-4456-97cb-041c5149f757`, and a successful turn response for player `eaf91587-e418-4bcb-a1e5-3b6fc4cfb11a`
 
 ### T08 - Deterministic State Reducer
 

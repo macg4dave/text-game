@@ -63,13 +63,11 @@ pub fn run(cli: Cli) -> Result<()> {
             selection_only,
             persona,
             persona_seed,
-        }) => {
-            test_local_ai_workflow::run(TestLocalAiWorkflowOptions {
-                selection_only,
-                persona,
-                persona_seed,
-            })
-        }
+        }) => test_local_ai_workflow::run(TestLocalAiWorkflowOptions {
+            selection_only,
+            persona,
+            persona_seed,
+        }),
         Some(Commands::TestSetupBrowserSmoke) => test_setup_browser_smoke::run(),
         Some(Commands::ValidateLocalGpuProfileMatrix) => {
             validators::run_validate_local_gpu_profile_matrix()

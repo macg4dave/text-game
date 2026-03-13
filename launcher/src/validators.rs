@@ -4,7 +4,7 @@ use std::fs;
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
 
-use crate::config::{local_gpu_profile_matrix_path, resolve_workspace_root_from};
+use crate::config::{local_gpu_profile_matrix_path, resolve_workspace_root};
 
 #[derive(Debug, Default)]
 struct ValidationReport {
@@ -89,7 +89,7 @@ struct EmbeddingRoute {
 }
 
 pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
-    let repo_root = resolve_workspace_root_from(&std::env::current_dir()?)?;
+    let repo_root = resolve_workspace_root()?;
     let matrix_path = local_gpu_profile_matrix_path(&repo_root);
     let litellm_config_path = repo_root.join("litellm.local-gpu.config.yaml");
     let docker_compose_path = repo_root.join("docker-compose.yml");
@@ -424,7 +424,7 @@ pub fn run_validate_local_gpu_profile_matrix() -> Result<()> {
 }
 
 pub fn run_validate_litellm_default_config() -> Result<()> {
-    let repo_root = resolve_workspace_root_from(&std::env::current_dir()?)?;
+    let repo_root = resolve_workspace_root()?;
     let config_text = fs::read_to_string(repo_root.join("litellm.config.yaml"))?;
     let mut report = ValidationReport::default();
 

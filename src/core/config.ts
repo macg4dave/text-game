@@ -7,6 +7,7 @@ import {
   type ConfigValueSource,
   DEFAULT_PORT,
   SUPPORTED_AI_PROVIDERS,
+  getProviderDefaults,
   type SafeConfigDiagnostics
 } from "./config/shared.js";
 import {
@@ -40,6 +41,15 @@ export {
 
 export type { AiConfigField, ConfigEnvSource, ConfigLike, ConfigValueSource, SafeConfigDiagnostics };
 
+export interface AiRouteSummary {
+  provider: string;
+  baseUrl: string;
+  chatModel: string;
+  embeddingModel: string;
+  usesDefaultLiteLLMAliases: boolean;
+  usesDefaultLiteLLMRoute: boolean;
+}
+
 export function loadConfig(env: EnvSource = process.env): AppConfig {
   return loadConfigInternal(env);
 }
@@ -55,6 +65,26 @@ export function getSafeConfigDiagnostics(
 
 export function getPublicRuntimeConfig(configToSummarize: ConfigLike, env: EnvSource = process.env) {
   return getPublicRuntimeConfigInternal(configToSummarize, env);
+}
+
+export function getAiRouteSummary(configToSummarize: AppConfig = config): AiRouteSummary {
+  const litellmDefaults = getProviderDefaults("litellm");
+
+  return {
+    provider: configToSummarize.ai.provider,
+    baseUrl: configToSummarize.ai.baseUrl,
+    chatModel: configToSummarize.ai.chatModel,
+    embeddingModel: configToSummarize.ai.embeddingModel,
+    usesDefaultLiteLLMAliases:
+      configToSummarize.ai.provider === "litellm" &&
+      configToSummarize.ai.chatModel === litellmDefaults.chatModel &&
+      configToSummarize.ai.embeddingModel === litellmDefaults.embeddingModel,
+    usesDefaultLiteLLMRoute:
+      configToSummarize.ai.provider === "litellm" &&
+      configToSummarize.ai.baseUrl === litellmDefaults.baseUrl &&
+      configToSummarize.ai.chatModel === litellmDefaults.chatModel &&
+      configToSummarize.ai.embeddingModel === litellmDefaults.embeddingModel
+  };
 }
 
 export function assertValidConfig(configToValidate: AppConfig = config): AppConfig {

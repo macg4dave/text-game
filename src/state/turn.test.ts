@@ -622,7 +622,10 @@ test("turn service rejects unearned quest and memory proposals before persistenc
   assert.equal(outcome.turnOutput.state_updates.quests[0]?.status, "complete");
   assert.equal(outcome.turnOutput.director_updates.end_goal_progress, "The tower is basically won already.");
   assert.deepEqual(outcome.turnOutput.memory_updates, ["Everyone in the city trusts the player now."]);
-  assert.equal(outcome.turnOutput.narrative, "You press the attempt, but nothing new is committed yet.");
+  assert.equal(
+    outcome.turnOutput.narrative,
+    "You pause in Rooftop Market and take stock. The clearest lead is still to find the signal."
+  );
   assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
 
   const persistedPlayer = persistedPlayers.at(-1);

@@ -7,6 +7,7 @@ import {
   countPreflightIssues,
   createPreflightReport,
   formatConfigErrors,
+  getAiRouteSummary,
   getAiEnvVarNames,
   getPublicRuntimeConfig,
   getSafeConfigDiagnostics,
@@ -133,6 +134,19 @@ test("loadConfig applies LiteLLM defaults without extra env edits", () => {
   assert.equal(loaded.ai.baseUrl, "http://127.0.0.1:4000");
   assert.equal(loaded.ai.chatModel, "game-chat");
   assert.equal(loaded.ai.embeddingModel, "game-embedding");
+});
+
+test("getAiRouteSummary identifies the default LiteLLM alias route", () => {
+  const loaded = loadConfig({});
+
+  assert.deepEqual(getAiRouteSummary(loaded), {
+    provider: "litellm",
+    baseUrl: "http://127.0.0.1:4000",
+    chatModel: "game-chat",
+    embeddingModel: "game-embedding",
+    usesDefaultLiteLLMAliases: true,
+    usesDefaultLiteLLMRoute: true
+  });
 });
 
 test("loadConfig defaults logging to info and validates supported LOG_LEVEL values", () => {

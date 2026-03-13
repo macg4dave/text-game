@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::process::Command;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use crate::error::SunrayError;
 
@@ -98,6 +98,15 @@ impl ProcessInvocation {
         })
     }
 
+    pub fn capture_checked(&self) -> Result<ProcessCapture> {
+        let capture = self.capture()?;
+        if capture.exit_code == Some(0) {
+            return Ok(capture);
+        }
+
+        Err(anyhow!(combine_capture_output(&capture)))
+    }
+
     fn to_command(&self) -> Command {
         let mut command = Command::new(&self.program);
         command.args(&self.args);
@@ -116,6 +125,14 @@ impl ProcessInvocation {
 
         command
     }
+}
+
+pub fn combine_capture_output(capture: &ProcessCapture) -> String {
+    [capture.stdout.trim(), capture.stderr.trim()]
+        .into_iter()
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 pub fn render_command_preview(program: &str, args: &[String]) -> String {
@@ -139,7 +156,9 @@ fn quote_arg(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{render_command_preview, ProcessInvocation};
+    use super::{
+        combine_capture_output, render_command_preview, ProcessCapture, ProcessInvocation,
+    };
 
     #[test]
     fn command_preview_quotes_spacey_args() {
@@ -174,5 +193,16 @@ mod tests {
     fn invocation_stores_env_removals() {
         let invocation = ProcessInvocation::new("npm").with_env_removed("ELECTRON_RUN_AS_NODE");
         assert!(invocation.env_removals.contains("ELECTRON_RUN_AS_NODE"));
+    }
+
+    #[test]
+    fn combine_capture_output_joins_non_empty_streams() {
+        let capture = ProcessCapture {
+            exit_code: Some(1),
+            stdout: "left".to_string(),
+            stderr: "right".to_string(),
+        };
+
+        assert_eq!(combine_capture_output(&capture), "left right");
     }
 }
