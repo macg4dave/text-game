@@ -470,6 +470,8 @@ export interface MemoryRow {
   embedding: string | null;
 }
 
+export type MemoryKind = "fact" | "npc-encounter-fact" | "npc-memory";
+
 export const MEMORY_CLASS_RULES = {
   hard_canon: {
     authority: "authoritative",
@@ -504,8 +506,46 @@ export interface MemoryCandidate {
   source: MemorySource;
 }
 
+export interface NpcEncounterFact {
+  npc_id: string;
+  display_name: string;
+  role: string | null;
+  location: string | null;
+  topics: string[];
+  promises: string[];
+  clues: string[];
+  mood: string | null;
+  relationship_change: string | null;
+  last_seen_beat: string | null;
+  encounter_count: number;
+  significance: number;
+  summary: string;
+  source_event_id: string;
+  last_seen_at: string;
+  quest_hooks?: string[];
+}
+
+export interface NpcEncounterSignificanceBreakdown {
+  stable_identity: number;
+  repeated_meaningful_exchange: number;
+  relationship_change: number;
+  clues: number;
+  promises: number;
+  quest_hooks: number;
+  unique_role: number;
+  voluntary_return: number;
+}
+
+export interface NpcEncounterSignificanceResult {
+  score: number;
+  threshold: number;
+  shouldPromoteToLongLivedMemory: boolean;
+  breakdown: NpcEncounterSignificanceBreakdown;
+}
+
 export interface MemoryInsert {
   content: string;
+  kind?: MemoryKind;
   embedding?: number[];
 }
 

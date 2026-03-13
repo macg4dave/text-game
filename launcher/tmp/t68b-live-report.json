@@ -1,0 +1,56 @@
+{
+  "command": "SunRay test-local-ai-workflow --persona-seed 7 --report-json launcher/tmp/t68b-live-report.json",
+  "selection_only": false,
+  "status": "passed",
+  "summary": "9 scenario(s) passed.",
+  "persona": "practical-fixer",
+  "persona_source": "seeded selection",
+  "persona_seed": 7,
+  "scenarios": [
+    {
+      "scenario_id": "local-gpu-profile-selection",
+      "status": "passed",
+      "summary": "Local GPU profile selection contract stayed stable."
+    },
+    {
+      "scenario_id": "turn-schema-guardrails",
+      "status": "passed",
+      "summary": "TypeScript turn-schema guardrail test passed."
+    },
+    {
+      "scenario_id": "walkthrough-matrix-contracts",
+      "status": "passed",
+      "summary": "Validated 3 scripted walkthrough scenarios against story_sample_ghostlight_relay_v1."
+    },
+    {
+      "scenario_id": "embeddings-endpoint",
+      "status": "passed",
+      "summary": "Embeddings endpoint returned a vector of length 768."
+    },
+    {
+      "scenario_id": "scene-schema",
+      "status": "passed",
+      "summary": "Structured scene response parsed successfully."
+    },
+    {
+      "scenario_id": "game-turn-schema",
+      "status": "passed",
+      "summary": "Single-turn game_turn schema smoke passed with practical-fixer persona."
+    },
+    {
+      "scenario_id": "story-sample-market-rumor",
+      "status": "passed",
+      "summary": "Market rumor opening validated 3 turns from Rooftop Market to Closed Stacks with practical-fixer persona."
+    },
+    {
+      "scenario_id": "story-sample-causeway-run",
+      "status": "passed",
+      "summary": "Causeway route validated 5 turns from Closed Stacks to Relay Vault with practical-fixer persona."
+    },
+    {
+      "scenario_id": "story-sample-relay-finale",
+      "status": "passed",
+      "summary": "Relay finale validated 2 turns from Relay Vault to Relay Vault with practical-fixer persona."
+    }
+  ]
+}

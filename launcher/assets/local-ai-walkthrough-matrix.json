@@ -1,0 +1,28 @@
+{
+  "fixture_id": "story_sample_ghostlight_relay_v1",
+  "history_window": 3,
+  "memory_window": 4,
+  "scenarios": [
+    {
+      "id": "story-sample-market-rumor",
+      "label": "Market rumor opening",
+      "summary": "Beacon inspection, Nila guidance, and the first move toward the Closed Stacks.",
+      "start_turn": 0,
+      "turn_count": 3
+    },
+    {
+      "id": "story-sample-causeway-run",
+      "label": "Causeway route",
+      "summary": "Tuning fork recovery, causeway crossing, and vault opening.",
+      "start_turn": 3,
+      "turn_count": 5
+    },
+    {
+      "id": "story-sample-relay-finale",
+      "label": "Relay finale",
+      "summary": "Final relay study and the retuned-warning ending.",
+      "start_turn": 8,
+      "turn_count": 2
+    }
+  ]
+}

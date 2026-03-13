@@ -225,7 +225,7 @@ No global blocker as of 2026-03-09:
 | T53 | Next | P1 | P1 | Launcher entrypoint and script library split | Dropped | T02h, T12c | Superseded by `T65` |
 | T54 | Next | P1 | P2 | Setup view model and recovery policy split | Done | T11a, T12c | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/setup-view.test.ts src/ui/launch-view.test.ts src/ui/setup-browser-smoke.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T62 | Next | P2 | P1 | NPC memory significance pipeline | Done | T59, T60 | Manual planning-doc consistency review |
-| T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Ready | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T62a | Next | P2 | P1 | Encounter fact schema and significance evaluator | Done | T59a, T60a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T63 | Next | P2 | P1 | Memory storage hierarchy and context-budget policy | Done | T59, T60, T61, T62 | Manual planning-doc consistency review |
 | T63a | Next | P2 | P1 | Live context hierarchy and retrieval budget contract | Blocked | T60a, T61a, T62a | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T63b | Next | P2 | P1 | Summary compression and versioned memory artifacts | Blocked | T63a, T59b, T62b | `docker compose run --rm --no-deps app npm run type-check` + replay fixture execution + `docker compose run --rm --no-deps app npm test` |
@@ -236,7 +236,7 @@ No global blocker as of 2026-03-09:
 | T67c | Later | P2 | P2 | Guide UI surface and turn-safe presentation | Blocked | T67b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/ui/**/*.test.ts` + `docker compose run --rm --no-deps app npm run build:client` |
 | T68 | Now | P1 | P2 | VS Code AI auto-test workflow and operator guidance | Done | None | Manual planning-doc consistency review + child task validation |
 | T68a | Now | P1 | P2 | VS Code AI auto-test rules and usage docs | Done | T68 | Manual doc consistency review |
-| T68b | Next | P1 | P2 | SunRay scripted AI walkthrough matrix | Ready | T64c, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
+| T68b | Next | P1 | P2 | SunRay scripted AI walkthrough matrix | Done | T64c, T65c | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live walkthrough smoke |
 | T68c | Next | P1 | P2 | AI validation reporting and seed-capture contract | Done | T68a | Manual planning-doc consistency review + example handoff-note review |
 | T69 | Now | P1 | P2 | VS Code dual-AI validation protocol | Done | T68a | Manual planning-doc consistency review + child task validation |
 | T69a | Now | P1 | P2 | Dual-AI builder and challenger workflow docs | Done | T69 | Manual doc consistency review + example prompt review |
@@ -1446,7 +1446,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T62a - Encounter Fact Schema And Significance Evaluator
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P2
 - Priority: P1
@@ -1485,6 +1485,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - names should be cheap to persist even when the full encounter does not cross the long-lived-memory threshold
   - later player re-engagement should be able to raise cumulative significance for earlier encounters without rewriting replay canon
   - keep canon facts structured and committed; dialogue prose is source material for derivation, not the durable record
+  - completed on 2026-03-13 by adding the explicit `NpcEncounterFact` contract, validator coverage, and a server-owned significance evaluator with documented weights: stable identity +2, repeated meaningful exchange +2, relationship change +2, clues up to +2, promises up to +2, quest hooks up to +2, unique role +1, and voluntary return +2
+  - the current promotion threshold is 6; every derived encounter persists as `npc-encounter-fact`, while only scored facts at or above threshold emit a separate `npc-memory` recall record
+  - generic recall now excludes raw `npc-encounter-fact` JSON so structured facts stay available for later tiering and retrieval work without polluting the normal text-memory bucket
+  - validation on 2026-03-13 ran `docker compose build app`, `docker compose run --rm --no-deps app npm run type-check`, `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts src/rules/validator.test.ts`, and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
 
 ### T62b - NPC Importance Tiers And Long-Lived Memory Admission
 
@@ -1995,7 +1999,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T68b - SunRay Scripted AI Walkthrough Matrix
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P2
@@ -2030,6 +2034,10 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - moved to `Ready` on 2026-03-13 after `T64c` and `T65c` both closed, so the walkthrough matrix now has its story baseline and harness foundation
   - when this starts, keep the output compact and reviewable; the follow-on dual-AI protocol should consume named scenarios and summaries, not giant raw transcripts
+  - completed on 2026-03-13 by adding `launcher/assets/local-ai-walkthrough-matrix.json` and expanding `launcher/src/test_local_ai_workflow.rs` so `SunRay test-local-ai-workflow` now validates a named three-scenario `story_sample` Ghostlight Relay matrix instead of only a single live turn smoke
+  - the deterministic harness now records `walkthrough-matrix-contracts`, and the live seeded smoke records stable scenario ids `story-sample-market-rumor`, `story-sample-causeway-run`, and `story-sample-relay-finale` in the JSON review bundle for later challenger reruns
+  - the walkthrough smoke advances prompt context from committed fixture outcomes rather than trusting prior model prose, keeps the live requests at deterministic temperature, and retries transient local-provider transport failures conservatively so the multi-turn matrix stays practical on local Ollama
+  - validation on 2026-03-13 ran `cargo check --manifest-path launcher/Cargo.toml`, `cargo test --manifest-path launcher/Cargo.toml`, `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only --report-json launcher/tmp/t68b-selection-report.json`, and `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --persona-seed 7 --report-json launcher/tmp/t68b-live-report.json`
 
 ### T68c - AI Validation Reporting And Seed-Capture Contract
 

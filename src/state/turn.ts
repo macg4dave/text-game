@@ -15,6 +15,7 @@ import {
   addEvent,
   addMemories,
   getOrCreatePlayer,
+  getNpcEncounterFacts,
   persistPlayerState,
   getRelevantMemories,
   getShortHistory
@@ -27,6 +28,13 @@ import {
 import { adjudicateTurnOutput } from "./adjudication.js";
 import { reconcileTurnPresentation } from "./presentation.js";
 import { reduceCommittedPlayerState } from "./reducer.js";
+import {
+  createNpcEncounterFactMemoryInsert,
+  createNpcLongLivedMemoryInsert,
+  deriveNpcEncounterFacts,
+  type DeriveNpcEncounterFactsParams,
+  evaluateNpcEncounterSignificance
+} from "./encounter-facts.js";
 import { sanitizeTurnResult } from "./turn-result.js";
 import { getCurrentBeat } from "../story/director.js";
 import { classifyTurnInput, freezesTurnProgress } from "../rules/turn-input-classification.js";
@@ -88,9 +96,11 @@ export interface TurnServiceDependencies {
   addEvent: typeof addEvent;
   addMemories: typeof addMemories;
   adjudicateTurnOutput: typeof adjudicateTurnOutput;
+  deriveNpcEncounterFacts: (params: DeriveNpcEncounterFactsParams) => Awaited<ReturnType<typeof deriveNpcEncounterFacts>> | Promise<Awaited<ReturnType<typeof deriveNpcEncounterFacts>>>;
   generateTurn: typeof generateTurn;
   getEmbedding: typeof getEmbedding;
   getEmbeddings: typeof getEmbeddings;
+  getNpcEncounterFacts: typeof getNpcEncounterFacts;
   getOrCreatePlayer: typeof getOrCreatePlayer;
   getRelevantMemories: typeof getRelevantMemories;
   getShortHistory: typeof getShortHistory;
@@ -126,9 +136,11 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
     addEvent,
     addMemories,
     adjudicateTurnOutput,
+    deriveNpcEncounterFacts,
     generateTurn,
     getEmbedding,
     getEmbeddings,
+    getNpcEncounterFacts,
     getOrCreatePlayer,
     getRelevantMemories,
     getShortHistory,
@@ -291,26 +303,6 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
         deps.addEvent(player.id, "narrator", trace.result.narrative);
         deps.persistPlayerState(reducedState.player);
 
-        if (acceptedConsequences.memory_updates.length) {
-          try {
-            trace.memoryEmbeddings = await deps.getEmbeddings({
-              model: embeddingModel,
-              inputs: acceptedConsequences.memory_updates
-            });
-          } catch (error) {
-            trace.memoryEmbeddings = [];
-            trace.memoryEmbeddingError = getErrorMessage(error);
-          }
-
-          deps.addMemories(
-            player.id,
-            acceptedConsequences.memory_updates.map((content, index) => ({
-              content,
-              embedding: trace.memoryEmbeddings[index]
-            }))
-          );
-        }
-
         trace.committedEvent = createCommittedTurnEventPayload({
           playerId: player.id,
           input,
@@ -340,6 +332,63 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           }
         });
         deps.addCommittedTurnEvent(trace.committedEvent);
+
+        if (acceptedConsequences.memory_updates.length) {
+          try {
+            trace.memoryEmbeddings = await deps.getEmbeddings({
+              model: embeddingModel,
+              inputs: acceptedConsequences.memory_updates
+            });
+          } catch (error) {
+            trace.memoryEmbeddings = [];
+            trace.memoryEmbeddingError = getErrorMessage(error);
+          }
+
+          deps.addMemories(
+            player.id,
+            acceptedConsequences.memory_updates.map((content, index) => ({
+              content,
+              kind: "fact",
+              embedding: trace.memoryEmbeddings[index]
+            }))
+          );
+        }
+
+        const derivedEncounterFacts = await deps.deriveNpcEncounterFacts({
+          player,
+          nextPlayer: reducedState.player,
+          input,
+          turnOutput: trace.result,
+          acceptedConsequences,
+          sourceEventId: trace.committedEvent.event_id,
+          occurredAt: trace.committedEvent.occurred_at
+        });
+        if (derivedEncounterFacts.length) {
+          const encounterMemoryInserts = derivedEncounterFacts.flatMap((fact) => {
+            const previousFacts = deps.getNpcEncounterFacts(player.id, fact.npc_id);
+            const significance = evaluateNpcEncounterSignificance({
+              fact,
+              previousFacts,
+              voluntaryReturn: previousFacts.length > 0
+            });
+            const scoredFact = {
+              ...fact,
+              encounter_count: Math.max(fact.encounter_count, previousFacts.length + 1),
+              significance: significance.score
+            };
+
+            return significance.shouldPromoteToLongLivedMemory
+              ? [
+                  createNpcEncounterFactMemoryInsert(scoredFact),
+                  createNpcLongLivedMemoryInsert(scoredFact)
+                ]
+              : [createNpcEncounterFactMemoryInsert(scoredFact)];
+          });
+
+          if (encounterMemoryInserts.length) {
+            deps.addMemories(player.id, encounterMemoryInserts);
+          }
+        }
 
         trace.refreshedPlayer = deps.getOrCreatePlayer({ playerId: player.id });
 

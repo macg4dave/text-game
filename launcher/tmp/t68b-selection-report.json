@@ -1,0 +1,26 @@
+{
+  "command": "SunRay test-local-ai-workflow --selection-only --report-json launcher/tmp/t68b-selection-report.json",
+  "selection_only": true,
+  "status": "passed",
+  "summary": "3 scenario(s) passed.",
+  "persona": null,
+  "persona_source": null,
+  "persona_seed": null,
+  "scenarios": [
+    {
+      "scenario_id": "local-gpu-profile-selection",
+      "status": "passed",
+      "summary": "Local GPU profile selection contract stayed stable."
+    },
+    {
+      "scenario_id": "turn-schema-guardrails",
+      "status": "passed",
+      "summary": "TypeScript turn-schema guardrail test passed."
+    },
+    {
+      "scenario_id": "walkthrough-matrix-contracts",
+      "status": "passed",
+      "summary": "Validated 3 scripted walkthrough scenarios against story_sample_ghostlight_relay_v1."
+    }
+  ]
+}

@@ -67,3 +67,11 @@ Or use the repo convenience scripts:
 The full `test-local-ai-workflow` smoke now picks one test-player persona before the live AI turn check starts. You can let it choose at runtime, force a specific persona with `--persona`, or make the choice repeatable with `--persona-seed`. The supported personas are `curious-explorer`, `cautious-survivor`, `empathetic-talker`, and `practical-fixer`.
 
 Use `--report-json <path>` when you want a machine-readable review bundle with the exact `SunRay` command, persona or seed details, overall pass or fail status, and stable per-scenario summaries.
+
+The deterministic harness now also validates the scripted walkthrough matrix contract that backs the live story smoke. The current named walkthrough scenarios are:
+
+- `story-sample-market-rumor`
+- `story-sample-causeway-run`
+- `story-sample-relay-finale`
+
+During live smoke, those scenarios replay the canonical `story_sample` Ghostlight Relay path as multi-turn schema checks while keeping committed fixture outcomes server-owned instead of trusting model prose as truth.

@@ -1,5 +1,7 @@
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
@@ -9,7 +11,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::config::{
-    local_gpu_profile_matrix_path, resolve_repo_ai_config, resolve_workspace_root, RepoAiConfig,
+    local_ai_walkthrough_matrix_path, local_gpu_profile_matrix_path, resolve_repo_ai_config,
+    resolve_workspace_root, RepoAiConfig,
 };
 use crate::env::load_repo_env;
 use crate::process::render_command_preview;
@@ -110,33 +113,14 @@ impl HarnessReport {
         self.failures.push(message);
     }
 
-    fn assert_equal<T>(&mut self, name: &str, actual: T, expected: T)
-    where
-        T: PartialEq + std::fmt::Display,
-    {
-        if actual != expected {
-            self.fail(format!("{name} expected '{expected}' but got '{actual}'."));
-        } else {
-            self.pass(format!("{name} matches {expected}."));
-        }
-    }
-
-    fn assert_array_length_at_most(&mut self, name: &str, value: &[Value], max: usize) {
-        if value.len() > max {
-            self.fail(format!("{name} exceeds max length {max}."));
-        } else {
-            self.pass(format!("{name} length is within limit."));
-        }
-    }
-
-    fn record_scenario(&mut self, scenario_id: &str, result: Result<()>) {
+    fn record_scenario(&mut self, scenario_id: &str, result: Result<String>) {
         match result {
-            Ok(()) => {
+            Ok(summary) => {
                 self.pass(format!("{scenario_id} passed."));
                 self.scenarios.push(HarnessScenarioResult {
                     scenario_id: scenario_id.to_string(),
                     status: "passed".to_string(),
-                    summary: "Scenario completed successfully.".to_string(),
+                    summary,
                 });
             }
             Err(error) => {
@@ -228,6 +212,107 @@ struct LocalGpuSelectionResult {
     profile_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct LocalAiWalkthroughMatrix {
+    fixture_id: String,
+    history_window: usize,
+    memory_window: usize,
+    scenarios: Vec<LocalAiWalkthroughScenario>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct LocalAiWalkthroughScenario {
+    id: String,
+    label: String,
+    summary: String,
+    start_turn: usize,
+    turn_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct StorySampleWalkthroughFixture {
+    fixture_id: String,
+    player: WalkthroughPlayerState,
+    turns: Vec<WalkthroughFixtureTurn>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct WalkthroughFixtureTurn {
+    input: String,
+    outcome_summary: String,
+    committed: WalkthroughCommittedOutcome,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct WalkthroughCommittedOutcome {
+    state_updates: WalkthroughCommittedStateUpdates,
+    director_updates: WalkthroughCommittedDirectorUpdates,
+    #[serde(default)]
+    memory_updates: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct WalkthroughCommittedStateUpdates {
+    location: String,
+    #[serde(default)]
+    inventory_add: Vec<String>,
+    #[serde(default)]
+    inventory_remove: Vec<String>,
+    #[serde(default)]
+    flags_add: Vec<String>,
+    #[serde(default)]
+    flags_remove: Vec<String>,
+    #[serde(default)]
+    quests: Vec<WalkthroughQuest>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct WalkthroughCommittedDirectorUpdates {
+    end_goal_progress: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct WalkthroughPlayerState {
+    id: String,
+    name: String,
+    location: String,
+    summary: String,
+    #[serde(default)]
+    inventory: Vec<String>,
+    #[serde(default)]
+    flags: Vec<String>,
+    #[serde(default)]
+    quests: Vec<WalkthroughQuest>,
+    director_state: WalkthroughDirectorState,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct WalkthroughQuest {
+    id: String,
+    status: String,
+    summary: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct WalkthroughDirectorState {
+    #[serde(default)]
+    end_goal: Option<String>,
+    end_goal_progress: String,
+}
+
+#[derive(Debug, Clone)]
+struct WalkthroughScenarioContext {
+    player: WalkthroughPlayerState,
+    recent_turns: Vec<WalkthroughHistoryTurn>,
+    recalled_memories: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct WalkthroughHistoryTurn {
+    input: String,
+    outcome_summary: String,
+}
+
 pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
     let repo_root = resolve_workspace_root()?;
     let repo_env = load_repo_env(&repo_root)?;
@@ -244,12 +329,21 @@ pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
     report.record_scenario("local-gpu-profile-selection", local_gpu_profile_selection);
     let turn_schema_guardrails = test_turn_schema_guardrails(&repo_root, &mut report);
     report.record_scenario("turn-schema-guardrails", turn_schema_guardrails);
-
-    let persona_selection = resolve_test_player_persona_selection(&options)?;
+    let walkthrough_matrix_contracts =
+        test_walkthrough_matrix_contracts(&repo_root, &mut report);
+    report.record_scenario(
+        "walkthrough-matrix-contracts",
+        walkthrough_matrix_contracts,
+    );
 
     if options.selection_only {
         return report.finish(&options, None);
     }
+
+    let persona_selection = resolve_test_player_persona_selection(&options)?;
+
+    let walkthrough_matrix = load_local_ai_walkthrough_matrix(&repo_root)?;
+    let walkthrough_fixture = load_story_sample_walkthrough_fixture(&repo_root)?;
 
     println!(
         "Test-player persona: {} ({}) via {}.",
@@ -281,7 +375,40 @@ pub fn run(options: TestLocalAiWorkflowOptions) -> Result<()> {
         test_game_turn_schema(&client, &config, persona_selection.persona, &mut report);
     report.record_scenario("game-turn-schema", game_turn_schema);
 
+    for scenario in &walkthrough_matrix.scenarios {
+        let scenario_id = scenario.id.clone();
+        let walkthrough_result = test_story_sample_walkthrough_scenario(
+            &client,
+            &config,
+            persona_selection.persona,
+            &walkthrough_matrix,
+            &walkthrough_fixture,
+            scenario,
+            &mut report,
+        );
+        report.record_scenario(&scenario_id, walkthrough_result);
+    }
+
     report.finish(&options, Some(persona_selection))
+}
+
+fn ensure_equal<T>(name: &str, actual: T, expected: T) -> Result<()>
+where
+    T: PartialEq + std::fmt::Display,
+{
+    if actual != expected {
+        Err(anyhow!("{name} expected '{expected}' but got '{actual}'."))
+    } else {
+        Ok(())
+    }
+}
+
+fn ensure_array_length_at_most(name: &str, value: &[Value], max: usize) -> Result<()> {
+    if value.len() > max {
+        Err(anyhow!("{name} exceeds max length {max}."))
+    } else {
+        Ok(())
+    }
 }
 
 fn command_preview(options: &TestLocalAiWorkflowOptions) -> String {
@@ -319,37 +446,40 @@ fn maybe_write_manifest(options: &TestLocalAiWorkflowOptions, manifest: &Harness
     Ok(())
 }
 
-fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport) -> Result<()> {
+fn test_local_gpu_profile_selection(
+    repo_root: &Path,
+    report: &mut HarnessReport,
+) -> Result<String> {
     let matrix_path = local_gpu_profile_matrix_path(repo_root);
     let matrix = load_local_gpu_profile_matrix(&matrix_path)?;
 
     let auto_small =
         resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(10.0));
-    report.assert_equal("autoSmall.status", auto_small.status.as_str(), "selected");
-    report.assert_equal(
+    ensure_equal("autoSmall.status", auto_small.status.as_str(), "selected")?;
+    ensure_equal(
         "autoSmall.profileId",
         auto_small.profile_id.as_deref().unwrap_or(""),
         "local-gpu-8gb",
-    );
-    report.assert_equal(
+    )?;
+    ensure_equal(
         "autoSmall.selectionSource",
         auto_small.selection_source.as_str(),
         "detected-vram",
-    );
+    )?;
 
     let auto_large =
         resolve_local_gpu_profile_selection(&matrix, "local-gpu-large", None, None, Some(12.0));
-    report.assert_equal("autoLarge.status", auto_large.status.as_str(), "selected");
-    report.assert_equal(
+    ensure_equal("autoLarge.status", auto_large.status.as_str(), "selected")?;
+    ensure_equal(
         "autoLarge.profileId",
         auto_large.profile_id.as_deref().unwrap_or(""),
         "local-gpu-12gb",
-    );
-    report.assert_equal(
+    )?;
+    ensure_equal(
         "autoLarge.selectionSource",
         auto_large.selection_source.as_str(),
         "detected-vram",
-    );
+    )?;
 
     let manual_profile = resolve_local_gpu_profile_selection(
         &matrix,
@@ -358,75 +488,72 @@ fn test_local_gpu_profile_selection(repo_root: &Path, report: &mut HarnessReport
         None,
         Some(8.0),
     );
-    report.assert_equal(
-        "manualProfile.status",
-        manual_profile.status.as_str(),
-        "selected",
-    );
-    report.assert_equal(
+    ensure_equal("manualProfile.status", manual_profile.status.as_str(), "selected")?;
+    ensure_equal(
         "manualProfile.profileId",
         manual_profile.profile_id.as_deref().unwrap_or(""),
         "local-gpu-20gb-plus",
-    );
-    report.assert_equal(
+    )?;
+    ensure_equal(
         "manualProfile.selectionSource",
         manual_profile.selection_source.as_str(),
         "manual-profile",
-    );
+    )?;
 
     let manual_vram =
         resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, Some(21.0), None);
-    report.assert_equal("manualVram.status", manual_vram.status.as_str(), "selected");
-    report.assert_equal(
+    ensure_equal("manualVram.status", manual_vram.status.as_str(), "selected")?;
+    ensure_equal(
         "manualVram.profileId",
         manual_vram.profile_id.as_deref().unwrap_or(""),
         "local-gpu-20gb-plus",
-    );
-    report.assert_equal(
+    )?;
+    ensure_equal(
         "manualVram.selectionSource",
         manual_vram.selection_source.as_str(),
         "manual-vram",
-    );
+    )?;
 
     let unsupported =
         resolve_local_gpu_profile_selection(&matrix, "local-gpu-small", None, None, Some(6.0));
-    report.assert_equal(
+    ensure_equal(
         "unsupported.status",
         unsupported.status.as_str(),
         "manual-selection-required",
-    );
-    report.assert_equal(
+    )?;
+    ensure_equal(
         "unsupported.selectionSource",
         unsupported.selection_source.as_str(),
         "unsupported-vram",
-    );
-    report.assert_equal(
+    )?;
+    ensure_equal(
         "unsupported.profileId",
         unsupported.profile_id.as_deref().unwrap_or(""),
         "",
-    );
+    )?;
 
     let unknown = resolve_local_gpu_profile_selection(&matrix, "local-gpu-large", None, None, None);
-    report.assert_equal(
+    ensure_equal(
         "unknown.status",
         unknown.status.as_str(),
         "manual-selection-required",
-    );
-    report.assert_equal(
+    )?;
+    ensure_equal(
         "unknown.selectionSource",
         unknown.selection_source.as_str(),
         "detection-unavailable",
-    );
-    report.assert_equal(
+    )?;
+    ensure_equal(
         "unknown.profileId",
         unknown.profile_id.as_deref().unwrap_or(""),
         "",
-    );
+    )?;
 
-    Ok(())
+    report.pass("Local GPU profile selection contract stayed stable.");
+    Ok("Local GPU profile selection contract stayed stable.".to_string())
 }
 
-fn test_turn_schema_guardrails(repo_root: &Path, report: &mut HarnessReport) -> Result<()> {
+fn test_turn_schema_guardrails(repo_root: &Path, report: &mut HarnessReport) -> Result<String> {
     docker_compose(repo_root)
         .with_args([
             "run",
@@ -442,14 +569,35 @@ fn test_turn_schema_guardrails(repo_root: &Path, report: &mut HarnessReport) -> 
         .capture_checked()?;
 
     report.pass("Turn schema guardrail check passed.");
-    Ok(())
+    Ok("TypeScript turn-schema guardrail test passed.".to_string())
+}
+
+fn test_walkthrough_matrix_contracts(
+    repo_root: &Path,
+    report: &mut HarnessReport,
+) -> Result<String> {
+    let matrix = load_local_ai_walkthrough_matrix(repo_root)?;
+    let fixture = load_story_sample_walkthrough_fixture(repo_root)?;
+
+    validate_walkthrough_matrix_contract(&matrix, &fixture)?;
+    report.pass(format!(
+        "Walkthrough matrix contract loaded {} scripted scenarios from {}.",
+        matrix.scenarios.len(),
+        fixture.fixture_id
+    ));
+
+    Ok(format!(
+        "Validated {} scripted walkthrough scenarios against {}.",
+        matrix.scenarios.len(),
+        fixture.fixture_id
+    ))
 }
 
 fn test_embeddings(
     client: &Client,
     config: &RepoAiConfig,
     report: &mut HarnessReport,
-) -> Result<()> {
+) -> Result<String> {
     let response = invoke_api_json(
         client,
         &format!("{}/embeddings", config.base_url),
@@ -479,14 +627,16 @@ fn test_embeddings(
     report.pass(format!(
         "Embeddings endpoint returned a vector of length {length}."
     ));
-    Ok(())
+    Ok(format!(
+        "Embeddings endpoint returned a vector of length {length}."
+    ))
 }
 
 fn test_scene_schema(
     client: &Client,
     config: &RepoAiConfig,
     report: &mut HarnessReport,
-) -> Result<()> {
+) -> Result<String> {
     let response = invoke_api_json(
         client,
         &format!("{}/chat/completions", config.base_url),
@@ -529,7 +679,7 @@ fn test_scene_schema(
     }
 
     report.pass("Structured scene response parsed successfully.");
-    Ok(())
+    Ok("Structured scene response parsed successfully.".to_string())
 }
 
 fn test_game_turn_schema(
@@ -537,7 +687,7 @@ fn test_game_turn_schema(
     config: &RepoAiConfig,
     persona: TestPlayerPersonaChoice,
     report: &mut HarnessReport,
-) -> Result<()> {
+) -> Result<String> {
     let state_pack_json = r#"{"player":{"id":"test-player","name":"Wanderer","location":"Rooftop Market","inventory":[],"flags":[],"quests":[]},"summary":"","director":{"end_goal_progress":"Just beginning."},"director_spec":{"end_goal":"Recover the moon shard.","current_beat":{"id":"beat_1","label":"Hear the rumor"},"rules":["Keep the story moving."]},"quest_spec":{"quests":[]}}"#;
     let prompt = format!(
         "TEST_PLAYER_PERSONA\nname: {}\nguidance: {}\n\nSTATE_PACK\n{state_pack_json}\n\nSHORT_HISTORY\nPLAYER: look around\n\nMEMORIES\n\nPLAYER_INPUT\nlook around",
@@ -550,7 +700,7 @@ fn test_game_turn_schema(
         &format!("{}/chat/completions", config.base_url),
         json!({
             "model": config.chat_model,
-            "temperature": 0.2,
+            "temperature": 0,
             "messages": [
                 {"role": "system", "content": "You are the Narrative Engine for a text-based adventure game. Return structured JSON only."},
                 {"role": "user", "content": prompt}
@@ -619,9 +769,64 @@ fn test_game_turn_schema(
         &config.api_key,
     )?;
 
-    let content = extract_message_content(&response)?;
-    let parsed: Value = serde_json::from_str(&content)?;
+    let parsed: Value = serde_json::from_str(&extract_message_content(&response)?)?;
+    validate_game_turn_response(&parsed, report)?;
 
+    Ok(format!(
+        "Single-turn game_turn schema smoke passed with {} persona.",
+        persona.cli_name()
+    ))
+}
+
+fn test_story_sample_walkthrough_scenario(
+    client: &Client,
+    config: &RepoAiConfig,
+    persona: TestPlayerPersonaChoice,
+    matrix: &LocalAiWalkthroughMatrix,
+    fixture: &StorySampleWalkthroughFixture,
+    scenario: &LocalAiWalkthroughScenario,
+    report: &mut HarnessReport,
+) -> Result<String> {
+    let mut context = build_walkthrough_scenario_context(matrix, fixture, scenario)?;
+    let start_location = context.player.location.clone();
+
+    for turn in fixture_turn_slice(fixture, scenario) {
+        let prompt = build_walkthrough_prompt(&context, scenario, turn, persona);
+        let response = invoke_api_json(
+            client,
+            &format!("{}/chat/completions", config.base_url),
+            json!({
+                "model": config.chat_model,
+                "temperature": 0,
+                "messages": [
+                    {"role": "system", "content": "You are the Narrative Engine for a text-based adventure game. Return structured JSON only."},
+                    {"role": "user", "content": prompt}
+                ],
+                "response_format": game_turn_response_format()
+            }),
+            &config.api_key,
+        )?;
+
+        let parsed: Value = serde_json::from_str(&extract_message_content(&response)?)?;
+        validate_game_turn_response(&parsed, report)?;
+        report.pass(format!(
+            "Walkthrough scenario {} accepted cue: {}",
+            scenario.id, turn.input
+        ));
+        apply_fixture_turn_to_context(&mut context, matrix, turn);
+    }
+
+    Ok(format!(
+        "{} validated {} turns from {} to {} with {} persona.",
+        scenario.label,
+        scenario.turn_count,
+        start_location,
+        context.player.location,
+        persona.cli_name()
+    ))
+}
+
+fn validate_game_turn_response(parsed: &Value, report: &mut HarnessReport) -> Result<()> {
     if parsed
         .get("narrative")
         .and_then(Value::as_str)
@@ -663,17 +868,315 @@ fn test_game_turn_schema(
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    report.assert_array_length_at_most("player_options", &player_options, 6);
+    ensure_array_length_at_most("player_options", &player_options, 6)?;
 
     let memory_updates = parsed
         .get("memory_updates")
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    report.assert_array_length_at_most("memory_updates", &memory_updates, 8);
+    ensure_array_length_at_most("memory_updates", &memory_updates, 8)?;
+
     report.pass("Full game_turn response parsed successfully.");
+    Ok(())
+}
+
+fn game_turn_response_format() -> Value {
+    json!({
+        "type": "json_schema",
+        "json_schema": {
+            "name": "game_turn",
+            "strict": true,
+            "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "narrative": {"type": "string"},
+                    "player_options": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 0,
+                        "maxItems": 6
+                    },
+                    "state_updates": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "location": {"type": "string"},
+                            "inventory_add": {"type": "array", "items": {"type": "string"}},
+                            "inventory_remove": {"type": "array", "items": {"type": "string"}},
+                            "flags_add": {"type": "array", "items": {"type": "string"}},
+                            "flags_remove": {"type": "array", "items": {"type": "string"}},
+                            "quests": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "id": {"type": "string"},
+                                        "status": {"type": "string"},
+                                        "summary": {"type": "string"}
+                                    },
+                                    "required": ["id", "status", "summary"]
+                                }
+                            }
+                        },
+                        "required": ["location", "inventory_add", "inventory_remove", "flags_add", "flags_remove", "quests"]
+                    },
+                    "director_updates": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "end_goal_progress": {"type": "string"}
+                        },
+                        "required": ["end_goal_progress"]
+                    },
+                    "memory_updates": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 0,
+                        "maxItems": 8
+                    }
+                },
+                "required": ["narrative", "player_options", "state_updates", "director_updates", "memory_updates"]
+            }
+        }
+    })
+}
+
+fn load_local_ai_walkthrough_matrix(repo_root: &Path) -> Result<LocalAiWalkthroughMatrix> {
+    let path = local_ai_walkthrough_matrix_path(repo_root);
+    Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
+}
+
+fn load_story_sample_walkthrough_fixture(repo_root: &Path) -> Result<StorySampleWalkthroughFixture> {
+    let path = repo_root.join("data").join("story_sample_walkthrough.json");
+    Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
+}
+
+fn validate_walkthrough_matrix_contract(
+    matrix: &LocalAiWalkthroughMatrix,
+    fixture: &StorySampleWalkthroughFixture,
+) -> Result<()> {
+    if matrix.fixture_id != fixture.fixture_id {
+        return Err(anyhow!(
+            "Walkthrough matrix fixture_id '{}' did not match story fixture '{}'.",
+            matrix.fixture_id,
+            fixture.fixture_id
+        ));
+    }
+
+    if matrix.scenarios.len() < 2 {
+        return Err(anyhow!(
+            "Walkthrough matrix must define at least two scripted scenarios."
+        ));
+    }
+
+    if matrix.history_window == 0 || matrix.memory_window == 0 {
+        return Err(anyhow!(
+            "Walkthrough matrix history and memory windows must both be greater than zero."
+        ));
+    }
+
+    let mut ids = BTreeSet::new();
+    let mut next_turn_index = 0_usize;
+    for scenario in &matrix.scenarios {
+        if scenario.id.trim().is_empty() || scenario.label.trim().is_empty() {
+            return Err(anyhow!("Walkthrough scenarios need non-empty ids and labels."));
+        }
+        if !ids.insert(scenario.id.as_str()) {
+            return Err(anyhow!(
+                "Walkthrough scenario id '{}' is duplicated.",
+                scenario.id
+            ));
+        }
+        if scenario.turn_count == 0 {
+            return Err(anyhow!(
+                "Walkthrough scenario '{}' must cover at least one turn.",
+                scenario.id
+            ));
+        }
+        if scenario.start_turn != next_turn_index {
+            return Err(anyhow!(
+                "Walkthrough scenario '{}' expected to start at turn {} but starts at {}.",
+                scenario.id,
+                next_turn_index,
+                scenario.start_turn
+            ));
+        }
+        let scenario_end = scenario.start_turn + scenario.turn_count;
+        if scenario_end > fixture.turns.len() {
+            return Err(anyhow!(
+                "Walkthrough scenario '{}' exceeds the {}-turn story fixture.",
+                scenario.id,
+                fixture.turns.len()
+            ));
+        }
+        next_turn_index = scenario_end;
+    }
+
+    if next_turn_index != fixture.turns.len() {
+        return Err(anyhow!(
+            "Walkthrough matrix covered {} turns but the fixture contains {}.",
+            next_turn_index,
+            fixture.turns.len()
+        ));
+    }
 
     Ok(())
+}
+
+fn fixture_turn_slice<'a>(
+    fixture: &'a StorySampleWalkthroughFixture,
+    scenario: &LocalAiWalkthroughScenario,
+) -> &'a [WalkthroughFixtureTurn] {
+    &fixture.turns[scenario.start_turn..scenario.start_turn + scenario.turn_count]
+}
+
+fn build_walkthrough_scenario_context(
+    matrix: &LocalAiWalkthroughMatrix,
+    fixture: &StorySampleWalkthroughFixture,
+    scenario: &LocalAiWalkthroughScenario,
+) -> Result<WalkthroughScenarioContext> {
+    validate_walkthrough_matrix_contract(matrix, fixture)?;
+
+    let mut context = WalkthroughScenarioContext {
+        player: fixture.player.clone(),
+        recent_turns: Vec::new(),
+        recalled_memories: Vec::new(),
+    };
+
+    for prior_turn in &fixture.turns[..scenario.start_turn] {
+        apply_fixture_turn_to_context(&mut context, matrix, prior_turn);
+    }
+
+    Ok(context)
+}
+
+fn apply_fixture_turn_to_context(
+    context: &mut WalkthroughScenarioContext,
+    matrix: &LocalAiWalkthroughMatrix,
+    turn: &WalkthroughFixtureTurn,
+) {
+    context.player.location = turn.committed.state_updates.location.clone();
+
+    for item in &turn.committed.state_updates.inventory_add {
+        if !context.player.inventory.contains(item) {
+            context.player.inventory.push(item.clone());
+        }
+    }
+    context
+        .player
+        .inventory
+        .retain(|item| !turn.committed.state_updates.inventory_remove.contains(item));
+
+    for flag in &turn.committed.state_updates.flags_add {
+        if !context.player.flags.contains(flag) {
+            context.player.flags.push(flag.clone());
+        }
+    }
+    context
+        .player
+        .flags
+        .retain(|flag| !turn.committed.state_updates.flags_remove.contains(flag));
+
+    if !turn.committed.state_updates.quests.is_empty() {
+        context.player.quests = turn.committed.state_updates.quests.clone();
+    }
+
+    context.player.director_state.end_goal_progress =
+        turn.committed.director_updates.end_goal_progress.clone();
+
+    context.recent_turns.push(WalkthroughHistoryTurn {
+        input: turn.input.clone(),
+        outcome_summary: turn.outcome_summary.clone(),
+    });
+    if context.recent_turns.len() > matrix.history_window {
+        let overflow = context.recent_turns.len() - matrix.history_window;
+        context.recent_turns.drain(0..overflow);
+    }
+
+    for memory in &turn.committed.memory_updates {
+        if !memory.trim().is_empty() && !context.recalled_memories.contains(memory) {
+            context.recalled_memories.push(memory.clone());
+        }
+    }
+    if context.recalled_memories.len() > matrix.memory_window {
+        let overflow = context.recalled_memories.len() - matrix.memory_window;
+        context.recalled_memories.drain(0..overflow);
+    }
+}
+
+fn build_walkthrough_prompt(
+    context: &WalkthroughScenarioContext,
+    scenario: &LocalAiWalkthroughScenario,
+    turn: &WalkthroughFixtureTurn,
+    persona: TestPlayerPersonaChoice,
+) -> String {
+    let state_pack = json!({
+        "player": {
+            "id": context.player.id,
+            "name": context.player.name,
+            "location": context.player.location,
+            "inventory": context.player.inventory,
+            "flags": context.player.flags,
+            "quests": context.player.quests,
+        },
+        "summary": context.player.summary,
+        "director": {
+            "end_goal_progress": context.player.director_state.end_goal_progress,
+        },
+        "director_spec": {
+            "end_goal": context
+                .player
+                .director_state
+                .end_goal
+                .clone()
+                .unwrap_or_else(|| "Keep the Ghostlight Relay from panicking the district.".to_string()),
+            "current_beat": {
+                "id": scenario.id,
+                "label": scenario.label,
+            },
+            "rules": [
+                "Keep the story moving.",
+                "Treat any consequences as proposals rather than committed truth."
+            ]
+        },
+        "quest_spec": {
+            "quests": context.player.quests,
+        }
+    });
+
+    let short_history = if context.recent_turns.is_empty() {
+        "PLAYER: (start of walkthrough scenario)".to_string()
+    } else {
+        context
+            .recent_turns
+            .iter()
+            .map(|entry| format!("PLAYER: {}\nNARRATOR: {}", entry.input, entry.outcome_summary))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    let memories = if context.recalled_memories.is_empty() {
+        "(no recalled memories yet)".to_string()
+    } else {
+        context.recalled_memories.join("\n")
+    };
+
+    format!(
+        "TEST_PLAYER_PERSONA\nname: {}\nguidance: {}\n\nWALKTHROUGH_SCENARIO\nid: {}\nlabel: {}\nsummary: {}\nfixture_outcome_target: {}\n\nSTATE_PACK\n{}\n\nSHORT_HISTORY\n{}\n\nMEMORIES\n{}\n\nPLAYER_INPUT\n{}",
+        persona.display_name(),
+        persona.guidance(),
+        scenario.id,
+        scenario.label,
+        scenario.summary,
+        turn.outcome_summary,
+        state_pack,
+        short_history,
+        memories,
+        turn.input
+    )
 }
 
 fn resolve_test_player_persona_selection(
@@ -710,14 +1213,34 @@ fn select_test_player_persona_from_seed(seed: u128) -> TestPlayerPersonaChoice {
 }
 
 fn invoke_api_json(client: &Client, uri: &str, body: Value, api_key: &str) -> Result<Value> {
-    let response = client.post(uri).bearer_auth(api_key).json(&body).send()?;
-    let status = response.status();
-    let payload = response.text()?;
-    if !status.is_success() {
-        return Err(anyhow!("{status}: {payload}"));
+    let mut last_transport_error = None;
+
+    for attempt in 1..=3 {
+        match client.post(uri).bearer_auth(api_key).json(&body).send() {
+            Ok(response) => {
+                let status = response.status();
+                let payload = response.text()?;
+                if !status.is_success() {
+                    return Err(anyhow!("{status}: {payload}"));
+                }
+
+                return Ok(serde_json::from_str(&payload)?);
+            }
+            Err(error) => {
+                last_transport_error = Some(error);
+                if attempt < 3 {
+                    thread::sleep(Duration::from_millis(500));
+                }
+            }
+        }
     }
 
-    Ok(serde_json::from_str(&payload)?)
+    Err(anyhow!(
+        "error sending request for url ({uri}) after 3 attempts: {}",
+        last_transport_error
+            .map(|error| error.to_string())
+            .unwrap_or_else(|| "unknown transport error".to_string())
+    ))
 }
 
 fn extract_message_content(response: &Value) -> Result<String> {
@@ -825,12 +1348,111 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
+        apply_fixture_turn_to_context, build_walkthrough_scenario_context, fixture_turn_slice,
         command_preview, find_profile_for_vram, resolve_local_gpu_profile_selection,
         resolve_test_player_persona_selection, select_test_player_persona_from_seed,
-        HarnessManifest, HarnessReport, HarnessScenarioResult, LocalGpuProfile,
-        LocalGpuProfileMatrix, TestLocalAiWorkflowOptions, TestPlayerPersonaChoice,
-        TestPlayerPersonaSelection, TEST_PLAYER_PERSONAS,
+        validate_walkthrough_matrix_contract, HarnessManifest, HarnessReport,
+        HarnessScenarioResult, LocalAiWalkthroughMatrix, LocalAiWalkthroughScenario,
+        LocalGpuProfile, LocalGpuProfileMatrix, StorySampleWalkthroughFixture,
+        TestLocalAiWorkflowOptions, TestPlayerPersonaChoice, TestPlayerPersonaSelection,
+        TEST_PLAYER_PERSONAS,
     };
+
+    fn sample_story_fixture() -> StorySampleWalkthroughFixture {
+        serde_json::from_value(serde_json::json!({
+            "fixture_id": "story_sample_ghostlight_relay_v1",
+            "description": "sample",
+            "player": {
+                "id": "player-1",
+                "name": "Avery",
+                "location": "Rooftop Market",
+                "summary": "",
+                "inventory": [],
+                "flags": [],
+                "quests": [{"id": "ghostlight_relay", "status": "active", "summary": "Inspect the sparking market beacon"}],
+                "director_state": {
+                    "end_goal": "Stop the Ghostlight Relay.",
+                    "end_goal_progress": "Just beginning.",
+                    "completed_beats": []
+                }
+            },
+            "turns": [
+                {
+                    "input": "inspect beacon",
+                    "outcome_summary": "You confirm the fake orders.",
+                    "committed": {
+                        "state_updates": {
+                            "location": "Rooftop Market",
+                            "inventory_add": [],
+                            "inventory_remove": [],
+                            "flags_add": ["beacon_inspected"],
+                            "flags_remove": [],
+                            "quests": [{"id": "ghostlight_relay", "status": "active", "summary": "Question Nila"}]
+                        },
+                        "director_updates": {"end_goal_progress": "You confirm the threat."},
+                        "memory_updates": ["The beacon is compromised."]
+                    }
+                },
+                {
+                    "input": "question Nila",
+                    "outcome_summary": "Nila points you to the stacks.",
+                    "committed": {
+                        "state_updates": {
+                            "location": "Rooftop Market",
+                            "inventory_add": [],
+                            "inventory_remove": [],
+                            "flags_add": ["nila_guidance"],
+                            "flags_remove": [],
+                            "quests": [{"id": "ghostlight_relay", "status": "active", "summary": "Head to Closed Stacks"}]
+                        },
+                        "director_updates": {"end_goal_progress": "You know where to go next."},
+                        "memory_updates": ["Nila told you about the stacks."]
+                    }
+                },
+                {
+                    "input": "head to stacks",
+                    "outcome_summary": "You reach the Closed Stacks.",
+                    "committed": {
+                        "state_updates": {
+                            "location": "Closed Stacks",
+                            "inventory_add": [],
+                            "inventory_remove": [],
+                            "flags_add": [],
+                            "flags_remove": [],
+                            "quests": []
+                        },
+                        "director_updates": {"end_goal_progress": "The route is open."},
+                        "memory_updates": []
+                    }
+                }
+            ]
+        }))
+        .expect("sample fixture")
+    }
+
+    fn sample_walkthrough_matrix() -> LocalAiWalkthroughMatrix {
+        LocalAiWalkthroughMatrix {
+            fixture_id: "story_sample_ghostlight_relay_v1".to_string(),
+            history_window: 2,
+            memory_window: 2,
+            scenarios: vec![
+                LocalAiWalkthroughScenario {
+                    id: "story-sample-opening".to_string(),
+                    label: "Opening".to_string(),
+                    summary: "First half.".to_string(),
+                    start_turn: 0,
+                    turn_count: 2,
+                },
+                LocalAiWalkthroughScenario {
+                    id: "story-sample-pivot".to_string(),
+                    label: "Pivot".to_string(),
+                    summary: "Second half.".to_string(),
+                    start_turn: 2,
+                    turn_count: 1,
+                },
+            ],
+        }
+    }
 
     fn sample_matrix() -> LocalGpuProfileMatrix {
         LocalGpuProfileMatrix {
@@ -997,5 +1619,47 @@ mod tests {
                 }],
             }
         );
+    }
+
+    #[test]
+    fn walkthrough_matrix_contract_requires_full_ordered_coverage() {
+        let fixture = sample_story_fixture();
+        let matrix = sample_walkthrough_matrix();
+
+        validate_walkthrough_matrix_contract(&matrix, &fixture)
+            .expect("walkthrough matrix contract should be valid");
+        assert_eq!(fixture_turn_slice(&fixture, &matrix.scenarios[0]).len(), 2);
+        assert_eq!(fixture_turn_slice(&fixture, &matrix.scenarios[1]).len(), 1);
+    }
+
+    #[test]
+    fn walkthrough_context_replays_prior_committed_turns_before_scenario_start() {
+        let fixture = sample_story_fixture();
+        let matrix = sample_walkthrough_matrix();
+
+        let context = build_walkthrough_scenario_context(&matrix, &fixture, &matrix.scenarios[1])
+            .expect("scenario context");
+
+        assert_eq!(context.player.location, "Rooftop Market");
+        assert!(context.player.flags.contains(&"beacon_inspected".to_string()));
+        assert!(context.player.flags.contains(&"nila_guidance".to_string()));
+        assert_eq!(context.recent_turns.len(), 2);
+        assert_eq!(context.recalled_memories.len(), 2);
+    }
+
+    #[test]
+    fn applying_fixture_turn_caps_history_and_memory_windows() {
+        let fixture = sample_story_fixture();
+        let matrix = sample_walkthrough_matrix();
+        let mut context = build_walkthrough_scenario_context(&matrix, &fixture, &matrix.scenarios[0])
+            .expect("scenario context");
+
+        apply_fixture_turn_to_context(&mut context, &matrix, &fixture.turns[0]);
+        apply_fixture_turn_to_context(&mut context, &matrix, &fixture.turns[1]);
+        apply_fixture_turn_to_context(&mut context, &matrix, &fixture.turns[2]);
+
+        assert_eq!(context.recent_turns.len(), 2);
+        assert_eq!(context.recalled_memories.len(), 2);
+        assert_eq!(context.player.location, "Closed Stacks");
     }
 }

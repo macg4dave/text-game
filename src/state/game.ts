@@ -9,6 +9,7 @@ import type {
   DirectorState,
   EventRow,
   MemoryInsert,
+  NpcEncounterFact,
   MemoryRow,
   Player,
   PlayerRow,
@@ -85,7 +86,7 @@ export function getShortHistory(playerId: string, limit = 6): string[] {
 export function getRecentMemories(playerId: string, limit = 6): string[] {
   const db = getDb();
   const rows = db
-    .prepare("SELECT content FROM memories WHERE player_id = ? ORDER BY created_at DESC LIMIT ?")
+    .prepare("SELECT content FROM memories WHERE player_id = ? AND kind != 'npc-encounter-fact' ORDER BY created_at DESC LIMIT ?")
     .all(playerId, limit) as ContentRow[];
 
   return rows.reverse().map((row) => row.content);
@@ -146,16 +147,33 @@ export function addMemories(playerId: string, memoryList: MemoryInsert[]): void 
     "INSERT INTO memories (id, player_id, kind, content, created_at, embedding) VALUES (?, ?, ?, ?, ?, ?)"
   );
 
-  memoryList.forEach(({ content, embedding }) => {
+  memoryList.forEach(({ content, kind = "fact", embedding }) => {
     stmt.run(
       crypto.randomUUID(),
       playerId,
-      "fact",
+      kind,
       content,
       now,
       embedding ? JSON.stringify(embedding) : null
     );
   });
+}
+
+export function getNpcEncounterFacts(playerId: string, npcId?: string, limit = 12): NpcEncounterFact[] {
+  const db = getDb();
+  const rows = (npcId
+    ? db
+        .prepare(
+          "SELECT content FROM memories WHERE player_id = ? AND kind = 'npc-encounter-fact' AND content LIKE ? ORDER BY created_at DESC LIMIT ?"
+        )
+        .all(playerId, `%\"npc_id\":\"${npcId}\"%`, limit)
+    : db
+        .prepare("SELECT content FROM memories WHERE player_id = ? AND kind = 'npc-encounter-fact' ORDER BY created_at DESC LIMIT ?")
+        .all(playerId, limit)) as ContentRow[];
+
+  return rows
+    .map((row) => safeJsonParse<NpcEncounterFact | null>(row.content, null))
+    .filter((row): row is NpcEncounterFact => row !== null);
 }
 
 export function getRelevantMemories(playerId: string, queryEmbedding: number[], limit = 6): string[] {
@@ -165,7 +183,7 @@ export function getRelevantMemories(playerId: string, queryEmbedding: number[], 
   }
 
   const rows = db
-    .prepare("SELECT content, embedding FROM memories WHERE player_id = ? AND embedding IS NOT NULL")
+    .prepare("SELECT content, embedding FROM memories WHERE player_id = ? AND kind != 'npc-encounter-fact' AND embedding IS NOT NULL")
     .all(playerId) as MemoryRow[];
 
   if (!rows.length) return getRecentMemories(playerId, limit);

@@ -57,6 +57,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Old interactions must be compressed into rolling summaries and structured facts, with summary formats versioned so they can be recomputed later from canonical data.
 - Compression passes should run after scenes, with higher-level recap merges after chapters or beats so verbose dialogue leaves hot memory quickly.
 - NPC continuity must use a significance pipeline, not a raw chat-log replay. The system must distinguish transcript or event-log data, structured encounter facts, thresholded long-lived NPC memory, and short-lived scene context.
+- Structured encounter facts must be explicit server-owned records with fields for NPC identity, display name, role or location, topics, promises, clues, mood, relationship-relevant change, last-seen beat, source event id, and last-seen timestamp so later tiers can build on committed data instead of raw prose.
 - NPC memory persistence must be tiered and significance-gated. Stable identity such as names should be cheap to persist, while richer relationship or history recall should require cumulative importance and player re-engagement.
 - NPC memory, world memory, and player journal memory must remain separate stores or classes of recall, and durable canon must be stored as structured facts or summaries rather than as raw dialogue prose.
 - The player flow should provide an optional DM-guide surface for recall-oriented questions about known places, NPCs, goals, and previously discovered facts.
@@ -103,6 +104,7 @@ A portable, text-based adventure game powered by a provider-neutral AI adapter w
 - Embeddings stored for memory retrieval.
 - Memory records must distinguish authority-relevant facts from flavor-only recollections so retrieval, summarization, and persistence policy can treat them differently.
 - Durable NPC canon must come from committed structured encounter facts and significance-scored memory admission, while transcript text remains replay or debug material.
+- The baseline server-side significance score must remain testable and documented; the current contract promotes long-lived NPC memory at score 6 or higher after adding weighted signals for stable identity, repeated meaningful exchange, relationship change, clues, promises, quest hooks, unique role, and voluntary return.
 - Versioned summary or recap artifacts must remain derivable from canonical records rather than becoming opaque authoritative data that cannot be rebuilt.
 - Director spec stored in `data/spec/director.json`.
 - Quest spec stored in `data/spec/quests.json`.

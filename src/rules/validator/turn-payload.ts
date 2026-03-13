@@ -3,6 +3,7 @@ import {
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
   type MemoryCandidate,
+  type NpcEncounterFact,
   type StateUpdates,
   type TurnInputPayload,
   type TurnOutputPayload,
@@ -98,6 +99,69 @@ export function validateMemoryCandidate(candidate: unknown): ValidationResult<st
     errors.push("source must be server_commit, summary, or narration.");
   } else if (!allowedSources.includes(typedCandidate.source)) {
     errors.push(`source ${typedCandidate.source} is not allowed for ${typedCandidate.memory_class}.`);
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateNpcEncounterFact(fact: unknown): ValidationResult<string> {
+  const errors: string[] = [];
+  if (!fact || typeof fact !== "object") {
+    return { ok: false, errors: ["npc encounter fact must be an object."] };
+  }
+
+  const typedFact = fact as Partial<NpcEncounterFact> & Record<string, unknown>;
+  const allowedKeys = new Set([
+    "npc_id",
+    "display_name",
+    "role",
+    "location",
+    "topics",
+    "promises",
+    "clues",
+    "mood",
+    "relationship_change",
+    "last_seen_beat",
+    "encounter_count",
+    "significance",
+    "summary",
+    "source_event_id",
+    "last_seen_at",
+    "quest_hooks"
+  ]);
+
+  for (const key of Object.keys(typedFact)) {
+    if (!allowedKeys.has(key)) {
+      errors.push(`${key} is not allowed in the npc encounter fact contract.`);
+    }
+  }
+
+  validateRequiredString(typedFact.npc_id, "npc_id", errors);
+  validateRequiredString(typedFact.display_name, "display_name", errors);
+  validateOptionalString(typedFact.role, "role", errors);
+  validateOptionalString(typedFact.location, "location", errors);
+  validateStringArray(typedFact.topics, "topics", errors);
+  validateStringArray(typedFact.promises, "promises", errors);
+  validateStringArray(typedFact.clues, "clues", errors);
+  validateOptionalString(typedFact.mood, "mood", errors);
+  validateOptionalString(typedFact.relationship_change, "relationship_change", errors);
+  validateOptionalString(typedFact.last_seen_beat, "last_seen_beat", errors);
+  validateStringArray(typedFact.quest_hooks, "quest_hooks", errors, true);
+  validateRequiredString(typedFact.summary, "summary", errors);
+  validateRequiredString(typedFact.source_event_id, "source_event_id", errors);
+
+  if (!Number.isInteger(typedFact.encounter_count) || (typedFact.encounter_count ?? 0) < 1) {
+    errors.push("encounter_count must be an integer greater than or equal to 1.");
+  }
+
+  if (typeof typedFact.significance !== "number" || !Number.isFinite(typedFact.significance) || typedFact.significance < 0) {
+    errors.push("significance must be a non-negative number.");
+  }
+
+  if (typeof typedFact.last_seen_at !== "string" || !typedFact.last_seen_at.trim()) {
+    errors.push("last_seen_at must be a non-empty ISO timestamp string.");
+  } else if (Number.isNaN(Date.parse(typedFact.last_seen_at))) {
+    errors.push("last_seen_at must be a valid ISO timestamp.");
   }
 
   return { ok: errors.length === 0, errors };
@@ -217,4 +281,35 @@ export function validateTurnOutput(payload: unknown): ValidationResult<string> {
   }
 
   return { ok: errors.length === 0, errors };
+}
+
+function validateRequiredString(value: unknown, field: string, errors: string[]): void {
+  if (typeof value !== "string" || !value.trim()) {
+    errors.push(`${field} must be a non-empty string.`);
+  }
+}
+
+function validateOptionalString(value: unknown, field: string, errors: string[]): void {
+  if (value === undefined || value === null) {
+    return;
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    errors.push(`${field} must be a non-empty string or null.`);
+  }
+}
+
+function validateStringArray(value: unknown, field: string, errors: string[], optional = false): void {
+  if (optional && (value === undefined || value === null)) {
+    return;
+  }
+
+  if (!Array.isArray(value)) {
+    errors.push(`${field} must be an array.`);
+    return;
+  }
+
+  if (value.some((item) => typeof item !== "string" || !item.trim())) {
+    errors.push(`${field} must contain only non-empty strings.`);
+  }
 }

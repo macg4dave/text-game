@@ -124,6 +124,8 @@ Do not assume:
   - long-lived NPC memory records admitted only above a significance threshold
   - short-lived scene context used only for the current conversation
 - A server-side significance evaluator should score encounter facts after dialogue scenes using committed signals such as stable identity, repeated meaningful exchange, relationship change, clues, promises, quest hooks, unique role, and later voluntary player return.
+- The current implementation stores every committed structured encounter as `npc-encounter-fact`, excludes that raw structured record from default hot recall, and promotes a separate `npc-memory` recall record only when the weighted significance score reaches the current threshold of 6.
+- The current scoring weights are intentionally small and inspectable: stable identity +2, repeated meaningful exchange +2, relationship change +2, clues up to +2, promises up to +2, quest hooks up to +2, unique role +1, and voluntary return +2.
 - NPC importance tiers should control what is persisted and how aggressively it is retrieved, from ambient presence through anchor-cast history.
 - World memory, NPC memory, and player journal memory should remain separate retrieval domains even if they share lower-level storage primitives.
 - Context assembly should be budgeted by bucket and remain inspectable enough to explain which facts entered the model context, why they were selected, and what token cost they consumed.

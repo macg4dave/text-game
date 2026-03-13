@@ -694,6 +694,8 @@ When you are driving AI checks from VS Code, keep the loop boring and repeatable
 - Re-run the same deterministic command and the same seeded or explicit-persona command after the implementation change.
 - Record the exact harness command that passed in your backlog handoff notes so the next agent can replay it without guesswork.
 
+The live harness now includes a named scripted walkthrough matrix over the canonical `story_sample` Ghostlight Relay fixture. Current scenario ids are `story-sample-market-rumor`, `story-sample-causeway-run`, and `story-sample-relay-finale`; they show up in `--report-json` output so later review or challenger reruns can cite the same slices instead of describing them loosely.
+
 Use `--selection-only` when you are validating contract drift, schema boundaries, or other deterministic request-side checks. Use `--persona-seed` when you want human-ish but repeatable turn style during live smoke. Use `--persona` when the play style itself is part of the scenario you are validating.
 
 If you discover that one manual AI smoke run is no longer enough, add or update backlog work for a broader walkthrough suite instead of silently expanding the local ritual. Tiny process goblins love undocumented test steps.

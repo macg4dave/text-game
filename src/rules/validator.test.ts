@@ -7,6 +7,7 @@ import {
   TURN_INPUT_SCHEMA_VERSION,
   TURN_OUTPUT_SCHEMA_VERSION,
   type MemoryCandidate,
+  type NpcEncounterFact,
   type CanonicalPlayerCreatedEventPayload,
   type CanonicalTurnEventPayload,
   type AuthoritativePlayerState,
@@ -33,6 +34,7 @@ import { validateSetupStatusResponse } from "./validator/setup-contract.js";
 import {
   parseTurnInput,
   validateMemoryCandidate,
+  validateNpcEncounterFact,
   validateTurnOutput
 } from "./validator/turn-payload.js";
 
@@ -331,6 +333,60 @@ test("validateMemoryCandidate rejects flavor memory when it tries to become auth
   assert.match(result.errors.join(" "), /soft_flavor/i);
   assert.match(result.errors.join(" "), /narration-only/i);
   assert.match(result.errors.join(" "), /server_commit/i);
+});
+
+test("validateNpcEncounterFact accepts a structured committed NPC encounter record", () => {
+  const fact: NpcEncounterFact = {
+    npc_id: "npc-nila-vale",
+    display_name: "Nila Vale",
+    role: "relay mechanic",
+    location: "Rooftop Market",
+    topics: ["ghostlight relay", "causeway route"],
+    promises: ["Meet the player at the causeway gate"],
+    clues: ["The relay draws power through Stormglass Causeway"],
+    mood: "guarded but helpful",
+    relationship_change: "Nila now trusts the player with the tuning fork route.",
+    last_seen_beat: "beat-2",
+    encounter_count: 2,
+    significance: 8,
+    summary: "Nila Vale shared the relay route and promised to meet the player at the causeway gate.",
+    source_event_id: "turn-evt-123",
+    last_seen_at: "2026-03-13T12:00:00.000Z"
+  };
+
+  assert.deepEqual(validateNpcEncounterFact(fact), { ok: true, errors: [] });
+});
+
+test("validateNpcEncounterFact rejects malformed encounter facts and negative significance", () => {
+  const result = validateNpcEncounterFact({
+    npc_id: "  ",
+    display_name: "Nila Vale",
+    role: 7,
+    location: "Rooftop Market",
+    topics: ["ghostlight relay", "   "],
+    promises: "Meet later",
+    clues: [],
+    mood: null,
+    relationship_change: 42,
+    last_seen_beat: "",
+    encounter_count: 0,
+    significance: -1,
+    summary: "   ",
+    source_event_id: "",
+    last_seen_at: "not-a-date"
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /npc_id/i);
+  assert.match(result.errors.join(" "), /role/i);
+  assert.match(result.errors.join(" "), /topics/i);
+  assert.match(result.errors.join(" "), /promises/i);
+  assert.match(result.errors.join(" "), /relationship_change/i);
+  assert.match(result.errors.join(" "), /encounter_count/i);
+  assert.match(result.errors.join(" "), /significance/i);
+  assert.match(result.errors.join(" "), /summary/i);
+  assert.match(result.errors.join(" "), /source_event_id/i);
+  assert.match(result.errors.join(" "), /last_seen_at/i);
 });
 
 test("validateStateResponse accepts a versioned authoritative player envelope", () => {

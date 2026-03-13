@@ -9,6 +9,7 @@ import {
   type CanonicalTurnEventPayload,
   type DirectorSpec,
   type MemoryCandidate,
+  type NpcEncounterFact,
   type Player,
   type QuestSpec,
   type TurnResult
@@ -19,6 +20,7 @@ import { TURN_RESPONSE_SCHEMA, validateTurnResponseSchemaContract } from "../ai/
 import { validateCanonicalTurnEvent, validateMemoryCandidate } from "../rules/validator.js";
 import { createCommittedTurnEventPayload } from "../server/http-contract.js";
 import { DRIFT_RECONCILED_PLAYER_OPTIONS } from "./presentation.js";
+import { evaluateNpcEncounterSignificance } from "./encounter-facts.js";
 import { createTurnService } from "./turn.js";
 
 function getTurnResolutionEvent(event: CanonicalEventPayload): CanonicalTurnEventPayload | null {
@@ -287,6 +289,60 @@ test("memory admission rules keep soft flavor outside authoritative truth", () =
   assert.match(result.errors.join(" "), /narration-only/i);
 });
 
+test("npc encounter significance rises with stable identity, meaningful exchange, and voluntary return", () => {
+  const firstEncounter: NpcEncounterFact = {
+    npc_id: "npc-nila-vale",
+    display_name: "Nila Vale",
+    role: "relay mechanic",
+    location: "Rooftop Market",
+    topics: ["ghostlight relay"],
+    promises: [],
+    clues: [],
+    mood: "hurried",
+    relationship_change: null,
+    last_seen_beat: "beat-1",
+    encounter_count: 1,
+    significance: 0,
+    summary: "Nila Vale warns that the beacon is tied to the Ghostlight Relay.",
+    source_event_id: "turn-evt-1",
+    last_seen_at: "2026-03-13T12:00:00.000Z"
+  };
+
+  const returnedEncounter: NpcEncounterFact = {
+    ...firstEncounter,
+    topics: ["ghostlight relay", "causeway route"],
+    promises: ["Meet the player at the causeway gate"],
+    clues: ["The relay draws power through Stormglass Causeway"],
+    relationship_change: "Nila now trusts the player with the relay route.",
+    last_seen_beat: "beat-2",
+    encounter_count: 2,
+    summary: "Nila Vale shared the causeway route and promised to meet the player there.",
+    source_event_id: "turn-evt-2",
+    last_seen_at: "2026-03-13T12:05:00.000Z"
+  };
+
+  const firstResult = evaluateNpcEncounterSignificance({
+    fact: firstEncounter,
+    previousFacts: [],
+    voluntaryReturn: false
+  });
+  const returnedResult = evaluateNpcEncounterSignificance({
+    fact: returnedEncounter,
+    previousFacts: [firstEncounter],
+    voluntaryReturn: true
+  });
+
+  assert.ok(firstResult.score < returnedResult.score);
+  assert.equal(firstResult.shouldPromoteToLongLivedMemory, false);
+  assert.equal(returnedResult.shouldPromoteToLongLivedMemory, true);
+  assert.ok(returnedResult.breakdown.stable_identity > 0);
+  assert.ok(returnedResult.breakdown.repeated_meaningful_exchange > 0);
+  assert.ok(returnedResult.breakdown.promises > 0);
+  assert.ok(returnedResult.breakdown.clues > 0);
+  assert.ok(returnedResult.breakdown.relationship_change > 0);
+  assert.ok(returnedResult.breakdown.voluntary_return > 0);
+});
+
 test("turn service executes the gameplay pipeline outside the server layer", async () => {
   const events: Array<{ playerId: string; role: string; content: string }> = [];
   const committedEvents: string[] = [];
@@ -421,6 +477,131 @@ test("turn service executes the gameplay pipeline outside the server layer", asy
       embedding: [0.1, 0.2]
     }
   ]);
+});
+
+test("turn service always persists cheap encounter facts but only promotes durable NPC memory above significance threshold", async () => {
+  const player = createStorySamplePlayer();
+  const memoriesAdded: Array<{ playerId: string; content: string; kind?: string; embedding?: number[] }> = [];
+  const persistedPlayers: Player[] = [];
+  const lowSignificanceFact: NpcEncounterFact = {
+    npc_id: "npc-nila-vale",
+    display_name: "Nila Vale",
+    role: "relay mechanic",
+    location: "Rooftop Market",
+    topics: ["ghostlight relay"],
+    promises: [],
+    clues: [],
+    mood: "hurried",
+    relationship_change: null,
+    last_seen_beat: "beat-1",
+    encounter_count: 1,
+    significance: 0,
+    summary: "Nila Vale warns that the beacon is tied to the Ghostlight Relay.",
+    source_event_id: "turn-evt-1",
+    last_seen_at: "2026-03-13T12:00:00.000Z"
+  };
+  const highSignificanceFact: NpcEncounterFact = {
+    ...lowSignificanceFact,
+    topics: ["ghostlight relay", "causeway route"],
+    promises: ["Meet the player at the causeway gate"],
+    clues: ["The relay draws power through Stormglass Causeway"],
+    relationship_change: "Nila now trusts the player with the relay route.",
+    last_seen_beat: "beat-2",
+    encounter_count: 2,
+    summary: "Nila Vale shared the causeway route and promised to meet the player there.",
+    source_event_id: "turn-evt-2",
+    last_seen_at: "2026-03-13T12:05:00.000Z"
+  };
+  let encounterFactCalls = 0;
+
+  const service = createTurnService({
+    addCommittedTurnEvent() {},
+    addEvent() {},
+    addMemories(playerId, memoryList) {
+      memoryList.forEach((memory) => {
+        memoriesAdded.push({
+          playerId,
+          content: memory.content,
+          kind: "kind" in memory ? String(memory.kind) : undefined,
+          embedding: memory.embedding
+        });
+      });
+    },
+    async deriveNpcEncounterFacts() {
+      encounterFactCalls += 1;
+      return encounterFactCalls === 1 ? [lowSignificanceFact] : [highSignificanceFact];
+    },
+    async generateTurn(): Promise<TurnResult> {
+      return {
+        narrative: "Nila steadies the beacon housing and points toward the causeway.",
+        player_options: ["Ask about the causeway"],
+        state_updates: {
+          location: "Rooftop Market",
+          inventory_add: [],
+          inventory_remove: [],
+          flags_add: ["beacon_inspected"],
+          flags_remove: [],
+          quests: []
+        },
+        director_updates: {
+          end_goal_progress: "Next step: Ask Nila Vale where the relay draws power."
+        },
+        memory_updates: ["The beacon is tied to the Ghostlight Relay."]
+      };
+    },
+    async getEmbedding() {
+      return [];
+    },
+    async getEmbeddings({ inputs }) {
+      return inputs.map(() => []);
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return [];
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  const firstOutcome = await service.executeTurn({
+    player,
+    input: "ask Nila what the beacon is doing",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(firstOutcome.ok, true);
+  assert.deepEqual(
+    memoriesAdded.map((memory) => memory.kind),
+    ["fact", "npc-encounter-fact"]
+  );
+
+  const secondPlayer = persistedPlayers.at(-1) ?? player;
+  const secondOutcome = await service.executeTurn({
+    player: secondPlayer,
+    input: "go back to Nila and ask where the causeway route starts",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(secondOutcome.ok, true);
+  assert.deepEqual(
+    memoriesAdded.map((memory) => memory.kind),
+    ["fact", "npc-encounter-fact", "npc-encounter-fact", "npc-memory"]
+  );
+  assert.match(memoriesAdded[1]?.content ?? "", /Nila Vale/);
+  assert.match(memoriesAdded[3]?.content ?? "", /causeway route/i);
 });
 
 test("turn service returns a 400 outcome when turn output validation fails", async () => {

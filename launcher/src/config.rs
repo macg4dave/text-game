@@ -327,6 +327,10 @@ pub fn local_gpu_profile_matrix_path(repo_root: &Path) -> PathBuf {
     launcher_assets_dir(repo_root).join("local-gpu-profile-matrix.json")
 }
 
+pub fn local_ai_walkthrough_matrix_path(repo_root: &Path) -> PathBuf {
+    launcher_assets_dir(repo_root).join("local-ai-walkthrough-matrix.json")
+}
+
 fn is_workspace_root(candidate: &Path) -> bool {
     candidate.join("package.json").exists()
         && candidate.join("BACKLOG.md").exists()
@@ -341,7 +345,8 @@ mod tests {
     use crate::env::RepoEnv;
 
     use super::{
-        command_contracts, local_gpu_profile_matrix_path, resolve_repo_ai_config,
+        command_contracts, local_ai_walkthrough_matrix_path, local_gpu_profile_matrix_path,
+        resolve_repo_ai_config,
         resolve_workspace_root_from,
     };
 
@@ -374,6 +379,11 @@ mod tests {
             Path::new("launcher")
                 .join("assets")
                 .join("local-gpu-profile-matrix.json")
+        ));
+        assert!(local_ai_walkthrough_matrix_path(&root).ends_with(
+            Path::new("launcher")
+                .join("assets")
+                .join("local-ai-walkthrough-matrix.json")
         ));
     }
 

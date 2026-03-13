@@ -123,6 +123,8 @@ Numeric targets are required before Phase 0 closes. The source of truth for thes
 
 - Do not treat raw dialogue logs as durable NPC memory. Transcript retention exists for replay and debugging; durable NPC recall must come from committed structured encounter facts and server-owned significance scoring.
 - NPC memory should use explicit tiers with sparse defaults. Cheap identity facts such as names may persist broadly, but richer summaries, relationship state, open threads, and retrieval priority require higher cumulative significance.
+- Keep structured encounter facts and durable NPC recall as separate storage kinds. `npc-encounter-fact` records exist for server-owned structure and later tiering work; they must not be dumped into the default live recall bucket like ordinary text memories.
+- The significance contract must stay testable. If weights or threshold change, update the documented rule table and the focused validator or turn tests in the same change instead of relying on hidden heuristics.
 - Retrieval policy must keep NPC memory, world memory, player journal memory, and short-lived scene context separate enough that one pool cannot crowd out the others by default.
 - NPC memory changes should include fixtures proving both that meaningful returning NPCs are recognized from committed facts and that irrelevant prior chat does not flood the turn context.
 
