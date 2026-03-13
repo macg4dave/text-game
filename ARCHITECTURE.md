@@ -68,7 +68,7 @@ Do not assume:
 - Input interpretation should support both parser-like affordances and natural-language utterances. The parser verb is a helpful hint, not the required boundary format.
 - Intent interpretation turns broad player input into one or more candidate intents without deciding story pacing.
 - Referential follow-ups such as `what is that` should be resolved against the current salient scene or conversation context when the referent is clear, and should fall back to explicit clarification only when grounding is genuinely ambiguous.
-- First-person or quoted NPC speech should be normalized into dialogue intent when context identifies a plausible target, rather than being treated as out-of-band meta text by default.
+- First-person or quoted NPC speech should be normalized into dialogue intent when context identifies a plausible target or salient current actor, rather than being treated as out-of-band meta text or generic clarification by default.
 - NPC conversation should maintain a compact short-lived conversational state separate from long-lived NPC memory so broad talk can feel coherent without dragging full transcript history into hot context.
 - NPC dialogue assembly may include a compact persona bootstrap built from authored identity fields and admitted NPC memory at first contact, then refreshed from later admitted traits rather than from raw transcript accumulation.
 - World simulation resolution decides plausibility, accepted consequences, failures, and side effects against authoritative state and rules.

@@ -197,6 +197,67 @@ function createStorySamplePlayer(): Player {
   };
 }
 
+function createGroundedTurnHarness({
+  player,
+  shortHistory = []
+}: {
+  player: Player;
+  shortHistory?: string[];
+}) {
+  const committedEvents: CanonicalTurnEventPayload[] = [];
+  const persistedPlayers: Player[] = [];
+  let generateTurnCalls = 0;
+  let embeddingCalls = 0;
+
+  const service = createTurnService({
+    addCommittedTurnEvent(event) {
+      const turnEvent = getTurnResolutionEvent(event);
+      if (turnEvent) {
+        committedEvents.push(turnEvent);
+      }
+    },
+    addEvent() {},
+    addMemories() {},
+    async generateTurn(): Promise<TurnResult> {
+      generateTurnCalls += 1;
+      throw new Error("scene grounding should resolve before model generation");
+    },
+    async getEmbedding() {
+      embeddingCalls += 1;
+      throw new Error("scene grounding should not request embeddings");
+    },
+    async getEmbeddings() {
+      embeddingCalls += 1;
+      throw new Error("scene grounding should not request embeddings");
+    },
+    getOrCreatePlayer() {
+      return persistedPlayers.at(-1) ?? player;
+    },
+    getRelevantMemories() {
+      return [];
+    },
+    getShortHistory() {
+      return shortHistory;
+    },
+    persistPlayerState(nextPlayer) {
+      persistedPlayers.push(nextPlayer);
+      return nextPlayer;
+    }
+  });
+
+  return {
+    service,
+    committedEvents,
+    persistedPlayers,
+    getGenerateTurnCalls() {
+      return generateTurnCalls;
+    },
+    getEmbeddingCalls() {
+      return embeddingCalls;
+    }
+  };
+}
+
 test("system prompt frames model-emitted consequences as proposals instead of committed truth", () => {
   assert.match(SYSTEM_PROMPT, /propos/i);
   assert.match(SYSTEM_PROMPT, /do not present .* committed/i);
@@ -1654,58 +1715,9 @@ test("turn service accepts authored off-beat travel from quest prerequisites eve
 
 test("turn service blocks clarification-style inputs from unlocking quest progression", async () => {
   const player = createStorySamplePlayer();
-  const committedEvents: CanonicalTurnEventPayload[] = [];
-  const persistedPlayers: Player[] = [];
+  const harness = createGroundedTurnHarness({ player });
 
-  const service = createTurnService({
-    addCommittedTurnEvent(event) {
-      const turnEvent = getTurnResolutionEvent(event);
-      if (turnEvent) {
-        committedEvents.push(turnEvent);
-      }
-    },
-    addEvent() {},
-    addMemories() {},
-    async generateTurn(): Promise<TurnResult> {
-      return {
-        narrative: "The market beacon is the sparking loudspeaker throwing false evacuation orders across the stalls.",
-        player_options: ["Inspect the market beacon", "Ask who wired it"],
-        state_updates: {
-          location: "Rooftop Market",
-          inventory_add: [],
-          inventory_remove: [],
-          flags_add: ["beacon_inspected"],
-          flags_remove: [],
-          quests: []
-        },
-        director_updates: {
-          end_goal_progress: "Next step: Ask Nila Vale where the relay draws power."
-        },
-        memory_updates: ["The beacon is tied to the Ghostlight Relay."]
-      };
-    },
-    async getEmbedding() {
-      return [];
-    },
-    async getEmbeddings() {
-      return [];
-    },
-    getOrCreatePlayer() {
-      return persistedPlayers.at(-1) ?? player;
-    },
-    getRelevantMemories() {
-      return [];
-    },
-    getShortHistory() {
-      return [];
-    },
-    persistPlayerState(nextPlayer) {
-      persistedPlayers.push(nextPlayer);
-      return nextPlayer;
-    }
-  });
-
-  const outcome = await service.executeTurn({
+  const outcome = await harness.service.executeTurn({
     player,
     input: "what is the market beacon?",
     model: "game-chat",
@@ -1719,7 +1731,7 @@ test("turn service blocks clarification-style inputs from unlocking quest progre
     return;
   }
 
-  const persistedPlayer = persistedPlayers.at(-1);
+  const persistedPlayer = harness.persistedPlayers.at(-1);
   if (!persistedPlayer) {
     throw new Error("expected the turn pipeline to persist the adjudicated state");
   }
@@ -1727,14 +1739,112 @@ test("turn service blocks clarification-style inputs from unlocking quest progre
   assert.deepEqual(persistedPlayer.flags, []);
   assert.deepEqual(persistedPlayer.quests, player.quests);
   assert.equal(persistedPlayer.director_state.end_goal_progress, player.director_state.end_goal_progress);
-  assert.equal(
-    outcome.turnOutput.narrative,
-    "You pause in Rooftop Market and take stock. The clearest lead is still to confirm the relay is real."
-  );
-  assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
-  assert.equal(committedEvents[0]?.committed.state_updates, null);
-  assert.equal(committedEvents[0]?.committed.director_updates, null);
-  assert.deepEqual(committedEvents[0]?.committed.memory_updates, []);
+  assert.match(outcome.turnOutput.narrative, /market beacon/i);
+  assert.match(outcome.turnOutput.narrative, /false evacuation orders|loudspeaker/i);
+  assert.ok(outcome.turnOutput.player_options.includes("Inspect the market beacon"));
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.equal(harness.getEmbeddingCalls(), 0);
+  assert.equal(harness.committedEvents[0]?.committed.state_updates, null);
+  assert.equal(harness.committedEvents[0]?.committed.director_updates, null);
+  assert.deepEqual(harness.committedEvents[0]?.committed.memory_updates, []);
+});
+
+test("turn service answers look around with authored scene grounding from the opening hub", async () => {
+  const player = createStorySamplePlayer();
+  const harness = createGroundedTurnHarness({ player });
+
+  const outcome = await harness.service.executeTurn({
+    player,
+    input: "look around",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = harness.persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected the grounded turn to persist player state");
+  }
+
+  assert.deepEqual(persistedPlayer.flags, []);
+  assert.deepEqual(persistedPlayer.quests, player.quests);
+  assert.match(outcome.turnOutput.narrative, /Rooftop Market/);
+  assert.match(outcome.turnOutput.narrative, /market beacon/i);
+  assert.match(outcome.turnOutput.narrative, /Nila Vale/);
+  assert.match(outcome.turnOutput.narrative, /stairwell|stairs/i);
+  assert.ok(outcome.turnOutput.player_options.includes("Inspect the market beacon"));
+  assert.ok(outcome.turnOutput.player_options.includes("Ask Nila Vale what she has seen"));
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.equal(harness.getEmbeddingCalls(), 0);
+  assert.equal(harness.committedEvents[0]?.committed.state_updates, null);
+  assert.equal(harness.committedEvents[0]?.committed.director_updates, null);
+  assert.deepEqual(harness.committedEvents[0]?.committed.memory_updates, []);
+});
+
+test("turn service resolves short referential follow-ups against the current salient anchor", async () => {
+  const player = createStorySamplePlayer();
+  const harness = createGroundedTurnHarness({
+    player,
+    shortHistory: [
+      "NARRATOR: Canvas awnings snap above the stalls while the market beacon spits false evacuation orders over the crowd."
+    ]
+  });
+
+  const outcome = await harness.service.executeTurn({
+    player,
+    input: "what is that?",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  assert.match(outcome.turnOutput.narrative, /market beacon/i);
+  assert.match(outcome.turnOutput.narrative, /false evacuation orders|rewired|loudspeaker/i);
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.equal(harness.getEmbeddingCalls(), 0);
+  assert.equal(harness.committedEvents[0]?.committed.state_updates, null);
+});
+
+test("turn service resolves tell-me-more follow-ups against the current salient anchor", async () => {
+  const player = createStorySamplePlayer();
+  const harness = createGroundedTurnHarness({
+    player,
+    shortHistory: [
+      "NARRATOR: Canvas awnings snap above the stalls while the market beacon spits false evacuation orders over the crowd."
+    ]
+  });
+
+  const outcome = await harness.service.executeTurn({
+    player,
+    input: "tell me more about that",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  assert.match(outcome.turnOutput.narrative, /market beacon/i);
+  assert.match(outcome.turnOutput.narrative, /false evacuation orders|loudspeaker|rewired/i);
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.equal(harness.getEmbeddingCalls(), 0);
+  assert.equal(harness.committedEvents[0]?.committed.state_updates, null);
 });
 
 test("turn service blocks raw internal tokens from acting like valid story commands", async () => {
@@ -1821,62 +1931,13 @@ test("turn service blocks raw internal tokens from acting like valid story comma
   assert.deepEqual(committedEvents[0]?.committed.memory_updates, []);
 });
 
-test("turn service rewrites stale next-step narration after committed beacon inspection", async () => {
+test("turn service grounds beacon inspection before the model can improvise it", async () => {
   const player = createStorySamplePlayer();
-  const committedEvents: CanonicalTurnEventPayload[] = [];
-  const persistedPlayers: Player[] = [];
+  const harness = createGroundedTurnHarness({ player });
 
-  const service = createTurnService({
-    addCommittedTurnEvent(event) {
-      const turnEvent = getTurnResolutionEvent(event);
-      if (turnEvent) {
-        committedEvents.push(turnEvent);
-      }
-    },
-    addEvent() {},
-    addMemories() {},
-    async generateTurn(): Promise<TurnResult> {
-      return {
-        narrative: "Next step: Inspect the sparking market beacon.",
-        player_options: ["Look at the beacon again"],
-        state_updates: {
-          location: "Rooftop Market",
-          inventory_add: [],
-          inventory_remove: [],
-          flags_add: ["beacon_inspected"],
-          flags_remove: [],
-          quests: []
-        },
-        director_updates: {
-          end_goal_progress: "Next step: Inspect the sparking market beacon."
-        },
-        memory_updates: ["The market beacon is broadcasting false evacuation orders tied to the Ghostlight Relay."]
-      };
-    },
-    async getEmbedding() {
-      return [];
-    },
-    async getEmbeddings() {
-      return [];
-    },
-    getOrCreatePlayer() {
-      return persistedPlayers.at(-1) ?? player;
-    },
-    getRelevantMemories() {
-      return [];
-    },
-    getShortHistory() {
-      return [];
-    },
-    persistPlayerState(nextPlayer) {
-      persistedPlayers.push(nextPlayer);
-      return nextPlayer;
-    }
-  });
-
-  const outcome = await service.executeTurn({
+  const outcome = await harness.service.executeTurn({
     player,
-    input: "look at beacon",
+    input: "inspect the market beacon",
     model: "game-chat",
     embeddingModel: "game-embedding",
     directorSpec: createStorySampleDirectorSpec(),
@@ -1888,9 +1949,9 @@ test("turn service rewrites stale next-step narration after committed beacon ins
     return;
   }
 
-  const persistedPlayer = persistedPlayers.at(-1);
+  const persistedPlayer = harness.persistedPlayers.at(-1);
   if (!persistedPlayer) {
-    throw new Error("expected the reconciled story-sample state to persist");
+    throw new Error("expected the grounded beacon inspection to persist state");
   }
 
   assert.deepEqual(persistedPlayer.flags, ["beacon_inspected"]);
@@ -1901,15 +1962,254 @@ test("turn service rewrites stale next-step narration after committed beacon ins
       summary: "Ask Nila Vale where the relay draws power"
     }
   ]);
-  assert.equal(
-    outcome.turnOutput.narrative,
-    "The market beacon is broadcasting false evacuation orders tied to the Ghostlight Relay. Next step: Ask Nila Vale where the relay draws power."
-  );
-  assert.deepEqual(outcome.turnOutput.player_options, [...DRIFT_RECONCILED_PLAYER_OPTIONS]);
-  assert.equal(
-    committedEvents[0]?.supplemental?.proposal_presentation?.narrative,
-    "Next step: Inspect the sparking market beacon."
-  );
+  assert.match(outcome.turnOutput.narrative, /Ghostlight Relay/i);
+  assert.match(outcome.turnOutput.narrative, /false evacuation orders|fresh copper|rewired/i);
+  assert.ok(outcome.turnOutput.player_options.includes("Ask Nila Vale where the relay draws power"));
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.deepEqual(harness.committedEvents[0]?.committed.state_updates?.flags_add, ["beacon_inspected"]);
+  assert.deepEqual(harness.committedEvents[0]?.committed.memory_updates, [
+    "The market beacon is broadcasting false evacuation orders tied to the Ghostlight Relay."
+  ]);
+});
+
+test("turn service answers topical ask turns with grounded NPC detail in the opening hub", async () => {
+  const initialPlayer = createStorySamplePlayer();
+  const harness = createGroundedTurnHarness({ player: initialPlayer });
+
+  const inspectOutcome = await harness.service.executeTurn({
+    player: initialPlayer,
+    input: "inspect the market beacon",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(inspectOutcome.ok, true);
+  if (!inspectOutcome.ok) {
+    return;
+  }
+
+  const postInspectPlayer = harness.persistedPlayers.at(-1);
+  if (!postInspectPlayer) {
+    throw new Error("expected beacon inspection to persist before the follow-up question");
+  }
+
+  const askOutcome = await harness.service.executeTurn({
+    player: postInspectPlayer,
+    input: "ask Nila Vale about the Ghostlight Relay",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(askOutcome.ok, true);
+  if (!askOutcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = harness.persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected the grounded ask-about turn to persist state");
+  }
+
+  assert.deepEqual(persistedPlayer.flags, ["beacon_inspected", "nila_guidance"]);
+  assert.deepEqual(persistedPlayer.quests, [
+    {
+      id: "ghostlight_relay",
+      status: "active",
+      summary: "Recover the tuning fork from the Closed Stacks"
+    }
+  ]);
+  assert.match(askOutcome.turnOutput.narrative, /Nila/i);
+  assert.match(askOutcome.turnOutput.narrative, /Stormglass Causeway/i);
+  assert.ok(askOutcome.turnOutput.player_options.includes("Head for the Closed Stacks"));
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.deepEqual(harness.committedEvents.at(-1)?.committed.state_updates?.flags_add, ["nila_guidance"]);
+});
+
+test("turn service treats first-person NPC speech as a grounded dialogue attempt when the target is clear", async () => {
+  const initialPlayer = createStorySamplePlayer();
+  const harness = createGroundedTurnHarness({ player: initialPlayer });
+
+  const inspectOutcome = await harness.service.executeTurn({
+    player: initialPlayer,
+    input: "inspect the market beacon",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(inspectOutcome.ok, true);
+  if (!inspectOutcome.ok) {
+    return;
+  }
+
+  const postInspectPlayer = harness.persistedPlayers.at(-1);
+  if (!postInspectPlayer) {
+    throw new Error("expected beacon inspection to persist before the first-person follow-up");
+  }
+
+  const askOutcome = await harness.service.executeTurn({
+    player: postInspectPlayer,
+    input: "I ask Nila where the power comes from",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(askOutcome.ok, true);
+  if (!askOutcome.ok) {
+    return;
+  }
+
+  assert.match(askOutcome.turnOutput.narrative, /Nila/i);
+  assert.match(askOutcome.turnOutput.narrative, /Stormglass Causeway/i);
+  assert.ok(askOutcome.turnOutput.player_options.includes("Head for the Closed Stacks"));
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.deepEqual(harness.committedEvents.at(-1)?.committed.state_updates?.flags_add, ["nila_guidance"]);
+});
+
+test("turn service treats quoted speech as a grounded dialogue attempt when the current actor is salient", async () => {
+  const initialPlayer = createStorySamplePlayer();
+  const harness = createGroundedTurnHarness({ player: initialPlayer });
+
+  const inspectOutcome = await harness.service.executeTurn({
+    player: initialPlayer,
+    input: "inspect the market beacon",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(inspectOutcome.ok, true);
+  if (!inspectOutcome.ok) {
+    return;
+  }
+
+  const postInspectPlayer = harness.persistedPlayers.at(-1);
+  if (!postInspectPlayer) {
+    throw new Error("expected beacon inspection to persist before the quoted follow-up");
+  }
+
+  const askOutcome = await harness.service.executeTurn({
+    player: postInspectPlayer,
+    input: '"Where does it draw power from?"',
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(askOutcome.ok, true);
+  if (!askOutcome.ok) {
+    return;
+  }
+
+  assert.match(askOutcome.turnOutput.narrative, /Stormglass Causeway/i);
+  assert.ok(askOutcome.turnOutput.player_options.includes("Head for the Closed Stacks"));
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.deepEqual(harness.committedEvents.at(-1)?.committed.state_updates?.flags_add, ["nila_guidance"]);
+});
+
+test("turn service accepts nearby authored travel from Rooftop Market through natural stair phrasing", async () => {
+  const player = createStorySamplePlayer();
+  const harness = createGroundedTurnHarness({ player });
+
+  const outcome = await harness.service.executeTurn({
+    player,
+    input: "go down the stairs",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = harness.persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected nearby authored travel to persist state");
+  }
+
+  assert.equal(persistedPlayer.location, "Lantern Walk");
+  assert.deepEqual(persistedPlayer.flags, []);
+  assert.match(outcome.turnOutput.narrative, /Lantern Walk/i);
+  assert.match(outcome.turnOutput.narrative, /stairwell|stairs/i);
+  assert.ok(outcome.turnOutput.player_options.includes("Head back up to Rooftop Market"));
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.equal(harness.committedEvents[0]?.committed.state_updates?.location, "Lantern Walk");
+});
+
+test("turn service returns grounded direction when premature travel targets are not yet reachable", async () => {
+  const player = createStorySamplePlayer();
+  const harness = createGroundedTurnHarness({ player });
+
+  const outcome = await harness.service.executeTurn({
+    player,
+    input: "head for Stormglass Causeway",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = harness.persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected blocked premature travel to preserve state");
+  }
+
+  assert.equal(persistedPlayer.location, "Rooftop Market");
+  assert.match(outcome.turnOutput.narrative, /Stormglass Causeway/i);
+  assert.match(outcome.turnOutput.narrative, /Lantern Walk|stairwell/i);
+  assert.ok(outcome.turnOutput.player_options.includes("Go down the stairs to Lantern Walk"));
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.equal(harness.getEmbeddingCalls(), 0);
+  assert.equal(harness.committedEvents[0]?.committed.state_updates, null);
+});
+
+test("turn service clarifies ambiguous directional aliases from Rooftop Market without moving the player", async () => {
+  const player = createStorySamplePlayer();
+  const harness = createGroundedTurnHarness({ player });
+
+  const outcome = await harness.service.executeTurn({
+    player,
+    input: "go down",
+    model: "game-chat",
+    embeddingModel: "game-embedding",
+    directorSpec: createStorySampleDirectorSpec(),
+    questSpec: createStorySampleQuestSpec()
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) {
+    return;
+  }
+
+  const persistedPlayer = harness.persistedPlayers.at(-1);
+  if (!persistedPlayer) {
+    throw new Error("expected ambiguous directional travel to preserve state");
+  }
+
+  assert.equal(persistedPlayer.location, "Rooftop Market");
+  assert.match(outcome.turnOutput.narrative, /Lantern Walk/i);
+  assert.match(outcome.turnOutput.narrative, /take the stairs|stairwell/i);
+  assert.ok(outcome.turnOutput.player_options.includes("Look around"));
+  assert.equal(harness.getGenerateTurnCalls(), 0);
+  assert.equal(harness.getEmbeddingCalls(), 0);
+  assert.equal(harness.committedEvents[0]?.committed.state_updates, null);
 });
 
 test("turn service rejects stage-skipping travel and progression before director framing can treat it as truth", async () => {

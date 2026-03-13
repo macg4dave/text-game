@@ -246,11 +246,11 @@ No global blocker as of 2026-03-09:
 | T71 | Now | P1 | P1 | Commit-aligned weak narration reconciliation | Done | T57c, T64b, T70 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live AI smoke |
 | T72 | Now | P1 | P1 | Sparse hot-summary memory admission | Done | T60a, T71 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/reducer.test.ts src/state/turn.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T73 | Next | P1 | P1 | Open-play opening slice and local-model mitigation | Ready | T64b, T70, T71 | Manual planning-doc consistency review + child task validation |
-| T73a | Next | P1 | P1 | Scene grounding contract for look, inspect, and ask | Ready | T73 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/server/**/*.test.ts src/rules/**/*.test.ts` |
-| T73b | Next | P1 | P1 | Authored local movement and failed-travel affordances | Ready | T73a, T58b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/story/**/*.test.ts src/server/**/*.test.ts` |
-| T73c | Next | P1 | P1 | Small-model fallback narration for exploratory turns | Ready | T73a, T73b, T71 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/ui/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T73a | Done | P1 | P1 | Scene grounding contract for look, inspect, and ask | Done | T73 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/server/**/*.test.ts src/rules/**/*.test.ts` |
+| T73b | Next | P1 | P1 | Authored local movement and failed-travel affordances | Done | T73a, T58b | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/story/**/*.test.ts src/server/**/*.test.ts` |
+| T73c | Next | P1 | P1 | Small-model fallback narration for exploratory turns | Done | T73a, T73b, T71 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/ui/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T73d | Next | P1 | P2 | Local AI exploratory regression harness | Ready | T73c, T73e, T68b | `cargo test --manifest-path launcher/Cargo.toml` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` + repeatable live exploratory smoke |
-| T73e | Next | P1 | P1 | Natural-language intent and first-person dialogue parsing | Ready | T73a, T70 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/**/*.test.ts src/state/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
+| T73e | Next | P1 | P1 | Natural-language intent and first-person dialogue parsing | Done | T73a, T70 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/**/*.test.ts src/state/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
 | T74 | Later | P2 | P1 | Open-ended NPC conversation and anti-loop dialogue | Ready | T73e, T62b | Manual planning-doc consistency review + child task validation |
 | T74a | Later | P2 | P1 | NPC conversation topic map and conversational state contract | Ready | T74 | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/rules/**/*.test.ts src/server/**/*.test.ts` |
 | T74b | Later | P2 | P1 | Dialogue turn classification and non-quest conversation handling | Ready | T74a, T73e | `docker compose run --rm --no-deps app npm run type-check` + `docker compose run --rm --no-deps app npx tsx --test src/rules/**/*.test.ts src/state/**/*.test.ts` + `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only` |
@@ -2425,8 +2425,8 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T73a - Scene Grounding Contract For Look, Inspect, And Ask
 
-- Status: Ready
-- Queue: Next
+- Status: Done
+- Queue: Done
 - Phase: P1
 - Priority: P1
 - Owner Role: Gameplay systems lead
@@ -2459,10 +2459,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
   - prefer authored scene facts over larger prompts; this task is a mitigation for local-model weakness, not a request for more prompt bloat
   - keep the scope to the opening slice first so later world expansion can reuse the same contract if it proves sound
   - classic parser verbs should stay as strong affordances, but this task should not require the player to restate nouns in strict command form when the immediate referent is already clear
+  - completed on 2026-03-13 by adding `data/spec/scene-grounding.json` plus `src/state/scene-grounding.ts`, then routing grounded opening-hub turns through the server before model generation in `src/state/turn.ts`
+  - grounded paths now cover `look around`, direct clarification about authored anchors, `what is that` referential follow-ups, deterministic beacon inspection, and a topical `ask Nila Vale about the Ghostlight Relay` follow-up from `Rooftop Market`
+  - validation run: `docker compose run --rm --no-deps app npm run type-check`
+  - validation run: `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/server/**/*.test.ts src/rules/**/*.test.ts`
 
 ### T73b - Authored Local Movement And Failed-Travel Affordances
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -2495,10 +2499,14 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - preserve the simulation-first boundary from `T58b`; movement should feel broader, not more permissive than authored prerequisites allow
   - use this task to make the opening hub feel explorable, not to open unrestricted fast travel
+  - completed on 2026-03-13 by extending `data/spec/scene-grounding.json` with authored exits for `Rooftop Market` and `Lantern Walk`, adding `src/story/scene-travel.ts` for adjacent movement validation, and teaching `src/state/scene-grounding.ts` to resolve simple movement, blocked travel, and ambiguous directional aliases before model generation
+  - nearby movement now supports natural stair phrasing into `Lantern Walk`, keeps richer mixed-intent turns on the normal pipeline, and returns grounded direction when players reach too far ahead toward `Stormglass Causeway`
+  - validation run: `docker compose run --rm --no-deps app npm run type-check`
+  - validation run: `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/story/**/*.test.ts src/server/**/*.test.ts`
 
 ### T73c - Small-Model Fallback Narration For Exploratory Turns
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -2533,6 +2541,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - this is a mitigation layer for limited local models, not a substitute for richer future guide or memory work
   - keep fallback wording informative and grounded; do not smuggle in unearned state change just to make the response feel richer
+  - completed on 2026-03-13 by threading player input into `reconcileTurnPresentation`, adding `src/state/exploratory-fallback.ts`, and using opening-slice scene grounding to replace repetitive no-commit `You pause...` loops with authored scene detail or nearby route guidance when no committed change occurs
+  - deterministic regression coverage now lives in `src/state/presentation.test.ts` for `look around`, `tell me more about the rooftop market`, and blocked nearby travel toward `Stormglass Causeway`, while preserving the generic no-commit fallback outside authored opening-scene coverage
+  - validation run: `docker compose build app`
+  - validation run: `docker compose run --rm --no-deps app npm run type-check`
+  - validation run: `docker compose run --rm --no-deps app npx tsx --test src/state/**/*.test.ts src/ui/**/*.test.ts`
+  - validation run: `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
 
 ### T73d - Local AI Exploratory Regression Harness
 
@@ -2572,7 +2586,7 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 
 ### T73e - Natural-Language Intent And First-Person Dialogue Parsing
 
-- Status: Ready
+- Status: Done
 - Queue: Next
 - Phase: P1
 - Priority: P1
@@ -2608,6 +2622,12 @@ Closed task cards archived from the pre-`T05` slice live in [BACKLOG_ARCHIVE.md]
 - Handoff Notes:
   - the goal is parser-plus-natural-language, not parser-versus-natural-language
   - keep ambiguous follow-ups truthful: if there is no clear referent or dialogue target, the response should ask for clarification instead of inventing one
+  - completed on 2026-03-13 by adding focused `src/rules/turn-input-classification.test.ts` coverage, extending `src/state/scene-grounding.ts` to resolve `tell me more about that`, `what do you mean`, first-person asks such as `I ask Nila where the power comes from`, and quoted speech such as `"Where does it draw power from?"` when the current actor is clear
+  - deterministic turn coverage now proves parser-style commands still work, referential follow-ups stay grounded to salient authored context, and first-person or quoted NPC speech routes through the same truthful dialogue path without auto-granting state beyond the existing authored progression rules
+  - validation run: `docker compose build app`
+  - validation run: `docker compose run --rm --no-deps app npm run type-check`
+  - validation run: `docker compose run --rm --no-deps app npx tsx --test src/rules/**/*.test.ts src/state/**/*.test.ts`
+  - validation run: `cargo run --manifest-path launcher/Cargo.toml -- test-local-ai-workflow --selection-only`
 
 ### T74 - Open-Ended NPC Conversation And Anti-Loop Dialogue
 

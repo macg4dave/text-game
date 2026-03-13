@@ -1,0 +1,220 @@
+{
+  "locations": [
+    {
+      "id": "rooftop_market",
+      "name": "Rooftop Market",
+      "aliases": ["rooftop market", "market"],
+      "look_text": "Canvas awnings snap over Rooftop Market while a sparking market beacon spits false evacuation orders above the stalls. Nila Vale watches the crowd from beside a rain barrel, and a narrow stairwell drops toward the alleys below.",
+      "look_options": [
+        "Inspect the market beacon",
+        "Ask Nila Vale what she has seen",
+        "Check the narrow stairwell"
+      ],
+      "exits": [
+        {
+          "id": "lantern_walk",
+          "label": "Lantern Walk",
+          "destination": "Lantern Walk",
+          "aliases": [
+            "lantern walk",
+            "go down the stairs",
+            "go down stairs",
+            "go downstairs",
+            "take the stairs",
+            "take the stairwell",
+            "head down the stairwell",
+            "down the stairs",
+            "stairs",
+            "stairwell"
+          ],
+          "hint_aliases": ["down", "go down", "head down"],
+          "travel_text": "You slip down the narrow stairwell beneath the stalls and come out onto Lantern Walk, where the market noise turns into a lower, tighter murmur.",
+          "hint_text": "Down from Rooftop Market means the narrow stairwell to Lantern Walk. If that is where you want to go, take the stairs.",
+          "player_options": [
+            "Look around",
+            "Head back up to Rooftop Market",
+            "Ask who uses Lantern Walk"
+          ]
+        },
+        {
+          "id": "stormglass_causeway",
+          "label": "Stormglass Causeway",
+          "destination": "Stormglass Causeway",
+          "aliases": [
+            "stormglass causeway",
+            "causeway",
+            "head for stormglass causeway",
+            "go to stormglass causeway",
+            "return to stormglass causeway"
+          ],
+          "blocked_text": "Stormglass Causeway is farther out and exposed. From Rooftop Market, the only immediate route in reach is the stairwell down to Lantern Walk.",
+          "required_flags": ["tuning_fork_taken"],
+          "player_options": [
+            "Go down the stairs to Lantern Walk",
+            "Inspect the market beacon",
+            "Ask Nila Vale about the relay"
+          ]
+        }
+      ],
+      "default_focus_referent_id": "market_beacon",
+      "default_actor_referent_id": "nila_vale",
+      "anchors": [
+        {
+          "id": "market_beacon",
+          "label": "market beacon",
+          "aliases": ["market beacon", "beacon", "sparking market beacon", "sparking beacon", "loudspeaker"],
+          "inspect_text": "The market beacon is a jury-rigged loudspeaker bolted to a rusted pole. It keeps throwing false evacuation orders across the market, and a hairline service seam under the housing suggests someone rewired it recently.",
+          "player_options": [
+            "Inspect the market beacon",
+            "Ask Nila Vale about the beacon",
+            "Look around"
+          ],
+          "progress": {
+            "narrative": "You trace the fresh copper splice tucked under the market beacon housing. The loudspeaker is not failing on its own; someone rewired it to pump false evacuation orders through Rooftop Market, which means the Ghostlight Relay is real.",
+            "player_options": [
+              "Ask Nila Vale where the relay draws power",
+              "Look around",
+              "Inspect the exposed wiring"
+            ],
+            "flags_add": ["beacon_inspected"],
+            "memory_updates": [
+              "The market beacon is broadcasting false evacuation orders tied to the Ghostlight Relay."
+            ],
+            "director_end_goal_progress": "Next step: Ask Nila Vale where the relay draws power."
+          }
+        },
+        {
+          "id": "stairwell",
+          "label": "narrow stairwell",
+          "aliases": ["narrow stairwell", "stairwell", "stairs", "down stairs", "stairs down", "narrow stairs"],
+          "inspect_text": "A steep stairwell squeezes between tarped stalls into the alleys below. People keep glancing at it, but the bottleneck looks slow and exposed while the beacon is driving the panic.",
+          "player_options": [
+            "Look around",
+            "Ask Nila Vale what lies below",
+            "Inspect the market beacon"
+          ]
+        }
+      ],
+      "actors": [
+        {
+          "id": "nila_vale",
+          "label": "Nila Vale",
+          "aliases": ["nila vale", "nila", "woman by the rain barrel"],
+          "inspect_text": "Nila Vale stands half-turned toward the beacon with her coat sleeves rolled high and her attention fixed on the crowd. She looks like someone already measuring exits and lies at the same time.",
+          "player_options": [
+            "Ask Nila Vale about the Ghostlight Relay",
+            "Ask Nila Vale about the beacon",
+            "Look around"
+          ],
+          "topics": [
+            {
+              "id": "ghostlight_relay",
+              "topic": "Ghostlight Relay",
+              "aliases": ["ghostlight relay", "relay"],
+              "response_text": "Nila keeps her voice low and jerks her chin toward Stormglass Causeway. \"That is where the relay draws power. Follow that line and you will find the route in.\"",
+              "blocked_text": "Nila flicks her gaze back to the beacon. \"Start with the loudspeaker. Know what it is doing before you ask who profits from it.\"",
+              "required_flags": ["beacon_inspected"],
+              "player_options": [
+                "Inspect the market beacon",
+                "Ask Nila Vale about the beacon",
+                "Look around"
+              ],
+              "progress": {
+                "narrative": "Nila keeps her voice low and jerks her chin toward Stormglass Causeway. \"That is where the relay draws power. Follow that line and you will find the route in. The tuning fork you need is stashed in the Closed Stacks.\"",
+                "player_options": [
+                  "Head for the Closed Stacks",
+                  "Ask Nila Vale about the beacon",
+                  "Look around"
+                ],
+                "required_flags": ["beacon_inspected"],
+                "flags_add": ["nila_guidance"],
+                "memory_updates": [
+                  "Nila Vale shared that the relay draws power through Stormglass Causeway and pointed the player toward the Closed Stacks."
+                ],
+                "director_end_goal_progress": "Next step: Recover the tuning fork from the Closed Stacks."
+              }
+            },
+            {
+              "id": "market_beacon",
+              "topic": "market beacon",
+              "aliases": ["market beacon", "beacon", "evacuation orders"],
+              "response_text": "Nila taps the rain barrel with two fingers. \"It started screaming evacuation orders before dawn. Too regular to be a fault, too pointed to be random.\"",
+              "player_options": [
+                "Inspect the market beacon",
+                "Ask Nila Vale about the Ghostlight Relay",
+                "Look around"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "id": "lantern_walk",
+      "name": "Lantern Walk",
+      "aliases": ["lantern walk", "walk below the market", "lower walk"],
+      "look_text": "Lantern Walk runs below the market awnings in a narrow ribbon of damp stone. Light leaks through the slats overhead, the stairwell climbs back up to Rooftop Market, and shuttered service doors mark the way toward the Closed Stacks.",
+      "look_options": [
+        "Head back up to Rooftop Market",
+        "Inspect the shuttered service doors",
+        "Look around"
+      ],
+      "default_focus_referent_id": "service_doors",
+      "exits": [
+        {
+          "id": "rooftop_market",
+          "label": "Rooftop Market",
+          "destination": "Rooftop Market",
+          "aliases": [
+            "rooftop market",
+            "go back up",
+            "head back up",
+            "back upstairs",
+            "return to rooftop market",
+            "go upstairs"
+          ],
+          "travel_text": "You climb the stairwell back into Rooftop Market, where the beacon is still shouting over the stalls.",
+          "player_options": [
+            "Look around",
+            "Inspect the market beacon",
+            "Ask Nila Vale what she has seen"
+          ]
+        },
+        {
+          "id": "closed_stacks",
+          "label": "Closed Stacks",
+          "destination": "Closed Stacks",
+          "aliases": [
+            "closed stacks",
+            "head for the closed stacks",
+            "go to the closed stacks",
+            "service doors",
+            "shuttered doors"
+          ],
+          "required_flags": ["nila_guidance"],
+          "travel_text": "You follow Nila's route along Lantern Walk and slip through the shuttered service doors into the Closed Stacks.",
+          "blocked_text": "The service doors all look half-abandoned from Lantern Walk. Without Nila's route, you cannot tell which one still reaches the Closed Stacks.",
+          "player_options": [
+            "Head back up to Rooftop Market",
+            "Look around",
+            "Inspect the shuttered service doors"
+          ]
+        }
+      ],
+      "anchors": [
+        {
+          "id": "service_doors",
+          "label": "shuttered service doors",
+          "aliases": ["service doors", "shuttered doors", "doors"],
+          "inspect_text": "The doors along Lantern Walk are tagged with old stock marks and storm wards. Most are sealed shut, but one has cleaner hinges than the rest.",
+          "player_options": [
+            "Head back up to Rooftop Market",
+            "Head for the Closed Stacks",
+            "Look around"
+          ]
+        }
+      ]
+    }
+  ]
+}

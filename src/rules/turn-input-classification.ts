@@ -9,8 +9,9 @@ const INTERNAL_TOKEN_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)+$/i;
 const CLARIFICATION_PATTERNS = [
   /^(?:what|who|where|when|why)\b/i,
   /^(?:what's|who's|where's)\b/i,
+  /^what do you mean\b/i,
   /^how (?:do|can|should) i\b/i,
-  /^tell me about\b/i,
+  /^tell me(?: more)? about\b/i,
   /^remind me\b/i,
   /^describe\b/i,
   /^explain\b/i

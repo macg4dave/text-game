@@ -5,6 +5,7 @@ import {
   listReachableQuestLocations,
   resolveQuestUpdates
 } from "../story/quest.js";
+import { isSceneLocationReachable } from "../story/scene-travel.js";
 
 export interface ResolveSimulationStateUpdatesParams {
   player: Player;
@@ -102,6 +103,10 @@ function resolveAcceptedLocation({
   }
 
   const reachableLocations = listReachableQuestLocations(questSpec, flags);
+  if (isSceneLocationReachable({ currentLocation, proposedLocation: trimmedLocation, flags })) {
+    return trimmedLocation;
+  }
+
   if (!reachableLocations.length) {
     return trimmedLocation;
   }

@@ -1,4 +1,5 @@
 import type { AcceptedTurnConsequences, Player, TurnOutputPayload } from "../core/types.js";
+import { buildExploratoryFallbackPresentation } from "./exploratory-fallback.js";
 
 export const DRIFT_RECONCILED_PLAYER_OPTIONS = [
   "Look around",
@@ -8,6 +9,7 @@ export const DRIFT_RECONCILED_PLAYER_OPTIONS = [
 
 export interface ReconcileTurnPresentationParams {
   player: Player;
+  input: string;
   proposedTurnOutput: TurnOutputPayload;
   acceptedConsequences: AcceptedTurnConsequences;
   nextPlayer: Player;
@@ -15,10 +17,24 @@ export interface ReconcileTurnPresentationParams {
 
 export function reconcileTurnPresentation({
   player,
+  input,
   proposedTurnOutput,
   acceptedConsequences,
   nextPlayer
 }: ReconcileTurnPresentationParams): TurnOutputPayload {
+  const exploratoryFallback = buildExploratoryFallbackPresentation({
+    player,
+    input
+  });
+
+  if (shouldUseExploratoryFallback(proposedTurnOutput, acceptedConsequences, exploratoryFallback)) {
+    return {
+      ...proposedTurnOutput,
+      narrative: exploratoryFallback.narrative,
+      player_options: exploratoryFallback.playerOptions
+    };
+  }
+
   if (!hasPresentationDrift(player, proposedTurnOutput, acceptedConsequences, nextPlayer)) {
     return proposedTurnOutput;
   }
@@ -28,6 +44,27 @@ export function reconcileTurnPresentation({
     narrative: buildCommittedNarrative(player, nextPlayer, acceptedConsequences),
     player_options: [...DRIFT_RECONCILED_PLAYER_OPTIONS]
   };
+}
+
+function shouldUseExploratoryFallback(
+  proposedTurnOutput: TurnOutputPayload,
+  acceptedConsequences: AcceptedTurnConsequences,
+  exploratoryFallback: ReturnType<typeof buildExploratoryFallbackPresentation>
+): exploratoryFallback is NonNullable<ReturnType<typeof buildExploratoryFallbackPresentation>> {
+  if (!exploratoryFallback) {
+    return false;
+  }
+
+  if (acceptedConsequences.state_updates || acceptedConsequences.director_updates || acceptedConsequences.memory_updates.length) {
+    return false;
+  }
+
+  const narrative = proposedTurnOutput.narrative.trim();
+  if (!narrative) {
+    return true;
+  }
+
+  return /^you pause in\b/i.test(narrative) || /nothing else changes yet/i.test(narrative);
 }
 
 function hasPresentationDrift(

@@ -55,6 +55,8 @@ import { sanitizeTurnResult } from "./turn-result.js";
 import { getCurrentBeat } from "../story/director.js";
 import { classifyTurnInput, freezesTurnProgress } from "../rules/turn-input-classification.js";
 import { validateStateUpdates, validateTurnOutput } from "../rules/validator.js";
+import { tryResolveSceneGroundingTurn } from "./scene-grounding.js";
+import { resolveSimulationStateUpdates } from "./simulation.js";
 
 export interface TurnExecutionTrace {
   input: string;
@@ -186,36 +188,55 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
       const trace = createTurnExecutionTrace(input);
       trace.player = player;
       const inputClassification = classifyTurnInput(input);
+      let usedSceneGrounding = false;
 
       try {
         deps.addEvent(player.id, "player", input);
         trace.shortHistory = deps.getShortHistory(player.id, 6);
 
-        try {
-          trace.inputEmbedding = await deps.getEmbedding({ model: embeddingModel, input });
-        } catch (error) {
-          trace.inputEmbedding = [];
-          trace.inputEmbeddingError = getErrorMessage(error);
-        }
-
-        trace.liveContext = createLiveTurnContext({
+        const groundedTurn = tryResolveSceneGroundingTurn({
           player,
-          shortHistory: deps.getShortHistory(player.id, 6),
-          recalledMemories: deps.getRelevantMemories(player.id, trace.inputEmbedding, 6)
+          input,
+          shortHistory: trace.shortHistory
         });
-        trace.shortHistory = trace.liveContext.buckets.short_history;
-        trace.memories = trace.liveContext.recalled_facts;
-        trace.statePack = createStatePack(player, directorSpec, questSpec);
 
-        trace.rawResult = await deps.generateTurn({
-          model,
-          systemPrompt,
-          statePack: trace.statePack,
-          shortHistory: trace.shortHistory,
-          memories: trace.memories,
-          liveContext: trace.liveContext,
-          input
-        });
+        if (groundedTurn) {
+          usedSceneGrounding = true;
+          trace.rawResult = {
+            ...groundedTurn,
+            state_updates: resolveSimulationStateUpdates({
+              player,
+              proposed: groundedTurn.state_updates,
+              questSpec
+            })
+          };
+        } else {
+          try {
+            trace.inputEmbedding = await deps.getEmbedding({ model: embeddingModel, input });
+          } catch (error) {
+            trace.inputEmbedding = [];
+            trace.inputEmbeddingError = getErrorMessage(error);
+          }
+
+          trace.liveContext = createLiveTurnContext({
+            player,
+            shortHistory: deps.getShortHistory(player.id, 6),
+            recalledMemories: deps.getRelevantMemories(player.id, trace.inputEmbedding, 6)
+          });
+          trace.shortHistory = trace.liveContext.buckets.short_history;
+          trace.memories = trace.liveContext.recalled_facts;
+          trace.statePack = createStatePack(player, directorSpec, questSpec);
+
+          trace.rawResult = await deps.generateTurn({
+            model,
+            systemPrompt,
+            statePack: trace.statePack,
+            shortHistory: trace.shortHistory,
+            memories: trace.memories,
+            liveContext: trace.liveContext,
+            input
+          });
+        }
 
         const sanitizedResult = {
           schema_version: TURN_OUTPUT_SCHEMA_VERSION,
@@ -316,6 +337,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           questSpec
         });
         const { acceptedConsequences, resolvedDirectorState: directorState } = adjudication;
+        const hasCommittedContent = hasCommittedSummaryArtifactContent(acceptedConsequences);
         const reducedState = reduceCommittedPlayerState({
           player,
           acceptedConsequences,
@@ -324,6 +346,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
 
         trace.result = reconcileTurnPresentation({
           player,
+          input,
           proposedTurnOutput: trace.proposedResult,
           acceptedConsequences,
           nextPlayer: reducedState.player
@@ -372,15 +395,17 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           );
         }
 
-        const derivedEncounterFacts = await deps.deriveNpcEncounterFacts({
-          player,
-          nextPlayer: reducedState.player,
-          input,
-          turnOutput: trace.result,
-          acceptedConsequences,
-          sourceEventId: trace.committedEvent.event_id,
-          occurredAt: trace.committedEvent.occurred_at
-        });
+        const derivedEncounterFacts = (hasCommittedContent || !usedSceneGrounding)
+          ? await deps.deriveNpcEncounterFacts({
+              player,
+              nextPlayer: reducedState.player,
+              input,
+              turnOutput: trace.result,
+              acceptedConsequences,
+              sourceEventId: trace.committedEvent.event_id,
+              occurredAt: trace.committedEvent.occurred_at
+            })
+          : [];
         if (derivedEncounterFacts.length) {
           const encounterMemoryInserts = derivedEncounterFacts.flatMap((fact) => {
             const previousFacts = deps.getNpcEncounterFacts(player.id, fact.npc_id);
@@ -415,7 +440,7 @@ export function createTurnService(overrides: Partial<TurnServiceDependencies> = 
           }
         }
 
-        if (trace.committedEvent && hasCommittedSummaryArtifactContent(acceptedConsequences)) {
+        if (trace.committedEvent && hasCommittedContent) {
           const summaryArtifacts: MemorySummaryArtifact[] = [];
           const sceneSummaryArtifact = buildSceneSummaryArtifact({
             player,
